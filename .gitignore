@@ -31,7 +31,14 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
+
+# local database & scratch
+*.db
+scratch_*.py
+check_brackets.py
+__pycache__/
 
 # typescript
 *.tsbuildinfo

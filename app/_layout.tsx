@@ -13,7 +13,7 @@ export {
 
 export const unstable_settings = {
   // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
+  initialRouteName: 'index',
 };
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -42,15 +42,38 @@ export default function RootLayout() {
   return <RootLayoutNav />;
 }
 
+import { AuthProvider } from '../src/context/AuthContext';
+import { SportProvider } from '../src/context/SportContext';
+import { RoleProvider } from '../src/context/RoleContext';
+import { ReviewProvider } from '../src/context/ReviewContext';
+import { ContextSelector } from '../src/components/ui/ContextSelector';
+import { REVIEW_MODE } from '../src/config/reviewMode';
+import { useRouter, useSegments } from 'expo-router';
+
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
+  const router = useRouter();
+  const segments = useSegments();
+
+
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
+    <AuthProvider>
+      <SportProvider>
+        <RoleProvider>
+          <ReviewProvider>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <Stack>
+                <Stack.Screen name="index" options={{ headerShown: false }} />
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
+                <Stack.Screen name="review-center" options={{ headerShown: false, presentation: 'modal' }} />
+              </Stack>
+            </ThemeProvider>
+          </ReviewProvider>
+        </RoleProvider>
+      </SportProvider>
+    </AuthProvider>
   );
 }
