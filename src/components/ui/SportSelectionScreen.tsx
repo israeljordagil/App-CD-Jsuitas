@@ -116,7 +116,7 @@ export function SportSelectionScreen() {
     // Flotación suave de balones
     Animated.loop(
       Animated.sequence([
-        Animated.timing(floatAnim, { toValue: -6, duration: 2000, useNativeDriver: true }),
+        Animated.timing(floatAnim, { toValue: -4, duration: 2000, useNativeDriver: true }),
         Animated.timing(floatAnim, { toValue: 0, duration: 2000, useNativeDriver: true }),
       ])
     ).start();
@@ -187,16 +187,16 @@ export function SportSelectionScreen() {
         {/* ACCESO RÁPIDO PROBAR ENTRENADOR */}
         <TouchableOpacity style={styles.quickCoachBanner} onPress={() => loginAsCoachInfantilA()}>
           <LinearGradient colors={['#22c55e', '#15803d']} start={{x:0, y:0}} end={{x:1, y:0}} style={styles.quickCoachGradient}>
-            <Text style={{fontSize: 20, marginRight: 8}}>👨‍🏫</Text>
+            <Text style={{fontSize: 18, marginRight: 8}}>👨‍🏫</Text>
             <View style={{flex: 1}}>
               <Text style={styles.quickCoachTitle}>Acceso de Prueba: Entrenador Infantil A</Text>
               <Text style={styles.quickCoachSub}>Entra directo al panel táctico y plantilla del Infantil A</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#fff" />
+            <Ionicons name="chevron-forward" size={18} color="#fff" />
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* PARRILLA RESPONSIVA DE DEPORTES */}
+        {/* PARRILLA RESPONSIVA DE DEPORTES COMPACTA */}
         <Text style={styles.sectionLabel}>NUESTROS 4 DEPORTES</Text>
         
         <View style={[styles.sportsGrid, isTablet && styles.sportsGridTablet]}>
@@ -212,7 +212,7 @@ export function SportSelectionScreen() {
                   <ImageBackground source={sport.bgImage} style={styles.cardBgImage} resizeMode="cover">
                     <LinearGradient colors={sport.gradientColors} style={StyleSheet.absoluteFillObject} />
                     
-                    {/* Header de la tarjeta */}
+                    {/* Header compacto de la tarjeta (Categoría y Avisos) */}
                     <View style={styles.cardHeader}>
                       <View style={styles.badgeCategory}>
                         <Text style={styles.badgeCategoryText}>{sport.category}</Text>
@@ -224,29 +224,30 @@ export function SportSelectionScreen() {
                       )}
                     </View>
 
-                    {/* Icono 3D flotante en centro exacto del círculo */}
-                    <Animated.View style={[styles.ballContainer, { transform: [{ translateY: floatAnim }] }]}>
-                      <View style={styles.ballCircleContainer}>
-                        <Image source={sport.image3D} style={styles.ball3DImage} resizeMode="contain" />
+                    {/* Fila Central: Nombre del Deporte + Descripción en 1 línea + Balón 3D Compacto */}
+                    <View style={styles.cardMainRow}>
+                      <View style={styles.cardTextCol}>
+                        <Text style={styles.sportTitle}>{sport.label}</Text>
+                        <Text style={styles.sportDesc} numberOfLines={1}>{sport.description}</Text>
                       </View>
-                    </Animated.View>
 
-                    {/* Título y Detalles */}
-                    <View style={styles.cardBody}>
-                      <Text style={styles.sportTitle}>{sport.label}</Text>
-                      <Text style={styles.sportDesc} numberOfLines={2}>{sport.description}</Text>
-
-                      {/* Próxima Actividad */}
-                      <View style={styles.nextEventBox}>
-                        <Ionicons name="calendar-outline" size={12} color={colors.skyPrimary} />
-                        <Text style={styles.nextEventText} numberOfLines={1}>{sport.nextEvent}</Text>
-                      </View>
+                      <Animated.View style={[styles.ballContainer, { transform: [{ translateY: floatAnim }] }]}>
+                        <View style={styles.ballCircleContainer}>
+                          <Image source={sport.image3D} style={styles.ball3DImage} resizeMode="contain" />
+                        </View>
+                      </Animated.View>
                     </View>
 
-                    {/* Botón Acción Entrar */}
+                    {/* Próximo Evento en Franja Compacta */}
+                    <View style={styles.nextEventBox}>
+                      <Ionicons name="calendar-outline" size={11} color={colors.skyPrimary} />
+                      <Text style={styles.nextEventText} numberOfLines={1}>{sport.nextEvent}</Text>
+                    </View>
+
+                    {/* Botón Acceder Compacto */}
                     <View style={[styles.enterBtn, { backgroundColor: sport.colorAccent }]}>
                       <Text style={styles.enterBtnText}>ACCEDER</Text>
-                      <FontAwesome name="arrow-right" size={12} color="#fff" />
+                      <FontAwesome name="arrow-right" size={11} color="#fff" />
                     </View>
                   </ImageBackground>
                 </View>
@@ -277,14 +278,14 @@ const styles = StyleSheet.create({
     width: '100%'
   },
   contentContainer: { 
-    paddingTop: Platform.OS === 'ios' ? 60 : 40, 
-    paddingBottom: 60, 
+    paddingTop: Platform.OS === 'ios' ? 50 : 30, 
+    paddingBottom: 40, 
     paddingHorizontal: 16,
     minHeight: '100%'
   },
   contentContainerTablet: { 
     paddingHorizontal: 40, 
-    maxWidth: 1100, 
+    maxWidth: 960, 
     alignSelf: 'center', 
     width: '100%' 
   },
@@ -292,110 +293,106 @@ const styles = StyleSheet.create({
   // BARRA DE CONTEXTO SUPERIOR
   topContextBar: {
     backgroundColor: colors.navyCard,
-    borderRadius: 20,
-    padding: 12,
-    marginBottom: 20,
+    borderRadius: 16,
+    padding: 10,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: colors.borderGlow,
     flexDirection: 'column',
-    gap: 12,
+    gap: 8,
   },
   userInfoRow: { flexDirection: 'row', alignItems: 'center' },
   userAvatarBadge: {
-    width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center', alignItems: 'center', marginRight: 10
+    width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center', alignItems: 'center', marginRight: 8
   },
-  userGreeting: { fontSize: 11, color: colors.textMuted, fontWeight: '600' },
-  userName: { fontSize: 15, color: colors.white, fontWeight: '900' },
+  userGreeting: { fontSize: 10, color: colors.textMuted, fontWeight: '600' },
+  userName: { fontSize: 14, color: colors.white, fontWeight: '900' },
 
   roleBadgesGroup: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   rolePill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12,
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)'
   },
   rolePillActive: { backgroundColor: colors.navyDeep, borderColor: colors.skyPrimary },
-  rolePillText: { fontSize: 11, fontWeight: '700', color: colors.textMuted },
+  rolePillText: { fontSize: 10, fontWeight: '700', color: colors.textMuted },
   rolePillTextActive: { color: colors.skyPrimary, fontWeight: '900' },
 
   // HERO HEADER
-  heroHeader: { alignItems: 'center', marginBottom: 24 },
-  escudoWrapper: { width: 90, height: 90, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  escudoImage: { width: 80, height: 80 },
+  heroHeader: { alignItems: 'center', marginBottom: 16 },
+  escudoWrapper: { width: 70, height: 70, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  escudoImage: { width: 64, height: 64 },
 
-  heroTitle: { fontSize: 26, fontWeight: '900', color: colors.white, letterSpacing: 2, textAlign: 'center' },
+  heroTitle: { fontSize: 22, fontWeight: '900', color: colors.white, letterSpacing: 2, textAlign: 'center' },
   mottoBadge: {
-    backgroundColor: 'rgba(79, 195, 247, 0.15)', paddingHorizontal: 12, paddingVertical: 4,
-    borderRadius: 12, marginTop: 6, borderWidth: 1, borderColor: 'rgba(79, 195, 247, 0.3)'
+    backgroundColor: 'rgba(79, 195, 247, 0.15)', paddingHorizontal: 10, paddingVertical: 3,
+    borderRadius: 10, marginTop: 4, borderWidth: 1, borderColor: 'rgba(79, 195, 247, 0.3)'
   },
-  mottoText: { fontSize: 10, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 1 },
-  heroSub: { fontSize: 13, color: colors.textMuted, marginTop: 8, textAlign: 'center', fontWeight: '500' },
+  mottoText: { fontSize: 9, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 0.8 },
+  heroSub: { fontSize: 12, color: colors.textMuted, marginTop: 6, textAlign: 'center', fontWeight: '500' },
 
   // BANNER RAPIDO COACH
-  quickCoachBanner: { marginBottom: 24, borderRadius: 16, overflow: 'hidden' },
-  quickCoachGradient: { flexDirection: 'row', alignItems: 'center', padding: 14 },
-  quickCoachTitle: { color: '#fff', fontSize: 14, fontWeight: '900' },
-  quickCoachSub: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '600' },
+  quickCoachBanner: { marginBottom: 16, borderRadius: 14, overflow: 'hidden' },
+  quickCoachGradient: { flexDirection: 'row', alignItems: 'center', padding: 10 },
+  quickCoachTitle: { color: '#fff', fontSize: 13, fontWeight: '900' },
+  quickCoachSub: { color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '600' },
 
-  sectionLabel: { fontSize: 12, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 1.5, marginBottom: 16, textAlign: 'center' },
+  sectionLabel: { fontSize: 11, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 1.5, marginBottom: 12, textAlign: 'center' },
 
-  // PARRILLA RESPONSIVA
-  sportsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, justifyContent: 'center' },
-  sportsGridTablet: { gap: 20 },
+  // PARRILLA RESPONSIVA COMPACTA (2 COLUMNAS TAB / 1 COLUMNA MÓVIL)
+  sportsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
+  sportsGridTablet: { gap: 14 },
 
-  cardContainer: { width: '100%', borderRadius: 24, overflow: 'hidden' },
+  cardContainer: { width: '100%', borderRadius: 18, overflow: 'hidden' },
   cardContainerTablet: { width: '48%' },
 
   cardFrame: {
-    borderRadius: 24, borderWidth: 1, borderColor: colors.borderGlow,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 6
+    borderRadius: 18, borderWidth: 1, borderColor: colors.borderGlow,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 4
   },
-  cardBgImage: { padding: 16, minHeight: 230, justifyContent: 'space-between' },
+  cardBgImage: { padding: 12, justifyContent: 'space-between' },
 
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 },
-  badgeCategory: { backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
-  badgeCategoryText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  badgeCategory: { backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  badgeCategoryText: { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
 
-  unreadBadge: { backgroundColor: colors.accentGold, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
-  unreadBadgeText: { color: '#000', fontSize: 9, fontWeight: '900' },
+  unreadBadge: { backgroundColor: colors.accentGold, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8 },
+  unreadBadgeText: { color: '#000', fontSize: 8, fontWeight: '900' },
 
-  ballContainer: { width: '100%', alignItems: 'center', justifyContent: 'center', marginVertical: 6 },
+  // FILA PRINCIPAL: TEXTOS A LA IZQUIERDA, EMOJI/BALÓN COMPACTO A LA DERECHA
+  cardMainRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 },
+  cardTextCol: { flex: 1 },
+  sportTitle: { fontSize: 17, fontWeight: '900', color: '#fff', letterSpacing: 0.8 },
+  sportDesc: { fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 15, fontWeight: '500', marginTop: 2 },
+
+  ballContainer: { justifyContent: 'center', alignItems: 'center' },
   ballCircleContainer: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(0, 0, 0, 0.25)',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
-    alignSelf: 'center',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4
+    overflow: 'hidden'
   },
-  ball3DImage: { width: 58, height: 58, alignSelf: 'center' },
-
-  cardBody: { gap: 4 },
-  sportTitle: { fontSize: 20, fontWeight: '900', color: '#fff', letterSpacing: 1 },
-  sportDesc: { fontSize: 12, color: 'rgba(255,255,255,0.85)', lineHeight: 16, fontWeight: '500' },
+  ball3DImage: { width: 36, height: 36 },
 
   nextEventBox: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginTop: 4
+    backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginBottom: 8
   },
-  nextEventText: { fontSize: 11, color: colors.skyGlow, fontWeight: '700' },
+  nextEventText: { fontSize: 10, color: colors.skyGlow, fontWeight: '700' },
 
   enterBtn: {
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8,
-    paddingVertical: 12, borderRadius: 14, marginTop: 8
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6,
+    paddingVertical: 7, borderRadius: 10
   },
-  enterBtnText: { color: '#fff', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
+  enterBtnText: { color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
 
-  footer: { marginTop: 40, alignItems: 'center', paddingBottom: 20 },
-  footerClub: { color: colors.white, fontSize: 12, fontWeight: '800' },
-  footerCopy: { color: colors.textMuted, fontSize: 10, marginTop: 2 }
+  footer: { marginTop: 24, alignItems: 'center', paddingBottom: 16 },
+  footerClub: { color: colors.white, fontSize: 11, fontWeight: '800' },
+  footerCopy: { color: colors.textMuted, fontSize: 9, marginTop: 2 }
 });
