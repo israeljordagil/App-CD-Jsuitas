@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { useAuth, ActiveContextType } from '../../context/AuthContext';
 import { useSport } from '../../context/SportContext';
+import { useRole } from '../../context/RoleContext';
 
 const TABS: { id: ActiveContextType; label: string; icon: string }[] = [
   { id: 'FAMILIA', label: 'FAMILIA', icon: '👨‍👩‍👧' },
@@ -12,12 +13,20 @@ const TABS: { id: ActiveContextType; label: string; icon: string }[] = [
 
 export function ContextSelector() {
   const { user, activeContext, switchContext } = useAuth();
+  const { role, setRole } = useRole();
   const { sport } = useSport();
 
-  // Si no hay deporte seleccionado, o no hay usuario, ocultar la barra superior
   if (!sport || !user) {
     return null;
   }
+
+  const handleSelectTab = (tabId: ActiveContextType) => {
+    switchContext(tabId);
+    if (tabId === 'FAMILIA') setRole('familias');
+    else if (tabId === 'JUGADOR') setRole('jugadores');
+    else if (tabId === 'ENTRENADOR') setRole('entrenadores');
+    else if (tabId === 'COORDINADOR') setRole('coordinadores');
+  };
 
   return (
     <View style={styles.container}>
@@ -27,12 +36,12 @@ export function ContextSelector() {
         contentContainerStyle={styles.scrollContent}
       >
         {TABS.map((tab) => {
-          const isActive = activeContext === tab.id;
+          const isActive = activeContext === tab.id || (role === 'jugadores' && tab.id === 'JUGADOR') || (role === 'familias' && tab.id === 'FAMILIA');
           return (
             <TouchableOpacity 
               key={tab.id}
               style={[styles.tab, isActive && styles.tabActive]}
-              onPress={() => switchContext(tab.id)}
+              onPress={() => handleSelectTab(tab.id)}
               activeOpacity={0.7}
             >
               <Text style={styles.tabIcon}>{tab.icon}</Text>
@@ -49,8 +58,8 @@ export function ContextSelector() {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#0B1F4D', // Azul marino corporativo
-    paddingTop: Platform.OS === 'ios' ? 50 : 20, // Manejo del notch/status bar
+    backgroundColor: '#0B1F4D',
+    paddingTop: Platform.OS === 'ios' ? 50 : 20,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
     zIndex: 100,
@@ -71,7 +80,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   tabActive: {
-    backgroundColor: '#4FC3F7', // Celeste
+    backgroundColor: '#4FC3F7',
     borderColor: '#FFFFFF',
     shadowColor: '#4FC3F7',
     shadowOffset: { width: 0, height: 2 },

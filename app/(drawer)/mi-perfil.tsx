@@ -1,6 +1,6 @@
 import React from 'react';
-import { PendingScreen } from '../../src/components/ui/PendingScreen';
+import MiPerfilPlayerScreen from './jugador/perfil';
 
 export default function MiPerfilScreen() {
-  return <PendingScreen title="Mi Perfil" />;
+  return <MiPerfilPlayerScreen />;
 }

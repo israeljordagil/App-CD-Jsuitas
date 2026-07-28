@@ -1,366 +1,195 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { FontAwesome } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { colors, spacing } from '../../../src/utils/theme';
-import { AnimatedCard as Card } from '../../../src/components/ui/AnimatedCard';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  TouchableOpacity, 
+  Image, 
+  useWindowDimensions 
+} from 'react-native';
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { PremiumHeader } from '../../../src/components/ui/PremiumHeader';
 
-const INITIAL_CHECKLIST = [
-  { id: '1', text: 'Botas', checked: false },
-  { id: '2', text: 'Espinilleras', checked: false },
-  { id: '3', text: 'Equipación completa', checked: false },
-  { id: '4', text: 'Botella de agua', checked: false },
-  { id: '5', text: 'Llegar 45 minutos antes', checked: false },
-  { id: '6', text: 'Avisar si hay problema', checked: false },
-];
+// Colores corporativos de lujo
+const colors = {
+  navyDark: '#071A3D',
+  navyCard: '#0B224F',
+  skyPrimary: '#4FC3F7',
+  skyGlow: '#81D4FA',
+  accentGold: '#F59E0B',
+  goldLight: '#FDE047',
+  accentGreen: '#10B981',
+  accentRed: '#EF4444',
+  white: '#FFFFFF',
+  textMuted: '#94A3B8',
+  borderGlow: 'rgba(79, 195, 247, 0.25)',
+};
 
-const MOCK_TEAMMATES = [
-  { id: 1, name: 'Lucas P.', dorsal: 1, pos: 'POR', status: 'Convocado', avatar: 'https://i.pravatar.cc/100?u=lucas' },
-  { id: 2, name: 'Marcos R.', dorsal: 4, pos: 'DEF', status: 'Convocado', avatar: 'https://i.pravatar.cc/100?u=marcos' },
-  { id: 3, name: 'David G.', dorsal: 5, pos: 'DEF', status: 'Convocado', avatar: 'https://i.pravatar.cc/100?u=david' },
-  { id: 4, name: 'Héctor M.', dorsal: 8, pos: 'MED', status: 'Convocado', avatar: 'https://i.pravatar.cc/100?u=hector' },
-  { id: 5, name: 'Pablo M.', dorsal: 9, pos: 'DEL', status: 'Convocado', avatar: 'https://i.pravatar.cc/100?u=pablo' },
-  { id: 6, name: 'Dani G.', dorsal: 10, pos: 'MED', status: 'Convocado', avatar: 'https://i.pravatar.cc/100?u=dani' },
-];
-
-const MOCK_HISTORY = [
-  { id: 1, match: 'vs Villarreal', date: 'Hace 1 semana', status: 'Convocado Titular' },
-  { id: 2, match: 'vs Elche CF', date: 'Hace 2 semanas', status: 'Convocado Suplente' },
-  { id: 3, match: 'vs CD Castellón', date: 'Hace 3 semanas', status: 'No Convocado' },
-  { id: 4, match: 'vs Hércules', date: 'Hace 4 semanas', status: 'Convocado Titular' },
-  { id: 5, match: 'vs Alcoyano', date: 'Hace 5 semanas', status: 'Pendiente' },
+const MOCK_TEAMMATES_CONVOCADOS = [
+  { dorsal: 1, nombre: 'Marc Valls', pos: 'Portero' },
+  { dorsal: 4, nombre: 'Adrián García', pos: 'Defensa Central' },
+  { dorsal: 7, nombre: 'Santi Giménez', pos: 'Centrocampista' },
+  { dorsal: 9, nombre: 'Lucas Martínez', pos: 'Delantero' },
+  { dorsal: 10, nombre: 'Pablo Martínez', pos: 'Mediapunta (TÚ)' },
+  { dorsal: 11, nombre: 'Mateo Roldán', pos: 'Extremo Izquierdo' },
+  { dorsal: 14, nombre: 'Hugo López', pos: 'Lateral Izquierdo' },
+  { dorsal: 18, nombre: 'Diego Sanz', pos: 'Centrocampista' },
 ];
 
 export default function ConvocatoriasJugadorScreen() {
-  const router = useRouter();
-  const [checklist, setChecklist] = useState(INITIAL_CHECKLIST);
+  const { width: screenWidth } = useWindowDimensions();
+  const isTablet = screenWidth >= 768;
 
-  const toggleCheck = (id: string) => {
-    setChecklist(prev => prev.map(item => item.id === id ? { ...item, checked: !item.checked } : item));
+  // CHECKLIST MOCHILA JUGADOR
+  const [backpack, setBackpack] = useState({
+    boots: true,
+    shinGuards: true,
+    matchKit: true,
+    waterBottle: false,
+    tracksuit: true,
+  });
+
+  const toggleItem = (key: keyof typeof backpack) => {
+    setBackpack(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <View style={{ flex: 1, backgroundColor: colors.navyDark }}>
+      <PremiumHeader 
+        title="4. CONVOCATORIAS" 
+        subtitle="ESTADO PERSONAL Y LISTA DEL EQUIPO"
+        showSearchAndActions={false}
+        showAvatar={false}
+      />
+
+      <ScrollView style={styles.container} contentContainerStyle={[styles.content, isTablet && styles.contentTablet]} showsVerticalScrollIndicator={false}>
         
-        {/* CABECERA (Volver) */}
-        <View style={styles.topNav}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <FontAwesome name="arrow-left" size={20} color={colors.white} />
+        {/* 1. TARJETA PRINCIPAL DEL ESTADO DE LA CONVOCATORIA */}
+        <View style={styles.statusHeroCard}>
+          <LinearGradient colors={['rgba(16, 185, 129, 0.25)', 'rgba(11, 34, 79, 0.98)']} style={styles.statusGradient}>
+            <View style={styles.statusHeaderRow}>
+              <View style={styles.statusIconCircle}>
+                <Ionicons name="checkmark-circle" size={36} color={colors.accentGreen} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.statusTitle}>⭐ ¡ESTÁS CONVOCADO!</Text>
+                <Text style={styles.statusSub}>El míster cuenta contigo para la Jornada 9 vs Levante UD B.</Text>
+              </View>
+            </View>
+
+            <View style={styles.matchDetailBanner}>
+              <Text style={styles.matchTitle}>CD Jesuitas Cadete B vs Levante UD B</Text>
+              <Text style={styles.matchDate}>📅 Sábado 1 Noviembre • 10:00h</Text>
+              <Text style={styles.matchLoc}>📍 Campo 1 - Polideportivo San José (Local)</Text>
+              <Text style={styles.citationBadge}>🏷️ Citación equipo: 09:15h en Vestuario 2</Text>
+            </View>
+          </LinearGradient>
+        </View>
+
+        {/* 2. MOCHILA DEL PARTIDO (CHECKLIST INTERACTIVO) */}
+        <Text style={styles.sectionTitle}>🎒 CHECKLIST PARA MI MOCHILA DEL PARTIDO</Text>
+        <View style={styles.backpackCard}>
+          <TouchableOpacity style={styles.checkItemRow} onPress={() => toggleItem('boots')}>
+            <Ionicons name={backpack.boots ? "checkbox" : "square-outline"} size={20} color={backpack.boots ? colors.accentGreen : colors.textMuted} />
+            <Text style={[styles.checkItemTxt, backpack.boots && styles.checkItemDone]}>Botas de Tacos de Goma</Text>
           </TouchableOpacity>
-          <Text style={styles.topNavTitle}>CONVOCATORIA</Text>
-          <View style={{ width: 40 }} />
+
+          <TouchableOpacity style={styles.checkItemRow} onPress={() => toggleItem('shinGuards')}>
+            <Ionicons name={backpack.shinGuards ? "checkbox" : "square-outline"} size={20} color={backpack.shinGuards ? colors.accentGreen : colors.textMuted} />
+            <Text style={[styles.checkItemTxt, backpack.shinGuards && styles.checkItemDone]}>Espinilleras Oficiales</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.checkItemRow} onPress={() => toggleItem('matchKit')}>
+            <Ionicons name={backpack.matchKit ? "checkbox" : "square-outline"} size={20} color={backpack.matchKit ? colors.accentGreen : colors.textMuted} />
+            <Text style={[styles.checkItemTxt, backpack.matchKit && styles.checkItemDone]}>1ª Equipación Oficial Azul (Camiseta + Pantalón + Medias)</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.checkItemRow} onPress={() => toggleItem('tracksuit')}>
+            <Ionicons name={backpack.tracksuit ? "checkbox" : "square-outline"} size={20} color={backpack.tracksuit ? colors.accentGreen : colors.textMuted} />
+            <Text style={[styles.checkItemTxt, backpack.tracksuit && styles.checkItemDone]}>Chándal Oficial del Club (Para llegada y calentamiento)</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.checkItemRow} onPress={() => toggleItem('waterBottle')}>
+            <Ionicons name={backpack.waterBottle ? "checkbox" : "square-outline"} size={20} color={backpack.waterBottle ? colors.accentGreen : colors.textMuted} />
+            <Text style={[styles.checkItemTxt, backpack.waterBottle && styles.checkItemDone]}>Botella de Agua Rellenable (1.5L)</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* 1. CABECERA PREMIUM (PARTIDO) */}
-        <Card delay={100} style={styles.matchHeaderCard}>
-           <Text style={styles.matchCompetition}>Liga Cadete • Jornada 4</Text>
-           <Text style={styles.matchDate}>Sábado 14 Nov • 10:00</Text>
-           
-           <View style={styles.matchTeamsRow}>
-              <View style={styles.teamShieldBox}>
-                 <FontAwesome name="shield" size={50} color={colors.white} />
-                 <Text style={styles.teamName}>CD Jesuitas</Text>
+        {/* 3. LISTA DE COMPAÑEROS CONVOCADOS */}
+        <Text style={styles.sectionTitle}>👥 COMPAÑEROS CONVOCADOS (CADETE B)</Text>
+        <View style={styles.squadCard}>
+          {MOCK_TEAMMATES_CONVOCADOS.map((mate, idx) => (
+            <View key={idx} style={[styles.squadRow, mate.dorsal === 10 && styles.squadRowHighlight]}>
+              <View style={[styles.dorsalBox, mate.dorsal === 10 ? { backgroundColor: colors.accentGold } : { backgroundColor: colors.skyPrimary }]}>
+                <Text style={styles.dorsalBoxTxt}>#{mate.dorsal}</Text>
               </View>
-              <View style={styles.vsContainer}>
-                 <Text style={styles.vsText}>VS</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.squadName}>{mate.nombre} {mate.dorsal === 10 ? '(TÚ)' : ''}</Text>
+                <Text style={styles.squadPos}>{mate.pos}</Text>
               </View>
-              <View style={styles.teamShieldBox}>
-                 <FontAwesome name="shield" size={50} color={'#E11D48'} />
-                 <Text style={styles.teamName}>Levante UD</Text>
+              <View style={styles.statusGreenBadge}>
+                <Text style={styles.statusGreenBadgeTxt}>CONVOCADO</Text>
               </View>
-           </View>
-
-           <View style={styles.matchLocationRow}>
-              <FontAwesome name="map-marker" size={14} color={colors.sky} />
-              <Text style={styles.matchLocationText}>Ciudad Deportiva Levante, Campo 2</Text>
-           </View>
-        </Card>
-
-        {/* 10. CUENTA ATRÁS */}
-        <View style={styles.countdownBox}>
-           <FontAwesome name="clock-o" size={18} color={colors.sky} />
-           <Text style={styles.countdownText}>Faltan 2 días y 5 horas</Text>
+            </View>
+          ))}
         </View>
 
-        {/* 2. TARJETA PRINCIPAL DE ESTADO */}
-        <Card delay={150} style={styles.statusCard}>
-           <View style={styles.statusCircle}>
-              <FontAwesome name="check" size={32} color="#22C55E" />
-           </View>
-           <Text style={styles.statusTitle}>¡ESTÁS CONVOCADO!</Text>
-           <Text style={styles.statusSub}>El míster cuenta contigo para este partido.</Text>
-        </Card>
-
-        {/* 4. MI ROL */}
-        <Text style={styles.sectionTitle}>Tu Rol en el Partido</Text>
-        <Card delay={200} style={styles.roleCard}>
-           <View style={styles.roleHeader}>
-              <View style={styles.roleBadge}>
-                 <Text style={styles.roleBadgeNum}>9</Text>
-              </View>
-              <View>
-                 <Text style={styles.rolePosition}>Delantero</Text>
-                 <Text style={styles.roleType}>Titular</Text>
-              </View>
-           </View>
-           <View style={styles.roleObjectiveBox}>
-              <Text style={styles.roleObjectiveLabel}>OBJETIVO INDIVIDUAL:</Text>
-              <Text style={styles.roleObjectiveText}>"Atacar espacios y finalizar rápido."</Text>
-           </View>
-        </Card>
-
-        {/* 5. OBJETIVO DEL ENTRENADOR */}
-        <Text style={styles.sectionTitle}>Mensaje del Míster</Text>
-        <Card delay={250} style={styles.coachMsgCard}>
-           <FontAwesome name="quote-left" size={24} color="rgba(79, 195, 247, 0.3)" style={{ position: 'absolute', top: 16, left: 16 }} />
-           <Text style={styles.coachMsgText}>"Presionar arriba desde el inicio y salir rápido tras recuperación."</Text>
-        </Card>
-
-        {/* 3. MI INFORMACIÓN DEL PARTIDO */}
-        <Text style={styles.sectionTitle}>Logística</Text>
-        <Card delay={300} style={styles.logisticsCard}>
-           <View style={styles.logisticsGrid}>
-              <View style={styles.logisticsItem}>
-                 <FontAwesome name="clock-o" size={16} color={colors.sky} style={styles.logisticsIcon} />
-                 <View>
-                    <Text style={styles.logisticsLabel}>Hora Citación</Text>
-                    <Text style={styles.logisticsValue}>17:15</Text>
-                 </View>
-              </View>
-              <View style={styles.logisticsItem}>
-                 <FontAwesome name="map-marker" size={16} color={colors.sky} style={styles.logisticsIcon} />
-                 <View>
-                    <Text style={styles.logisticsLabel}>Punto Encuentro</Text>
-                    <Text style={styles.logisticsValue}>Puerta principal CD Jesuitas</Text>
-                 </View>
-              </View>
-              <View style={styles.logisticsItem}>
-                 <FontAwesome name="lock" size={16} color={colors.sky} style={styles.logisticsIcon} />
-                 <View>
-                    <Text style={styles.logisticsLabel}>Vestuario</Text>
-                    <Text style={styles.logisticsValue}>4</Text>
-                 </View>
-              </View>
-              <View style={styles.logisticsItem}>
-                 <FontAwesome name="shopping-bag" size={16} color={colors.sky} style={styles.logisticsIcon} />
-                 <View>
-                    <Text style={styles.logisticsLabel}>Equipación</Text>
-                    <Text style={styles.logisticsValue}>Azul</Text>
-                 </View>
-              </View>
-           </View>
-        </Card>
-
-        {/* 6. CHECKLIST DEL PARTIDO */}
-        <Text style={styles.sectionTitle}>Checklist Preparación</Text>
-        <Card delay={350} style={styles.checklistCard}>
-           {checklist.map((item, idx) => (
-             <TouchableOpacity key={item.id} style={styles.checklistItem} onPress={() => toggleCheck(item.id)}>
-                <FontAwesome name={item.checked ? "check-circle" : "circle-thin"} size={22} color={item.checked ? colors.success : colors.muted} />
-                <Text style={[styles.checklistText, item.checked && styles.checklistTextChecked]}>{item.text}</Text>
-             </TouchableOpacity>
-           ))}
-        </Card>
-
-        {/* 9. TIEMPO PREVISTO */}
-        <Text style={styles.sectionTitle}>Tiempo Previsto</Text>
-        <View style={styles.weatherBox}>
-           <FontAwesome name="cloud" size={30} color={colors.sky} />
-           <View style={styles.weatherInfo}>
-              <Text style={styles.weatherTemp}>22º</Text>
-              <Text style={styles.weatherDesc}>Parcialmente nublado • Viento suave</Text>
-           </View>
+        {/* 4. AVISO TÁCTICO Y LOGÍSTICO DEL MÍSTER */}
+        <Text style={styles.sectionTitle}>💬 INDICACIONES DEL CUERPO TÉCNICO</Text>
+        <View style={styles.coachCard}>
+          <View style={styles.coachHeader}>
+            <FontAwesome name="user-circle" size={18} color={colors.skyPrimary} />
+            <Text style={styles.coachName}>Carlos Ruiz (1er Entrenador)</Text>
+          </View>
+          <Text style={styles.coachTxt}>
+            "Puntualidad absoluta a las 09:15h en el Vestuario 2. Salimos a calentar a las 09:30h con máxima concentración. Venid ya cambiados con el chándal del club."
+          </Text>
         </View>
-
-        {/* 8. INFORMACIÓN DEL RIVAL */}
-        <Text style={styles.sectionTitle}>Análisis del Rival</Text>
-        <Card delay={400} style={styles.rivalCard}>
-           <View style={styles.rivalHeader}>
-              <FontAwesome name="shield" size={32} color="#E11D48" />
-              <View style={{ marginLeft: 12 }}>
-                 <Text style={styles.rivalName}>Levante UD</Text>
-                 <Text style={styles.rivalPosition}>3º Clasificado</Text>
-              </View>
-           </View>
-           <View style={styles.rivalStatsGrid}>
-              <View style={styles.rivalStat}>
-                 <Text style={styles.rivalStatLabel}>Últimos 5</Text>
-                 <View style={styles.rivalForm}>
-                    <Text style={[styles.formBadge, { backgroundColor: colors.success }]}>V</Text>
-                    <Text style={[styles.formBadge, { backgroundColor: colors.success }]}>V</Text>
-                    <Text style={[styles.formBadge, { backgroundColor: '#E11D48' }]}>D</Text>
-                    <Text style={[styles.formBadge, { backgroundColor: '#EAB308' }]}>E</Text>
-                    <Text style={[styles.formBadge, { backgroundColor: colors.success }]}>V</Text>
-                 </View>
-              </View>
-              <View style={styles.rivalStat}>
-                 <Text style={styles.rivalStatLabel}>Goles</Text>
-                 <Text style={styles.rivalStatValue}>18 F / 6 C</Text>
-              </View>
-              <View style={styles.rivalStat}>
-                 <Text style={styles.rivalStatLabel}>A tener en cuenta</Text>
-                 <Text style={styles.rivalStatValue}>Dorsal 10 (Media punta)</Text>
-              </View>
-           </View>
-        </Card>
-
-        {/* 11. ACCIONES */}
-        <View style={styles.actionsGrid}>
-           <TouchableOpacity style={styles.actionBtnMap}>
-              <FontAwesome name="location-arrow" size={16} color={colors.navy} />
-              <Text style={styles.actionBtnTextDark}>Cómo Llegar</Text>
-           </TouchableOpacity>
-           <View style={styles.actionsRow}>
-              <TouchableOpacity style={styles.actionBtnLight} onPress={() => router.push('/(drawer)/jugador/calendario' as any)}>
-                 <FontAwesome name="calendar" size={14} color={colors.white} />
-                 <Text style={styles.actionBtnTextLight}>Calendario</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionBtnLight}>
-                 <FontAwesome name="commenting-o" size={14} color={colors.white} />
-                 <Text style={styles.actionBtnTextLight}>Hablar al Míster</Text>
-              </TouchableOpacity>
-           </View>
-        </View>
-
-        {/* 7. LISTA DE CONVOCADOS */}
-        <Text style={styles.sectionTitle}>Compañeros Convocados</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.teammatesScroll} contentContainerStyle={{ gap: 12 }}>
-           {MOCK_TEAMMATES.map(player => (
-              <View key={player.id} style={styles.teammateCard}>
-                 <Image source={{ uri: player.avatar }} style={styles.teammateAvatar} />
-                 <Text style={styles.teammateName}>{player.name}</Text>
-                 <Text style={styles.teammatePos}>{player.pos} • #{player.dorsal}</Text>
-              </View>
-           ))}
-        </ScrollView>
-
-        {/* 12. HISTORIAL DE CONVOCATORIAS */}
-        <Text style={styles.sectionTitle}>Tu Historial</Text>
-        <Card delay={450} style={styles.historyCard}>
-           {MOCK_HISTORY.map((hist, idx) => (
-             <View key={hist.id}>
-                <View style={styles.historyRow}>
-                   <View>
-                      <Text style={styles.historyMatch}>{hist.match}</Text>
-                      <Text style={styles.historyDate}>{hist.date}</Text>
-                   </View>
-                   <Text style={[styles.historyStatus, 
-                      hist.status.includes('Convocado') && !hist.status.includes('No') ? { color: colors.success } : 
-                      hist.status.includes('No') ? { color: '#E11D48' } : { color: '#EAB308' }]}>
-                      {hist.status}
-                   </Text>
-                </View>
-                {idx < MOCK_HISTORY.length - 1 && <View style={styles.historyDivider} />}
-             </View>
-           ))}
-        </Card>
 
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0B1F4D' },
-  container: { flex: 1 },
-  content: { paddingHorizontal: spacing.l, paddingBottom: spacing.xxl },
-  
-  topNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.m, paddingTop: spacing.m },
-  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
-  topNavTitle: { color: colors.white, fontSize: 16, fontWeight: '900', letterSpacing: 1 },
+  container: { flex: 1, backgroundColor: colors.navyDark },
+  content: { padding: 16, paddingBottom: 60 },
+  contentTablet: { maxWidth: 900, alignSelf: 'center', width: '100%' },
 
-  sectionTitle: { color: colors.white, fontSize: 16, fontWeight: '900', marginTop: spacing.l, marginBottom: spacing.m, textTransform: 'uppercase', letterSpacing: 0.5 },
+  statusHeroCard: { borderRadius: 24, overflow: 'hidden', borderWidth: 2, borderColor: colors.accentGreen, backgroundColor: colors.navyCard, marginBottom: 20 },
+  statusGradient: { padding: 16, gap: 12 },
+  statusHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  statusIconCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(16, 185, 129, 0.2)', justifyContent: 'center', alignItems: 'center' },
+  statusTitle: { color: colors.accentGreen, fontSize: 18, fontWeight: '900' },
+  statusSub: { color: colors.white, fontSize: 12, fontWeight: '700', marginTop: 2, lineHeight: 16 },
 
-  // Cabecera Partido
-  matchHeaderCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)', padding: spacing.xl, borderRadius: 24, alignItems: 'center' },
-  matchCompetition: { color: colors.muted, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
-  matchDate: { color: colors.white, fontSize: 16, fontWeight: '900', marginTop: 4, marginBottom: 20 },
-  matchTeamsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: '100%', marginBottom: 24 },
-  teamShieldBox: { alignItems: 'center', flex: 1 },
-  teamName: { color: colors.white, fontSize: 13, fontWeight: '900', marginTop: 12, textAlign: 'center' },
-  vsContainer: { width: 40, alignItems: 'center' },
-  vsText: { color: colors.muted, fontSize: 20, fontWeight: '900' },
-  matchLocationRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
-  matchLocationText: { color: colors.sky, fontSize: 12, fontWeight: '700', marginLeft: 8 },
+  matchDetailBanner: { backgroundColor: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 14, gap: 4 },
+  matchTitle: { color: colors.white, fontSize: 14, fontWeight: '900' },
+  matchDate: { color: colors.skyGlow, fontSize: 11, fontWeight: '800' },
+  matchLoc: { color: colors.textMuted, fontSize: 11 },
+  citationBadge: { color: colors.goldLight, fontSize: 11, fontWeight: '900', marginTop: 2 },
 
-  countdownBox: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: -15, backgroundColor: 'rgba(79, 195, 247, 0.15)', alignSelf: 'center', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(79, 195, 247, 0.3)', marginBottom: spacing.xl },
-  countdownText: { color: colors.sky, fontSize: 13, fontWeight: '800', marginLeft: 8 },
+  sectionTitle: { fontSize: 11, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 1.5, marginBottom: 10, marginTop: 4 },
 
-  // Tarjeta Estado
-  statusCard: { backgroundColor: 'rgba(34,197,94,0.1)', borderColor: '#22C55E', padding: spacing.xl, borderRadius: 24, alignItems: 'center', borderWidth: 2 },
-  statusCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(34,197,94,0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  statusTitle: { color: '#22C55E', fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
-  statusSub: { color: colors.white, fontSize: 14, fontWeight: '600', marginTop: 4, textAlign: 'center' },
+  backpackCard: { backgroundColor: colors.navyCard, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: colors.borderGlow, gap: 10, marginBottom: 20 },
+  checkItemRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  checkItemTxt: { color: colors.white, fontSize: 12, fontWeight: '700' },
+  checkItemDone: { textDecorationLine: 'line-through', color: colors.textMuted },
 
-  // Mi Rol
-  roleCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)', padding: spacing.l, borderRadius: 20 },
-  roleHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  roleBadge: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  roleBadgeNum: { color: colors.white, fontSize: 20, fontWeight: '900' },
-  rolePosition: { color: colors.white, fontSize: 16, fontWeight: '800' },
-  roleType: { color: colors.sky, fontSize: 13, fontWeight: '700' },
-  roleObjectiveBox: { backgroundColor: 'rgba(255,255,255,0.05)', padding: 16, borderRadius: 12 },
-  roleObjectiveLabel: { color: colors.muted, fontSize: 11, fontWeight: '800', marginBottom: 4 },
-  roleObjectiveText: { color: colors.white, fontSize: 14, fontWeight: '700', fontStyle: 'italic' },
+  squadCard: { backgroundColor: colors.navyCard, borderRadius: 18, padding: 12, borderWidth: 1, borderColor: colors.borderGlow, gap: 8, marginBottom: 20 },
+  squadRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  squadRowHighlight: { backgroundColor: 'rgba(79, 195, 247, 0.12)', borderRadius: 10, paddingHorizontal: 6 },
+  dorsalBox: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  dorsalBoxTxt: { color: colors.navyDark, fontSize: 11, fontWeight: '900' },
+  squadName: { color: colors.white, fontSize: 12, fontWeight: '800' },
+  squadPos: { color: colors.textMuted, fontSize: 10 },
+  statusGreenBadge: { backgroundColor: 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  statusGreenBadgeTxt: { color: colors.accentGreen, fontSize: 9, fontWeight: '900' },
 
-  // Mensaje Míster
-  coachMsgCard: { backgroundColor: 'rgba(79, 195, 247, 0.05)', borderColor: 'rgba(79, 195, 247, 0.2)', padding: 24, borderRadius: 20 },
-  coachMsgText: { color: colors.white, fontSize: 16, fontWeight: '700', fontStyle: 'italic', textAlign: 'center', lineHeight: 24 },
-
-  // Logística
-  logisticsCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)', padding: spacing.l, borderRadius: 20 },
-  logisticsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
-  logisticsItem: { width: '47%', flexDirection: 'row', alignItems: 'center' },
-  logisticsIcon: { width: 24 },
-  logisticsLabel: { color: colors.muted, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
-  logisticsValue: { color: colors.white, fontSize: 13, fontWeight: '700' },
-
-  // Checklist
-  checklistCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)', padding: spacing.l, borderRadius: 20 },
-  checklistItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
-  checklistText: { color: colors.white, fontSize: 15, fontWeight: '600', marginLeft: 12 },
-  checklistTextChecked: { color: colors.muted, textDecorationLine: 'line-through' },
-
-  // Tiempo
-  weatherBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.03)', padding: spacing.l, borderRadius: 20, borderColor: 'rgba(255,255,255,0.05)', borderWidth: 1 },
-  weatherInfo: { marginLeft: 16 },
-  weatherTemp: { color: colors.white, fontSize: 24, fontWeight: '900' },
-  weatherDesc: { color: colors.sky, fontSize: 13, fontWeight: '700' },
-
-  // Rival
-  rivalCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)', padding: spacing.l, borderRadius: 20 },
-  rivalHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)', paddingBottom: 16 },
-  rivalName: { color: colors.white, fontSize: 18, fontWeight: '900' },
-  rivalPosition: { color: colors.muted, fontSize: 13, fontWeight: '700' },
-  rivalStatsGrid: { gap: 16 },
-  rivalStat: {},
-  rivalStatLabel: { color: colors.muted, fontSize: 11, fontWeight: '800', textTransform: 'uppercase', marginBottom: 4 },
-  rivalStatValue: { color: colors.white, fontSize: 14, fontWeight: '800' },
-  rivalForm: { flexDirection: 'row', gap: 6 },
-  formBadge: { width: 24, height: 24, borderRadius: 4, color: colors.white, fontSize: 12, fontWeight: '900', textAlign: 'center', lineHeight: 24 },
-
-  // Acciones
-  actionsGrid: { marginTop: spacing.xl },
-  actionBtnMap: { backgroundColor: colors.sky, padding: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  actionBtnTextDark: { color: colors.navy, fontSize: 14, fontWeight: '900', marginLeft: 8 },
-  actionsRow: { flexDirection: 'row', gap: 12 },
-  actionBtnLight: { flex: 1, backgroundColor: 'rgba(255,255,255,0.1)', padding: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  actionBtnTextLight: { color: colors.white, fontSize: 13, fontWeight: '800', marginLeft: 8 },
-
-  // Compañeros
-  teammatesScroll: { paddingRight: 40 },
-  teammateCard: { alignItems: 'center', width: 70 },
-  teammateAvatar: { width: 56, height: 56, borderRadius: 28, marginBottom: 8, borderWidth: 2, borderColor: colors.sky },
-  teammateName: { color: colors.white, fontSize: 11, fontWeight: '800', textAlign: 'center' },
-  teammatePos: { color: colors.muted, fontSize: 9, fontWeight: '700', textAlign: 'center' },
-
-  // Historial
-  historyCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)', padding: spacing.l, borderRadius: 20 },
-  historyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
-  historyMatch: { color: colors.white, fontSize: 14, fontWeight: '800' },
-  historyDate: { color: colors.muted, fontSize: 11, fontWeight: '600', marginTop: 2 },
-  historyStatus: { fontSize: 12, fontWeight: '900', textTransform: 'uppercase' },
-  historyDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.05)' }
+  coachCard: { backgroundColor: colors.navyCard, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: colors.borderGlow, gap: 6, marginBottom: 20 },
+  coachHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  coachName: { color: colors.skyGlow, fontSize: 11, fontWeight: '900' },
+  coachTxt: { color: colors.white, fontSize: 12, fontStyle: 'italic', lineHeight: 17 }
 });

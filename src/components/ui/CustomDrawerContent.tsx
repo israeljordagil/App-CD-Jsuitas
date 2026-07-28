@@ -1,77 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
 import { useSport } from '../../context/SportContext';
 import { useAuth } from '../../context/AuthContext';
-import { useReview } from '../../context/ReviewContext';
+import { useRole } from '../../context/RoleContext';
 
-// Paleta corporativa exigida
 const clubColors = {
   navy: '#0B1F4D',
   skyPrimary: '#4FC3F7',
   skyLight: '#81D4FA',
   white: '#FFFFFF',
   textMuted: '#6B7280',
-  danger: '#ef4444' // Para los badges
+  danger: '#ef4444'
 };
-
-export function CustomDrawerContent(props: any) {
-  const { sport } = useSport();
-type MenuItem = {
-  label: string;
-  icon: React.ComponentProps<typeof FontAwesome>['name'];
-  route: string;
-  roles: string[];
-  subItems?: { label: string; route: string }[];
-}
-
-const menuItems: MenuItem[] = [
-  { label: 'Inicio', icon: 'home', route: 'index', roles: ['jugador', 'entrenador', 'coordinador'] },
-  { 
-    label: 'Partidos', 
-    icon: 'trophy', 
-    route: 'partidos',
-    roles: ['jugador', 'entrenador', 'coordinador'],
-    subItems: [
-      { label: 'Hoy', route: 'partidos' },
-      { label: 'Convocatorias', route: 'convocatorias' },
-      { label: 'En directo', route: 'live_match' },
-      { label: 'Resultados', route: 'partidos' },
-      { label: 'Actas', route: 'partidos' },
-      { label: 'Árbitros', route: 'partidos' },
-    ]
-  },
-  { 
-    label: 'Equipos', 
-    icon: 'shield', 
-    route: 'equipos',
-    roles: ['entrenador', 'coordinador'],
-    subItems: [
-      { label: 'Juvenil', route: 'equipos' },
-      { label: 'Cadete', route: 'equipos' },
-      { label: 'Infantil', route: 'equipos' },
-      { label: 'Alevín', route: 'equipos' },
-      { label: 'Benjamín', route: 'equipos' },
-      { label: 'Prebenjamín', route: 'equipos' },
-      { label: 'Querubín', route: 'equipos' },
-    ]
-  },
-  { label: 'Jugadores', icon: 'user', route: 'jugadores', roles: ['jugador', 'entrenador', 'coordinador'] },
-  { label: 'Entrenadores', icon: 'id-badge', route: 'entrenadores', roles: ['coordinador'] },
-  { label: 'Plantillas', icon: 'list', route: 'plantillas', roles: ['entrenador', 'coordinador'] },
-  { label: 'Entrenamientos', icon: sport === 'baloncesto' ? 'dribbble' : 'soccer-ball-o', route: 'entrenamientos', roles: ['jugador', 'entrenador', 'coordinador'] },
-  { label: 'Informes', icon: 'file-text-o', route: 'informes', roles: ['entrenador', 'coordinador'] },
-  { label: 'Estadísticas', icon: 'bar-chart', route: 'estadisticas', roles: ['jugador', 'entrenador', 'coordinador'] },
-  { label: 'Clasificaciones', icon: 'list-ol', route: 'clasificaciones', roles: ['jugador', 'coordinador'] },
-  { label: 'Familias', icon: 'group', route: 'familias', roles: ['coordinador'] },
-  { label: 'Comunicación', icon: 'comments', route: 'comunicacion', roles: ['jugador', 'entrenador', 'coordinador'] },
-  { label: 'Árbitros', icon: 'legal', route: 'arbitros', roles: ['entrenador', 'coordinador'] },
-  { label: 'Vestuarios', icon: 'tags', route: 'vestuarios', roles: ['entrenador', 'coordinador'] },
-  { label: 'Instalaciones', icon: 'building', route: 'instalaciones', roles: ['entrenador', 'coordinador'] },
-  { label: 'Material', icon: 'shopping-bag', route: 'material', roles: ['entrenador', 'coordinador'] },
-  { label: 'Configuración', icon: 'cog', route: 'configuracion', roles: ['jugador', 'entrenador', 'coordinador'] },
-];
 
 const FAMILIAS_MENU_ITEMS = [
   { label: 'Inicio', route: 'index', icon: '🏠' },
@@ -92,6 +34,7 @@ const PLAYER_MENU_ITEMS = [
   { label: 'Mi perfil', route: 'mi-perfil', icon: '👤' },
   { label: 'Calendario', route: 'calendario', icon: '📅' },
   { label: 'Convocatorias', route: 'convocatorias', icon: '📋' },
+  { label: 'Entrenamientos', route: 'entrenamientos', icon: '🏃' },
   { label: 'Temporada', route: 'temporada', icon: '🏟️' },
   { label: 'Mi rendimiento', route: 'rendimiento', icon: '📊' },
   { label: 'Retos e insignias', route: 'retos', icon: '🏅' },
@@ -131,16 +74,18 @@ const COORDINATOR_MENU_ITEMS = [
   { label: 'Ajustes', route: 'configuracion', icon: '⚙️' },
 ];
 
-
-
+export function CustomDrawerContent(props: any) {
   const router = useRouter();
   const { activeContext, user, activePlayerId, linkedPlayers, assignedTeams, clearProfile } = useAuth();
-  const { setSport } = useSport();
+  const { role } = useRole();
+  const { sport, setSport } = useSport();
   
-  const isFamilias = activeContext === 'FAMILIA';
-  const isJugador = activeContext === 'JUGADOR';
-  const isEntrenador = activeContext === 'ENTRENADOR';
-  const isCoordinador = activeContext === 'COORDINADOR';
+  const currentRole = role || activeContext || user?.role || 'FAMILIA';
+
+  const isJugador = currentRole === 'jugadores' || currentRole === 'jugador' || currentRole === 'JUGADOR';
+  const isEntrenador = currentRole === 'entrenadores' || currentRole === 'entrenador' || currentRole === 'ENTRENADOR';
+  const isCoordinador = currentRole === 'coordinadores' || currentRole === 'coordinador' || currentRole === 'COORDINADOR';
+  const isFamilias = !isJugador && !isEntrenador && !isCoordinador;
 
   const activePlayer = linkedPlayers?.find(p => p.id === activePlayerId);
   const activeTeam = assignedTeams?.[0]?.name || 'Equipo';
@@ -157,7 +102,7 @@ const COORDINATOR_MENU_ITEMS = [
   if (isJugador) {
     return (
       <ScrollView style={styles.containerFamilias} contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* HEADER JUGADOR (GAMIFICADO) */}
+        {/* HEADER JUGADOR */}
         <View style={styles.headerFamilias}>
           <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16}}>
              <FontAwesome name={sport === 'baloncesto' ? 'dribbble' : 'shield'} size={56} color={clubColors.white} />
@@ -171,8 +116,8 @@ const COORDINATOR_MENU_ITEMS = [
                 <FontAwesome name="user" size={24} color={clubColors.navy} />
              </View>
              <View style={styles.textFamiliasBox}>
-                <Text style={styles.tutorName}>{user?.full_name === 'Familia Martínez' ? 'Pablo Martínez' : user?.full_name}</Text>
-                <Text style={styles.tutorRole}>{activePlayer ? `#10 • ${activePlayer.team}` : '#10'}</Text>
+                <Text style={styles.tutorName}>Pablo Martínez</Text>
+                <Text style={styles.tutorRole}>#10 • Cadete B Fútbol</Text>
              </View>
           </View>
           
@@ -189,33 +134,29 @@ const COORDINATOR_MENU_ITEMS = [
 
         {/* MENU JUGADOR */}
         <View style={styles.menuContainerFamilias}>
-           {PLAYER_MENU_ITEMS.map((item, idx) => {
-             const isActive = item.route === 'index' && idx === 0;
-
-             return (
-               <TouchableOpacity 
-                 key={idx}
-                 style={[styles.menuItemFamilias, isActive && styles.menuItemFamiliasActive]}
-                 onPress={() => {
-                   if (item.route === 'index') {
-                     router.replace('/(drawer)/inicio' as any);
-                   } else {
-                     router.push(`/(drawer)/${item.route}` as any);
-                   }
-                 }}
-                 activeOpacity={0.7}
-               >
-                 <View style={styles.menuItemFamiliasLeft}>
-                    <Text style={{ fontSize: 20, marginRight: 16, width: 28, textAlign: 'center' }}>
-                      {item.icon}
-                    </Text>
-                    <Text style={[styles.menuLabelFamilias, isActive && styles.menuLabelFamiliasActive]}>
-                      {item.label}
-                    </Text>
-                 </View>
-               </TouchableOpacity>
-             );
-           })}
+           {PLAYER_MENU_ITEMS.map((item, idx) => (
+             <TouchableOpacity 
+               key={idx}
+               style={styles.menuItemFamilias}
+               onPress={() => {
+                 if (item.route === 'index') {
+                   router.replace('/(drawer)/inicio' as any);
+                 } else {
+                   router.push(`/(drawer)/${item.route}` as any);
+                 }
+               }}
+               activeOpacity={0.7}
+             >
+               <View style={styles.menuItemFamiliasLeft}>
+                  <Text style={{ fontSize: 20, marginRight: 16, width: 28, textAlign: 'center' }}>
+                    {item.icon}
+                  </Text>
+                  <Text style={styles.menuLabelFamilias}>
+                    {item.label}
+                  </Text>
+               </View>
+             </TouchableOpacity>
+           ))}
         </View>
         <BottomActions />
       </ScrollView>
@@ -225,7 +166,6 @@ const COORDINATOR_MENU_ITEMS = [
   if (isEntrenador) {
     return (
       <ScrollView style={styles.containerFamilias} contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* HEADER ENTRENADOR */}
         <View style={styles.headerFamilias}>
           <FontAwesome name={sport === 'baloncesto' ? 'dribbble' : 'shield'} size={56} color={clubColors.white} style={{marginBottom: 16}} />
           <View style={styles.headerFamiliasInfoRow}>
@@ -233,107 +173,39 @@ const COORDINATOR_MENU_ITEMS = [
                 <FontAwesome name="user" size={24} color={clubColors.navy} />
              </View>
              <View style={styles.textFamiliasBox}>
-                <Text style={styles.tutorName}>{user?.full_name || 'Entrenador'}</Text>
+                <Text style={styles.tutorName}>{user?.full_name || 'Carlos Ruiz'}</Text>
                 <Text style={styles.tutorRole}>Míster • {activeTeam}</Text>
              </View>
           </View>
         </View>
 
-        {/* MENU ENTRENADOR */}
         <View style={styles.menuContainerFamilias}>
-           {COACH_MENU_ITEMS.map((item, idx) => {
-             const isActive = item.route === 'index' && idx === 0;
-
-             return (
-               <TouchableOpacity 
-                 key={idx}
-                 style={[styles.menuItemFamilias, isActive && styles.menuItemFamiliasActive]}
-                 onPress={() => router.push(`/(drawer)/${item.route}` as any)}
-                 activeOpacity={0.7}
-               >
-                 <View style={styles.menuItemFamiliasLeft}>
-                    <Text style={{ fontSize: 20, marginRight: 16, width: 28, textAlign: 'center' }}>
-                      {item.icon}
-                    </Text>
-                    <Text style={[styles.menuLabelFamilias, isActive && styles.menuLabelFamiliasActive]}>
-                      {item.label}
-                    </Text>
-                 </View>
-               </TouchableOpacity>
-             );
-           })}
+           {COACH_MENU_ITEMS.map((item, idx) => (
+             <TouchableOpacity 
+               key={idx}
+               style={styles.menuItemFamilias}
+               onPress={() => router.push(`/(drawer)/${item.route}` as any)}
+               activeOpacity={0.7}
+             >
+               <View style={styles.menuItemFamiliasLeft}>
+                  <Text style={{ fontSize: 20, marginRight: 16, width: 28, textAlign: 'center' }}>
+                    {item.icon}
+                  </Text>
+                  <Text style={styles.menuLabelFamilias}>
+                    {item.label}
+                  </Text>
+               </View>
+             </TouchableOpacity>
+           ))}
         </View>
         <BottomActions />
       </ScrollView>
     );
   }
 
-  if (isFamilias) {
-    return (
-      <ScrollView style={styles.containerFamilias} contentContainerStyle={{ paddingBottom: 40 }}>
-        
-        {/* HEADER FAMILIAS */}
-        <View style={styles.headerFamilias}>
-          <View style={styles.headerFamiliasInfoRow}>
-             <View style={styles.avatarFamilias}>
-                <FontAwesome name="user" size={24} color={clubColors.navy} />
-             </View>
-             <View style={styles.textFamiliasBox}>
-                <Text style={styles.tutorName}>{user?.full_name || 'Familia'}</Text>
-                <Text style={styles.tutorRole}>Familia / Tutor</Text>
-             </View>
-          </View>
-          
-          <View style={styles.sonCardFamilias}>
-             <Text style={styles.sonLabel}>Siguiendo a:</Text>
-             <Text style={styles.sonName}>{activePlayer ? activePlayer.name : 'Sin vinculaciones'}</Text>
-             {activePlayer && <Text style={styles.sonTeam}>{activePlayer.team} • {activePlayer.category}</Text>}
-          </View>
-        </View>
-
-        {/* MENU FAMILIAS */}
-        <View style={styles.menuContainerFamilias}>
-           {FAMILIAS_MENU_ITEMS.map((item, idx) => {
-             // Mock de activo (solo visual para index)
-             const isActive = item.route === 'index' && idx === 0;
-
-             return (
-               <TouchableOpacity 
-                 key={idx}
-                 style={[styles.menuItemFamilias, isActive && styles.menuItemFamiliasActive]}
-                 onPress={() => {
-                   if (item.route === 'index') {
-                     router.replace('/(drawer)/inicio' as any);
-                   } else {
-                     router.push(`/(drawer)/${item.route}` as any);
-                   }
-                 }}
-                 activeOpacity={0.7}
-               >
-                 <View style={styles.menuItemFamiliasLeft}>
-                    <Text style={{ fontSize: 20, marginRight: 16, width: 28, textAlign: 'center' }}>
-                      {item.icon}
-                    </Text>
-                    <Text style={[styles.menuLabelFamilias, isActive && styles.menuLabelFamiliasActive]}>
-                      {item.label}
-                    </Text>
-                 </View>
-               </TouchableOpacity>
-             );
-           })}
-         </View>
-
-         <BottomActions />
-      </ScrollView>
-    );
-  }
-
-  const sportName = sport === 'futbol' ? 'Fútbol' : sport === 'futbol_sala' ? 'Fútbol Sala' : sport === 'baloncesto' ? 'Baloncesto' : sport === 'voleibol' ? 'Voleibol' : 'Deporte';
-
   if (isCoordinador) {
     return (
       <ScrollView style={styles.containerFamilias} contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* HEADER COORDINADOR */}
         <View style={styles.headerFamilias}>
           <FontAwesome name={sport === 'baloncesto' ? 'dribbble' : 'shield'} size={56} color={clubColors.white} style={{marginBottom: 16}} />
           <View style={styles.headerFamiliasInfoRow}>
@@ -341,123 +213,95 @@ const COORDINATOR_MENU_ITEMS = [
                 <FontAwesome name="user" size={24} color={clubColors.navy} />
              </View>
              <View style={styles.textFamiliasBox}>
-                <Text style={styles.tutorName}>{user?.full_name || `Coordinador`}</Text>
-                <Text style={styles.tutorRole}>Gestión de {sportName}</Text>
+                <Text style={styles.tutorName}>{user?.full_name || `Javier Domínguez`}</Text>
+                <Text style={styles.tutorRole}>Coordinación Deportiva</Text>
              </View>
           </View>
         </View>
 
-        {/* MENU COORDINADOR */}
         <View style={styles.menuContainerFamilias}>
-           {COORDINATOR_MENU_ITEMS.map((item, idx) => {
-             const isActive = item.route === 'index' && idx === 0;
-
-             return (
-               <TouchableOpacity 
-                 key={idx}
-                 style={[styles.menuItemFamilias, isActive && styles.menuItemFamiliasActive]}
-                 onPress={() => {
-                   if (item.route === 'index') {
-                     router.replace('/(drawer)/inicio' as any);
-                   } else {
-                     router.push(`/(drawer)/${item.route}` as any);
-                   }
-                 }}
-                 activeOpacity={0.7}
-               >
-                 <View style={styles.menuItemFamiliasLeft}>
-                    <Text style={{ fontSize: 20, marginRight: 16, width: 28, textAlign: 'center' }}>
-                      {item.icon}
-                    </Text>
-                    <Text style={[styles.menuLabelFamilias, isActive && styles.menuLabelFamiliasActive]}>
-                      {item.label}
-                    </Text>
-                 </View>
-               </TouchableOpacity>
-             );
-           })}
+           {COORDINATOR_MENU_ITEMS.map((item, idx) => (
+             <TouchableOpacity 
+               key={idx}
+               style={styles.menuItemFamilias}
+               onPress={() => {
+                 if (item.route === 'index') {
+                   router.replace('/(drawer)/inicio' as any);
+                 } else {
+                   router.push(`/(drawer)/${item.route}` as any);
+                 }
+               }}
+               activeOpacity={0.7}
+             >
+               <View style={styles.menuItemFamiliasLeft}>
+                  <Text style={{ fontSize: 20, marginRight: 16, width: 28, textAlign: 'center' }}>
+                    {item.icon}
+                  </Text>
+                  <Text style={styles.menuLabelFamilias}>
+                    {item.label}
+                  </Text>
+               </View>
+             </TouchableOpacity>
+           ))}
         </View>
         <BottomActions />
       </ScrollView>
     );
   }
 
-  // LOGICA PARA EL RESTO DE ROLES
-  const roleString = activeContext?.toLowerCase() || '';
-  const filteredItems = menuItems.filter(item => item.roles.includes(roleString) || roleString === 'admin' || roleString === 'dir_deportiva');
-  
+  // DEFAULT / FAMILIAS
   return (
-    <ScrollView style={styles.containerGeneric} contentContainerStyle={{ paddingTop: 0 }}>
+    <ScrollView style={styles.containerFamilias} contentContainerStyle={{ paddingBottom: 40 }}>
+      <View style={styles.headerFamilias}>
+        <View style={styles.headerFamiliasInfoRow}>
+           <View style={styles.avatarFamilias}>
+              <FontAwesome name="user" size={24} color={clubColors.navy} />
+           </View>
+           <View style={styles.textFamiliasBox}>
+              <Text style={styles.tutorName}>{user?.full_name || 'Familia Martínez'}</Text>
+              <Text style={styles.tutorRole}>Familia / Tutor</Text>
+           </View>
+        </View>
         
-        {/* Header Drawer Genérico */}
-        <View style={styles.headerGeneric}>
-          <FontAwesome name={sport === 'baloncesto' ? 'dribbble' : 'shield'} size={40} color={clubColors.white} style={styles.logoGeneric} />
-          <Text style={styles.clubNameGeneric}>CD JESUITAS</Text>
-          <Text style={{color:'#81D4FA', fontSize: 12, marginTop:4, fontWeight: '800', letterSpacing:2}}>{sport === 'baloncesto' ? 'BALONCESTO' : 'FÚTBOL'}</Text>
+        <View style={styles.sonCardFamilias}>
+           <Text style={styles.sonLabel}>Siguiendo a:</Text>
+           <Text style={styles.sonName}>{activePlayer ? activePlayer.name : 'Pablo Martínez & Hugo Martínez'}</Text>
+           <Text style={styles.sonTeam}>Cadete B Fútbol • Infantil A Futsal</Text>
         </View>
+      </View>
 
-        <View style={styles.dividerGeneric} />
+      <View style={styles.menuContainerFamilias}>
+         {FAMILIAS_MENU_ITEMS.map((item, idx) => (
+           <TouchableOpacity 
+             key={idx}
+             style={styles.menuItemFamilias}
+             onPress={() => {
+               if (item.route === 'index') {
+                 router.replace('/(drawer)/inicio' as any);
+               } else {
+                 router.push(`/(drawer)/${item.route}` as any);
+               }
+             }}
+             activeOpacity={0.7}
+           >
+             <View style={styles.menuItemFamiliasLeft}>
+                <Text style={{ fontSize: 20, marginRight: 16, width: 28, textAlign: 'center' }}>
+                  {item.icon}
+                </Text>
+                <Text style={styles.menuLabelFamilias}>
+                  {item.label}
+                </Text>
+             </View>
+           </TouchableOpacity>
+         ))}
+       </View>
 
-        {/* Módulos Genéricos */}
-        <View style={styles.menuContainerGeneric}>
-          {filteredItems.map((item, index) => (
-            <View key={index}>
-              <TouchableOpacity 
-                style={[
-                  styles.menuItemGeneric,
-                  item.route === 'index' && !isCoordinador && index === 0 ? styles.menuItemGenericActive : {}
-                ]}
-                onPress={() => {
-                  if (item.route === 'index') {
-                    router.replace('/(drawer)/inicio' as any);
-                  } else {
-                    router.push(`/(drawer)/${item.route}` as any);
-                  }
-                }}
-              >
-                <View style={styles.menuItemGenericContent}>
-                  <FontAwesome 
-                    name={item.icon} 
-                    size={20} 
-                    color={item.route === 'index' && !isCoordinador && index === 0 ? clubColors.skyPrimary : clubColors.white} 
-                    style={styles.menuIconGeneric} 
-                  />
-                  <Text style={[
-                    styles.menuLabelGeneric,
-                    item.route === 'index' && roleString !== 'coordinador' && index === 0 ? styles.menuLabelGenericActive : {}
-                  ]}>
-                    {item.label}
-                  </Text>
-                </View>
-                {item.subItems && (
-                  <FontAwesome name="angle-down" size={20} color={clubColors.textMuted} />
-                )}
-              </TouchableOpacity>
-              
-              {/* SubItems Genéricos */}
-              {item.subItems && (
-                <View style={styles.subItemsGenericContainer}>
-                  {item.subItems.map((sub, subIdx) => (
-                    <TouchableOpacity 
-                      key={subIdx} 
-                      style={styles.subItemGeneric}
-                      onPress={() => router.push(`/(drawer)/${sub.route}` as any)}
-                    >
-                      <Text style={styles.subItemGenericLabel}>{sub.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </View>
-          ))}
-        </View>
+       <BottomActions />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  // ESTILOS EXCLUSIVOS FAMILIAS
-  // ============================
   bottomActionsContainer: {
     marginTop: 24,
     paddingHorizontal: 24,
@@ -478,7 +322,7 @@ const styles = StyleSheet.create({
   },
   bottomActionText: {
     fontSize: 16,
-    color: '#ef4444', // Un color más de acción o simplemente blanco
+    color: '#ef4444',
     fontWeight: '600',
   },
   containerFamilias: {
@@ -561,27 +405,6 @@ const styles = StyleSheet.create({
     backgroundColor: clubColors.skyPrimary,
     borderRadius: 4,
   },
-  childAvatarDrawer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  childDetailsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)'
-  },
-  childDetailText: {
-    color: '#81D4FA',
-    fontSize: 12,
-    fontWeight: '700'
-  },
 
   sonCardFamilias: {
     backgroundColor: 'rgba(255,255,255,0.05)',
@@ -617,119 +440,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 16,
     paddingHorizontal: 24,
-    borderLeftWidth: 4,
-    borderLeftColor: 'transparent',
-  },
-  menuItemFamiliasActive: {
-    backgroundColor: 'rgba(79, 195, 247, 0.1)',
-    borderLeftColor: clubColors.skyPrimary,
   },
   menuItemFamiliasLeft: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  menuIconFamilias: {
-    width: 28,
-    textAlign: 'center',
-    marginRight: 16,
-  },
   menuLabelFamilias: {
     color: clubColors.white,
     fontSize: 16,
     fontWeight: '700',
-  },
-  menuLabelFamiliasActive: {
-    color: clubColors.skyPrimary,
-    fontWeight: '900',
-  },
-  badgeFamilias: {
-    backgroundColor: clubColors.danger,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    minWidth: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeFamiliasText: {
-    color: clubColors.white,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-
-  // ============================
-  // ESTILOS GENÉRICOS (OTROS ROLES)
-  // ============================
-  containerGeneric: {
-    flex: 1,
-    backgroundColor: '#020814',
-  },
-  headerGeneric: {
-    backgroundColor: '#020814',
-    paddingTop: 60,
-    paddingBottom: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoGeneric: {
-    marginBottom: 8,
-  },
-  clubNameGeneric: {
-    color: clubColors.white,
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  dividerGeneric: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    marginHorizontal: 24,
-    marginBottom: 16,
-  },
-  menuContainerGeneric: {
-    paddingTop: 0,
-  },
-  menuItemGeneric: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-  },
-  menuItemGenericActive: {
-    backgroundColor: 'rgba(85, 199, 243, 0.1)',
-    borderRightWidth: 4,
-    borderRightColor: clubColors.skyPrimary,
-  },
-  menuItemGenericContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  menuIconGeneric: {
-    width: 28,
-    textAlign: 'center',
-    marginRight: 16,
-  },
-  menuLabelGeneric: {
-    color: clubColors.white,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  menuLabelGenericActive: {
-    color: clubColors.skyPrimary,
-    fontWeight: '900',
-  },
-  subItemsGenericContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-    paddingVertical: 8,
-  },
-  subItemGeneric: {
-    paddingVertical: 16,
-    paddingLeft: 68,
-  },
-  subItemGenericLabel: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 15,
-    fontWeight: '500',
-  },
+  }
 });

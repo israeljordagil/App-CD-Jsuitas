@@ -1,300 +1,220 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { FontAwesome } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { colors, spacing } from '../../../src/utils/theme';
-import { AnimatedCard as Card } from '../../../src/components/ui/AnimatedCard';
-import { ProgressBar } from '../../../src/components/ui/ProgressBar';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  TouchableOpacity, 
+  useWindowDimensions 
+} from 'react-native';
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { PremiumHeader } from '../../../src/components/ui/PremiumHeader';
 
-const TABS = ['Día', 'Semana', 'Mes'];
+// Colores corporativos de lujo
+const colors = {
+  navyDark: '#071A3D',
+  navyCard: '#0B224F',
+  skyPrimary: '#4FC3F7',
+  skyGlow: '#81D4FA',
+  accentGold: '#F59E0B',
+  goldLight: '#FDE047',
+  accentGreen: '#10B981',
+  accentRed: '#EF4444',
+  white: '#FFFFFF',
+  textMuted: '#94A3B8',
+  borderGlow: 'rgba(79, 195, 247, 0.25)',
+};
 
 const MOCK_EVENTS = [
-  // Entrenamientos
-  { id: 1, type: 'entrenamiento', title: 'Entrenamiento Táctico', date: '2026-07-03', time: '18:30', location: 'Campo 2 (Anexo)', objective: 'Mejorar la presión tras pérdida.', locker: 'Vestuario 4', materials: ['Botas', 'Espinilleras', 'Agua'] },
-  { id: 2, type: 'entrenamiento', title: 'Entrenamiento Físico', date: '2026-07-05', time: '18:30', location: 'Campo 2 (Anexo)', objective: 'Resistencia aeróbica.', locker: 'Vestuario 4', materials: ['Zapatillas running', 'Agua'] },
-  { id: 3, type: 'entrenamiento', title: 'Entrenamiento Estrategia', date: '2026-07-10', time: '18:30', location: 'Campo 1 (Principal)', objective: 'Jugadas a balón parado.', locker: 'Vestuario 1', materials: ['Botas', 'Espinilleras'] },
-  // Partidos
-  { id: 11, type: 'partido', opponent: 'Levante UD', competition: 'Liga Autonómica', matchday: 'Jornada 5', date: '2026-07-06', time: '10:00', location: 'Ciudad Deportiva Levante', status: '🟢 Convocado', meetingTime: '08:45', kit: '1ª Equipación (Azul)' },
-  { id: 12, type: 'partido', opponent: 'Valencia CF', competition: 'Liga Autonómica', matchday: 'Jornada 6', date: '2026-07-13', time: '12:00', location: 'Polideportivo CD Jesuitas', status: '🟡 Pendiente', meetingTime: '10:30', kit: '1ª Equipación (Azul)' },
-  // Torneos
-  { id: 21, type: 'torneo', title: 'Torneo de Verano', date: '2026-07-20', location: 'Gandía', description: 'Fase de grupos. Primer partido a las 09:30.' },
-  // Eventos
-  { id: 31, type: 'evento', title: 'Charla Nutricional', date: '2026-07-08', time: '19:00', location: 'Salón de Actos', description: 'Asistencia obligatoria.' }
+  { 
+    id: 1, 
+    type: 'entrenamiento', 
+    title: 'Entrenamiento Táctico y Balón Parado', 
+    date: 'Hoy Martes • 18:30h - 20:00h', 
+    pitch: 'Campo 2 Anexo (Jesuitas)', 
+    locker: 'Vestuario 4',
+    kit: 'Camiseta de Entrenamiento Azul',
+    badge: 'OBLIGATORIO'
+  },
+  { 
+    id: 2, 
+    type: 'entrenamiento', 
+    title: 'Entrenamiento Físico & Posicionamiento', 
+    date: 'Jueves 30 Oct • 18:30h - 20:00h', 
+    pitch: 'Campo 2 Anexo (Jesuitas)', 
+    locker: 'Vestuario 4',
+    kit: 'Camiseta de Entrenamiento Azul',
+    badge: 'PROGRAMADO'
+  },
+  { 
+    id: 3, 
+    type: 'partido', 
+    title: 'CD Jesuitas Cadete B vs Levante UD B', 
+    competition: 'Liga Preferente Cadete (Jornada 9)',
+    date: 'Sábado 1 Nov • 10:00h', 
+    citation: '09:15h en Vestuario 2',
+    pitch: 'Campo 1 - Polideportivo San José (Local)', 
+    kit: '1ª Equipación Oficial (Azul)',
+    status: '⭐ CONVOCADO (Titular)'
+  },
+  { 
+    id: 4, 
+    type: 'torneo', 
+    title: 'Torneo de Otoño FFCV (Expedición)', 
+    date: '15-16 Noviembre 2026', 
+    pitch: 'Complejo Deportivo Gandía', 
+    status: '📅 CONFIRMADO'
+  }
 ];
 
 export default function CalendarioJugadorScreen() {
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState('Semana');
-  const [search, setSearch] = useState('');
+  const { width: screenWidth } = useWindowDimensions();
+  const isTablet = screenWidth >= 768;
 
-  const nextEvent = MOCK_EVENTS[0]; // Forzamos el primero como próximo
+  const [activeFilter, setActiveFilter] = useState<'TODOS' | 'ENTRENOS' | 'PARTIDOS'>('TODOS');
+
+  const filteredEvents = MOCK_EVENTS.filter(e => {
+    if (activeFilter === 'ENTRENOS') return e.type === 'entrenamiento';
+    if (activeFilter === 'PARTIDOS') return e.type === 'partido';
+    return true;
+  });
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <View style={{ flex: 1, backgroundColor: colors.navyDark }}>
+      <PremiumHeader 
+        title="3. CALENDARIO" 
+        subtitle="AGENDA DE ENTRENOS Y PARTIDOS"
+        showSearchAndActions={false}
+        showAvatar={false}
+      />
+
+      <ScrollView style={styles.container} contentContainerStyle={[styles.content, isTablet && styles.contentTablet]} showsVerticalScrollIndicator={false}>
         
-        {/* CABECERA */}
-        <View style={styles.topNav}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <FontAwesome name="arrow-left" size={20} color={colors.white} />
+        {/* 1. FILTROS RÁPIDOS (TODOS / ENTRENOS / PARTIDOS) */}
+        <View style={styles.filterRow}>
+          <TouchableOpacity 
+            style={[styles.filterPill, activeFilter === 'TODOS' && styles.filterPillActive]} 
+            onPress={() => setActiveFilter('TODOS')}
+          >
+            <Text style={[styles.filterPillTxt, activeFilter === 'TODOS' && styles.filterPillTxtActive]}>TODOS</Text>
           </TouchableOpacity>
-          <Text style={styles.topNavTitle}>MI CALENDARIO</Text>
-          <View style={{ width: 40 }} />
+
+          <TouchableOpacity 
+            style={[styles.filterPill, activeFilter === 'ENTRENOS' && styles.filterPillActive]} 
+            onPress={() => setActiveFilter('ENTRENOS')}
+          >
+            <Text style={[styles.filterPillTxt, activeFilter === 'ENTRENOS' && styles.filterPillTxtActive]}>🏃 ENTRENAMIENTOS</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.filterPill, activeFilter === 'PARTIDOS' && styles.filterPillActive]} 
+            onPress={() => setActiveFilter('PARTIDOS')}
+          >
+            <Text style={[styles.filterPillTxt, activeFilter === 'PARTIDOS' && styles.filterPillTxtActive]}>🏟️ PARTIDOS</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* CONTROLES DE CALENDARIO */}
-        <View style={styles.calendarControls}>
-           <Text style={styles.monthTitle}>Julio 2026</Text>
-           
-           <View style={styles.tabsContainer}>
-              {TABS.map(tab => (
-                 <TouchableOpacity 
-                    key={tab} 
-                    style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]}
-                    onPress={() => setActiveTab(tab)}
-                 >
-                    <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
-                 </TouchableOpacity>
-              ))}
-           </View>
+        {/* 2. LISTA DE EVENTOS */}
+        <Text style={styles.sectionTitle}>📅 EVENTOS DE ESTA SEMANA</Text>
 
-           <View style={styles.searchBox}>
-              <FontAwesome name="search" size={16} color={colors.muted} />
-              <TextInput 
-                 style={styles.searchInput}
-                 placeholder="Buscar partidos, entrenamientos..."
-                 placeholderTextColor={colors.muted}
-                 value={search}
-                 onChangeText={setSearch}
-              />
-           </View>
-        </View>
-
-        {/* LEYENDA (VISTA CALENDARIO MOCK) */}
-        <View style={styles.legendContainer}>
-           <View style={styles.legendItem}><View style={[styles.legendDot, {backgroundColor: colors.sky}]} /><Text style={styles.legendText}>Entrenamientos</Text></View>
-           <View style={styles.legendItem}><View style={[styles.legendDot, {backgroundColor: '#3B82F6'}]} /><Text style={styles.legendText}>Partidos</Text></View>
-           <View style={styles.legendItem}><View style={[styles.legendDot, {backgroundColor: '#22C55E'}]} /><Text style={styles.legendText}>Eventos</Text></View>
-           <View style={styles.legendItem}><View style={[styles.legendDot, {backgroundColor: '#A855F7'}]} /><Text style={styles.legendText}>Torneos</Text></View>
-           <View style={styles.legendItem}><View style={[styles.legendDot, {backgroundColor: '#EAB308'}]} /><Text style={styles.legendText}>Actividades</Text></View>
-        </View>
-
-        {/* PRÓXIMO EVENTO HERO CARD */}
-        <Text style={styles.sectionTitle}>Próximo Evento</Text>
-        <Card delay={100} style={styles.heroCard}>
-           <View style={styles.heroHeader}>
-              <View style={styles.heroIconBox}>
-                 <FontAwesome name="soccer-ball-o" size={24} color={colors.sky} />
+        {filteredEvents.map(item => (
+          <View key={item.id} style={styles.eventCard}>
+            <LinearGradient colors={['rgba(11, 34, 79, 0.98)', 'rgba(7, 26, 61, 0.98)']} style={styles.eventGradient}>
+              
+              <View style={styles.eventHeaderRow}>
+                <View style={styles.eventTypeTag}>
+                  <Text style={styles.eventTypeTxt}>
+                    {item.type === 'entrenamiento' ? '🏃 ENTRENAMIENTO' : item.type === 'partido' ? '🏟️ PARTIDO DE LIGA' : '🏆 TORNEO'}
+                  </Text>
+                </View>
+                {!!item.status && (
+                  <View style={styles.statusTag}>
+                    <Text style={styles.statusTagTxt}>{item.status}</Text>
+                  </View>
+                )}
               </View>
-              <View style={styles.heroHeaderText}>
-                 <Text style={styles.heroTitle}>Entrenamiento</Text>
-                 <Text style={styles.heroDate}>Lunes • 18:30</Text>
+
+              <Text style={styles.eventTitle}>{item.title}</Text>
+
+              {item.competition && (
+                <Text style={styles.eventComp}>{item.competition}</Text>
+              )}
+
+              <View style={styles.eventDetailsBox}>
+                <Text style={styles.eventDateTxt}>⏰ {item.date}</Text>
+                <Text style={styles.eventLocTxt}>📍 {item.pitch}</Text>
+                
+                {item.citation && (
+                  <Text style={styles.citationTxt}>🏷️ Citación equipo: {item.citation}</Text>
+                )}
+
+                {item.locker && (
+                  <Text style={styles.lockerTxt}>🔑 Vestuario: {item.locker}</Text>
+                )}
+
+                {item.kit && (
+                  <Text style={styles.kitTxt}>🎽 Indumentaria: {item.kit}</Text>
+                )}
               </View>
-           </View>
 
-           <View style={styles.heroGrid}>
-              <View style={styles.heroGridItem}>
-                 <FontAwesome name="map-marker" size={14} color={colors.muted} style={styles.heroGridIcon} />
-                 <Text style={styles.heroGridText}>Campo 2</Text>
-              </View>
-              <View style={styles.heroGridItem}>
-                 <FontAwesome name="lock" size={14} color={colors.muted} style={styles.heroGridIcon} />
-                 <Text style={styles.heroGridText}>Vestuario 4</Text>
-              </View>
-           </View>
+            </LinearGradient>
+          </View>
+        ))}
 
-           <View style={styles.heroBoxDark}>
-              <Text style={styles.heroBoxTitle}>Material Necesario:</Text>
-              <Text style={styles.heroBoxText}>• Botas  • Espinilleras  • Agua</Text>
-           </View>
-           
-           <View style={[styles.heroBoxDark, { marginTop: 8 }]}>
-              <Text style={styles.heroBoxTitle}>Objetivo:</Text>
-              <Text style={styles.heroBoxText}>"Mejorar la presión tras pérdida."</Text>
-           </View>
-        </Card>
-
-        {/* PARTIDO DESTACADO */}
-        <Text style={styles.sectionTitle}>Próximo Partido</Text>
-        <Card delay={150} style={styles.matchCard}>
-           <View style={styles.matchHeader}>
-              <Text style={styles.matchCompetition}>Liga Autonómica • Jornada 5</Text>
-              <Text style={styles.matchDate}>Sábado 6 Jul • 10:00</Text>
-           </View>
-           
-           <View style={styles.matchTeamsRow}>
-              <View style={styles.teamShieldBox}>
-                 <FontAwesome name="shield" size={40} color={colors.white} />
-                 <Text style={styles.teamName}>CD Jesuitas</Text>
-              </View>
-              <Text style={styles.vsText}>VS</Text>
-              <View style={styles.teamShieldBox}>
-                 <FontAwesome name="shield" size={40} color={'#E11D48'} />
-                 <Text style={styles.teamName}>Levante UD</Text>
-              </View>
-           </View>
-
-           <View style={styles.matchDetailsRow}>
-              <View style={styles.matchDetailItem}>
-                 <FontAwesome name="map-marker" size={12} color={colors.sky} />
-                 <Text style={styles.matchDetailText}>Ciudad Deportiva Levante</Text>
-              </View>
-              <View style={styles.matchDetailItem}>
-                 <FontAwesome name="clock-o" size={12} color={colors.sky} />
-                 <Text style={styles.matchDetailText}>Citación: 08:45</Text>
-              </View>
-           </View>
-
-           <View style={styles.matchFooter}>
-              <View style={styles.statusBadgeGreen}>
-                 <Text style={styles.statusBadgeText}>🟢 CONVOCADO</Text>
-              </View>
-              <Text style={styles.kitText}>👕 1ª Equipación</Text>
-           </View>
-
-           <TouchableOpacity style={styles.mapsBtn}>
-              <FontAwesome name="location-arrow" size={14} color={colors.navy} />
-              <Text style={styles.mapsBtnText}>Abrir en Apple Maps</Text>
-           </TouchableOpacity>
-        </Card>
-
-        {/* OBJETIVOS DE LA SEMANA */}
-        <Text style={styles.sectionTitle}>Objetivos de la Semana</Text>
-        <Card delay={200} style={styles.objectivesCard}>
-           <View style={styles.objectiveRow}>
-              <FontAwesome name="check-square" size={20} color={colors.success} />
-              <Text style={styles.objectiveTextDone}>Llegar 15 minutos antes.</Text>
-           </View>
-           <View style={styles.objectiveRow}>
-              <FontAwesome name="check-square" size={20} color={colors.success} />
-              <Text style={styles.objectiveTextDone}>Completar los 3 entrenamientos.</Text>
-           </View>
-           <View style={styles.objectiveRow}>
-              <FontAwesome name="square-o" size={20} color={colors.muted} />
-              <Text style={styles.objectiveText}>Mejorar el pase con la pierna izquierda.</Text>
-           </View>
-           
-           <View style={styles.objProgressContainer}>
-              <Text style={styles.objProgressText}>Progreso: 66%</Text>
-              <ProgressBar progress={0.66} color={colors.success} height={6} />
-           </View>
-        </Card>
-
-        {/* RECORDATORIOS */}
-        <Text style={styles.sectionTitle}>Recordatorios</Text>
-        <View style={styles.remindersGrid}>
-           {['15 min antes', '30 min antes', '1 hora antes', '24 horas antes'].map((rem, i) => (
-             <TouchableOpacity key={i} style={[styles.reminderBtn, i === 1 && styles.reminderBtnActive]}>
-                <FontAwesome name="bell" size={12} color={i === 1 ? colors.white : colors.sky} />
-                <Text style={[styles.reminderText, i === 1 && styles.reminderTextActive]}>{rem}</Text>
-             </TouchableOpacity>
-           ))}
-        </View>
-
-        {/* RESUMEN SEMANAL */}
-        <Text style={styles.sectionTitle}>Resumen Semanal</Text>
-        <View style={styles.summaryGrid}>
-           <Card delay={250} style={styles.summaryBox}>
-              <Text style={styles.summaryNum}>3</Text>
-              <Text style={styles.summaryLbl}>Entrenos</Text>
-           </Card>
-           <Card delay={260} style={styles.summaryBox}>
-              <Text style={styles.summaryNum}>1</Text>
-              <Text style={styles.summaryLbl}>Partido</Text>
-           </Card>
-           <Card delay={270} style={styles.summaryBox}>
-              <Text style={styles.summaryNum}>0</Text>
-              <Text style={styles.summaryLbl}>Torneos</Text>
-           </Card>
-           <Card delay={280} style={styles.summaryBox}>
-              <Text style={[styles.summaryNum, { color: colors.success }]}>2/3</Text>
-              <Text style={styles.summaryLbl}>Objetivos</Text>
-           </Card>
-           <Card delay={290} style={[styles.summaryBox, { width: '100%' }]}>
-              <Text style={[styles.summaryNum, { color: colors.sky }]}>100%</Text>
-              <Text style={styles.summaryLbl}>Porcentaje de Asistencia</Text>
-           </Card>
+        {/* 3. SINCRONIZACIÓN CON CALENDARIO PERSONAL */}
+        <View style={styles.syncCard}>
+          <Ionicons name="calendar-outline" size={24} color={colors.skyPrimary} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.syncTitle}>SINCRONIZAR CON TU CALENDARIO</Text>
+            <Text style={styles.syncSub}>Añade automáticamente los horarios del Cadete B a tu iCal o Google Calendar.</Text>
+          </View>
+          <TouchableOpacity style={styles.syncBtn}>
+            <Text style={styles.syncBtnTxt}>Sincronizar</Text>
+          </TouchableOpacity>
         </View>
 
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0B1F4D' },
-  container: { flex: 1 },
-  content: { paddingHorizontal: spacing.l, paddingBottom: spacing.xxl },
-  
-  topNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.l, paddingTop: spacing.m },
-  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
-  topNavTitle: { color: colors.white, fontSize: 16, fontWeight: '900', letterSpacing: 1 },
+  container: { flex: 1, backgroundColor: colors.navyDark },
+  content: { padding: 16, paddingBottom: 60 },
+  contentTablet: { maxWidth: 900, alignSelf: 'center', width: '100%' },
 
-  calendarControls: { marginBottom: spacing.xl },
-  monthTitle: { color: colors.white, fontSize: 24, fontWeight: '900', marginBottom: spacing.m },
-  tabsContainer: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 4, marginBottom: spacing.m },
-  tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
-  tabBtnActive: { backgroundColor: colors.sky },
-  tabText: { color: colors.muted, fontSize: 13, fontWeight: '700' },
-  tabTextActive: { color: colors.navy, fontWeight: '900' },
-  
-  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, paddingHorizontal: 16, height: 48, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  searchInput: { flex: 1, marginLeft: 12, color: colors.white, fontSize: 14 },
+  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
+  filterPill: { flex: 1, backgroundColor: colors.navyCard, paddingVertical: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.borderGlow },
+  filterPillActive: { backgroundColor: colors.skyPrimary, borderColor: colors.skyPrimary },
+  filterPillTxt: { color: colors.textMuted, fontSize: 10, fontWeight: '900' },
+  filterPillTxtActive: { color: colors.navyDark, fontWeight: '900' },
 
-  legendContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: spacing.xl },
-  legendItem: { flexDirection: 'row', alignItems: 'center' },
-  legendDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-  legendText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
+  sectionTitle: { fontSize: 11, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 1.5, marginBottom: 12 },
 
-  sectionTitle: { color: colors.white, fontSize: 16, fontWeight: '900', marginBottom: spacing.m, textTransform: 'uppercase', letterSpacing: 0.5 },
+  eventCard: { borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderGlow, backgroundColor: colors.navyCard, marginBottom: 14 },
+  eventGradient: { padding: 16, gap: 8 },
 
-  heroCard: { backgroundColor: 'rgba(79, 195, 247, 0.08)', borderColor: 'rgba(79, 195, 247, 0.2)', padding: spacing.l, borderRadius: 20, marginBottom: spacing.xl },
-  heroHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  heroIconBox: { width: 48, height: 48, borderRadius: 16, backgroundColor: 'rgba(79, 195, 247, 0.2)', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-  heroTitle: { color: colors.sky, fontSize: 18, fontWeight: '900' },
-  heroDate: { color: colors.white, fontSize: 14, fontWeight: '700', marginTop: 2 },
-  heroGrid: { flexDirection: 'row', gap: 16, marginBottom: 16 },
-  heroGridItem: { flexDirection: 'row', alignItems: 'center' },
-  heroGridIcon: { marginRight: 6 },
-  heroGridText: { color: colors.white, fontSize: 13, fontWeight: '600' },
-  heroBoxDark: { backgroundColor: 'rgba(0,0,0,0.2)', padding: 12, borderRadius: 12 },
-  heroBoxTitle: { color: colors.muted, fontSize: 11, fontWeight: '800', textTransform: 'uppercase', marginBottom: 4 },
-  heroBoxText: { color: colors.white, fontSize: 13, fontWeight: '700', fontStyle: 'italic' },
+  eventHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  eventTypeTag: { backgroundColor: 'rgba(79, 195, 247, 0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  eventTypeTxt: { color: colors.skyGlow, fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
 
-  matchCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)', padding: spacing.l, borderRadius: 20, marginBottom: spacing.xl },
-  matchHeader: { alignItems: 'center', marginBottom: 16 },
-  matchCompetition: { color: colors.muted, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
-  matchDate: { color: colors.white, fontSize: 15, fontWeight: '900', marginTop: 4 },
-  matchTeamsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  teamShieldBox: { alignItems: 'center', width: 100 },
-  teamName: { color: colors.white, fontSize: 12, fontWeight: '800', marginTop: 8, textAlign: 'center' },
-  vsText: { color: colors.muted, fontSize: 16, fontWeight: '900', marginHorizontal: 20 },
-  matchDetailsRow: { flexDirection: 'row', justifyContent: 'center', gap: 16, marginBottom: 20 },
-  matchDetailItem: { flexDirection: 'row', alignItems: 'center' },
-  matchDetailText: { color: colors.white, fontSize: 12, fontWeight: '600', marginLeft: 6 },
-  matchFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingTop: 16, marginBottom: 16 },
-  statusBadgeGreen: { backgroundColor: 'rgba(34,197,94,0.1)', borderWidth: 1, borderColor: '#22C55E', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 },
-  statusBadgeText: { color: '#22C55E', fontSize: 11, fontWeight: '800' },
-  kitText: { color: colors.white, fontSize: 12, fontWeight: '700' },
-  mapsBtn: { backgroundColor: colors.sky, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, borderRadius: 12 },
-  mapsBtnText: { color: colors.navy, fontSize: 14, fontWeight: '900', marginLeft: 8 },
+  statusTag: { backgroundColor: 'rgba(16, 185, 129, 0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: colors.accentGreen },
+  statusTagTxt: { color: colors.accentGreen, fontSize: 9, fontWeight: '900' },
 
-  objectivesCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)', padding: spacing.l, borderRadius: 20, marginBottom: spacing.xl },
-  objectiveRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  objectiveTextDone: { color: colors.white, fontSize: 14, fontWeight: '600', marginLeft: 12, textDecorationLine: 'line-through', opacity: 0.7 },
-  objectiveText: { color: colors.white, fontSize: 14, fontWeight: '700', marginLeft: 12 },
-  objProgressContainer: { marginTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingTop: 16 },
-  objProgressText: { color: colors.white, fontSize: 12, fontWeight: '800', marginBottom: 8 },
+  eventTitle: { color: colors.white, fontSize: 16, fontWeight: '900', marginTop: 2 },
+  eventComp: { color: colors.skyGlow, fontSize: 11, fontWeight: '700' },
 
-  remindersGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: spacing.xl },
-  reminderBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  reminderBtnActive: { backgroundColor: 'rgba(79, 195, 247, 0.2)', borderColor: colors.sky },
-  reminderText: { color: colors.white, fontSize: 12, fontWeight: '700', marginLeft: 8 },
-  reminderTextActive: { color: colors.sky, fontWeight: '900' },
+  eventDetailsBox: { backgroundColor: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 12, gap: 4, marginTop: 4 },
+  eventDateTxt: { color: colors.goldLight, fontSize: 12, fontWeight: '800' },
+  eventLocTxt: { color: colors.white, fontSize: 11, fontWeight: '700' },
+  citationTxt: { color: colors.skyGlow, fontSize: 11, fontWeight: '800' },
+  lockerTxt: { color: colors.textMuted, fontSize: 11 },
+  kitTxt: { color: colors.textMuted, fontSize: 11 },
 
-  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 40 },
-  summaryBox: { width: '47%', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16, padding: spacing.m, alignItems: 'center', borderColor: 'rgba(255,255,255,0.05)' },
-  summaryNum: { color: colors.white, fontSize: 24, fontWeight: '900' },
-  summaryLbl: { color: colors.muted, fontSize: 11, fontWeight: '800', textTransform: 'uppercase', marginTop: 4, textAlign: 'center' },
+  syncCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.navyCard, padding: 14, borderRadius: 18, borderWidth: 1, borderColor: colors.borderGlow, marginTop: 10 },
+  syncTitle: { color: colors.white, fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
+  syncSub: { color: colors.textMuted, fontSize: 10, marginTop: 2 },
+  syncBtn: { backgroundColor: colors.skyPrimary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
+  syncBtnTxt: { color: colors.navyDark, fontSize: 11, fontWeight: '900' }
 });
