@@ -2,9 +2,20 @@ import 'react-native-url-polyfill/auto';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-const rawUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const rawKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+// Obtener extra manifest de Constants de Expo (inyectado por app.config.js en Vercel)
+const extra = Constants.expoConfig?.extra || {};
+
+const rawUrl = 
+  process.env.EXPO_PUBLIC_SUPABASE_URL || 
+  (extra.supabaseUrl as string) || 
+  '';
+
+const rawKey = 
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 
+  (extra.supabaseAnonKey as string) || 
+  '';
 
 export const supabaseUrl: string = rawUrl.trim();
 export const supabaseAnonKey: string = rawKey.trim();
