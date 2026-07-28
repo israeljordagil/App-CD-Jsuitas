@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase, isSupabaseConfigured } from '../src/lib/supabase';
+import { useAuth } from '../src/context/AuthContext';
 
 const colors = {
   navyDark: '#020814',
@@ -32,60 +33,57 @@ const colors = {
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
+  const { logout } = useAuth();
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
-  const [hasValidSession, setHasValidSession] = useState(false);
+  const [isRecoveryValid, setIsRecoveryValid] = useState(false);
   
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Comprobar la sesión de recuperación al montar la pantalla
+  // Validar sesión de recuperación específica
   useEffect(() => {
     let mounted = true;
 
-    async function checkRecoverySession() {
-      if (!supabase || !isSupabaseConfigured) {
-        if (mounted) {
-          setIsCheckingSession(false);
-          setHasValidSession(false);
-        }
-        return;
-      }
-
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (mounted) {
-          if (session) {
-            setHasValidSession(true);
-          } else {
-            setHasValidSession(false);
-          }
-          setIsCheckingSession(false);
-        }
-      } catch (err) {
-        if (mounted) {
-          setIsCheckingSession(false);
-          setHasValidSession(false);
-        }
+    // 1. En Web: comprobar si la URL contiene el parámetro hash de tipo recovery
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      if (hash.includes('type=recovery') || search.includes('type=recovery')) {
+        if (mounted) setIsRecoveryValid(true);
       }
     }
 
-    checkRecoverySession();
-
+    // 2. Escuchar el evento oficial PASSWORD_RECOVERY de Supabase Auth
     let authListener: any = null;
     if (supabase && isSupabaseConfigured) {
       const { data } = supabase.auth.onAuthStateChange((event, session) => {
         if (!mounted) return;
-        if (event === 'PASSWORD_RECOVERY' || session) {
-          setHasValidSession(true);
+        if (event === 'PASSWORD_RECOVERY') {
+          setIsRecoveryValid(true);
         }
         setIsCheckingSession(false);
       });
       authListener = data.subscription;
+
+      // Verificar si getSession indica recuperación
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!mounted) return;
+        if (session) {
+          if (Platform.OS === 'web' && (window.location.hash.includes('type=recovery') || window.location.search.includes('type=recovery'))) {
+            setIsRecoveryValid(true);
+          }
+        }
+        setIsCheckingSession(false);
+      }).catch(() => {
+        if (mounted) setIsCheckingSession(false);
+      });
+    } else {
+      if (mounted) setIsCheckingSession(false);
     }
 
     return () => {
@@ -118,25 +116,27 @@ export default function ResetPasswordScreen() {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.updateUser({
+      const { error } = await supabase.auth.updateUser({
         password: password,
       });
 
       if (error) {
-        const msg = error.message.toLowerCase();
-        if (msg.includes('auth') || msg.includes('jwt') || msg.includes('expired')) {
-          setErrorMessage('El enlace de recuperación ha caducado o no es válido.');
-        } else {
-          setErrorMessage('No se ha podido actualizar la contraseña. Inténtalo de nuevo.');
-        }
+        setErrorMessage('El enlace de recuperación ha caducado o no es válido.');
         setIsLoading(false);
         return;
       }
 
-      setSuccessMessage('¡Tu contraseña se ha actualizado correctamente!');
+      // 1. Cierre de sesión obligatorio para eliminar la sesión de recuperación
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+      await logout();
+
+      // 2. Mensaje exacto de confirmación
+      setSuccessMessage('Tu contraseña se ha actualizado correctamente.');
       setIsLoading(false);
 
-      // Redirigir a login tras 2 segundos de éxito
+      // 3. Redirección limpia a /login sin sesión activa
       setTimeout(() => {
         router.replace('/login');
       }, 2000);
@@ -179,12 +179,12 @@ export default function ResetPasswordScreen() {
             <Text style={styles.titleText}>Nueva Contraseña</Text>
             <Text style={styles.subtitleText}>Establece una contraseña segura para tu cuenta</Text>
 
-            {!hasValidSession && !successMessage ? (
+            {!isRecoveryValid && !successMessage ? (
               <View style={{ width: '100%', alignItems: 'center' }}>
                 <View style={styles.errorBox}>
                   <Ionicons name="alert-circle-outline" size={20} color={colors.errorRed} />
                   <Text style={styles.errorBoxText}>
-                    El enlace de recuperación ha caducado, no es válido o ya ha sido utilizado.
+                    El enlace de recuperación es inválido, ha caducado o no se ha detectado el evento de recuperación.
                   </Text>
                 </View>
 
