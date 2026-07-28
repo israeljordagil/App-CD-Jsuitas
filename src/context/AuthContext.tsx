@@ -41,6 +41,15 @@ interface AuthContextProps {
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
+const VALID_ROLES = new Set<ActiveContextType>([
+  'FAMILIA', 
+  'JUGADOR', 
+  'ENTRENADOR', 
+  'COORDINADOR', 
+  'DIR_DEPORTIVA', 
+  'ADMIN_GENERAL'
+]);
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -52,7 +61,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [assignedTeams, setAssignedTeams] = useState<any[]>([]);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
 
-  // MOCK DATA PARA LOS CONTEXTOS (Fallback si no hay registros deportivos completos)
+  // DATOS MOCK SOLO SI EXPO_PUBLIC_ENABLE_DEMO_ACCESS ES 'true'
+  const isDemoEnabled = process.env.EXPO_PUBLIC_ENABLE_DEMO_ACCESS === 'true';
+
   const mockPlayers = [
     { 
       id: 'p1', name: 'Pablo Martínez', sport: 'futbol', 
@@ -76,11 +87,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadUserProfileAndRoles = async (authUser: User) => {
     try {
       let fullName: string | null = authUser.user_metadata?.full_name || null;
-      let userRoles: ActiveContextType[] = ['FAMILIA'];
+      let userRoles: ActiveContextType[] = [];
 
       if (supabase && isSupabaseConfigured) {
         // 1. Consultar la tabla public.profiles
-        const { data: profileData, error: profileError } = await supabase
+        const { data: profileData } = await supabase
           .from('profiles')
           .select('full_name, email')
           .eq('id', authUser.id)
@@ -90,33 +101,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           fullName = profileData.full_name;
         }
 
-        // 2. Consultar la tabla public.user_roles
-        const { data: rolesData, error: rolesError } = await supabase
+        // 2. Consultar la tabla public.user_roles (NO ASIGNAR FAMILIA AUTOMÁTICAMENTE SI ESTÁ VACÍO)
+        const { data: rolesData } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', authUser.id);
 
         if (rolesData && rolesData.length > 0) {
-          userRoles = rolesData.map((r: any) => r.role as ActiveContextType);
+          userRoles = rolesData
+            .map((r: any) => r.role as ActiveContextType)
+            .filter((role: ActiveContextType) => VALID_ROLES.has(role));
         }
+      } else if (isDemoEnabled) {
+        userRoles = ['FAMILIA', 'JUGADOR', 'ENTRENADOR', 'COORDINADOR'];
       }
 
       const profile: UserProfile = {
         id: authUser.id,
         full_name: fullName || authUser.email?.split('@')[0] || 'Usuario Jesuitas',
         email: authUser.email || '',
-        roles: userRoles.length > 0 ? userRoles : ['FAMILIA']
+        roles: userRoles,
       };
 
       setUser(profile);
-      setLinkedPlayers(mockPlayers);
-      setActivePlayerId('p2');
-      setAssignedTeams(mockTeams);
-      setActiveTeamId('t1');
-      
-      // Asignar contexto por defecto si no está establecido
-      if (!activeContext) {
-        setActiveContext(profile.roles[0] || 'FAMILIA');
+
+      // Separación estricta de datos Mock vs Reales
+      if (isDemoEnabled) {
+        setLinkedPlayers(mockPlayers);
+        setActivePlayerId('p2');
+        setAssignedTeams(mockTeams);
+        setActiveTeamId('t1');
+      } else {
+        setLinkedPlayers([]);
+        setActivePlayerId(null);
+        setAssignedTeams([]);
+        setActiveTeamId(null);
+      }
+
+      // Si el usuario tiene roles válidos, asignar el primero como contexto activo por defecto
+      if (profile.roles.length > 0) {
+        if (!activeContext || !profile.roles.includes(activeContext)) {
+          setActiveContext(profile.roles[0]);
+        }
+      } else {
+        // Usuario autenticado pero SIN ROL asignado en Supabase
+        setActiveContext(null);
       }
     } catch (err) {
       console.error('Error cargando perfil del usuario:', err);
@@ -179,13 +208,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Inicio de Sesión con Supabase Auth (signInWithPassword)
   const loginWithEmail = async (email: string, password: string): Promise<{ error: string | null }> => {
-    // Validaciones previas
     const cleanEmail = email.trim();
-    if (!cleanEmail) {
-      return { error: 'El correo electrónico no es válido.' };
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(cleanEmail)) {
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       return { error: 'El correo electrónico no es válido.' };
     }
     if (!password || password.trim() === '') {
@@ -193,8 +217,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (!supabase || !isSupabaseConfigured) {
-      // Si Supabase no está configurado aún con credenciales reales
-      return { error: 'No se ha podido conectar con Supabase. Comprueba las variables de entorno.' };
+      return { error: 'No se ha podido conectar con Supabase. Comprueba la configuración de entorno.' };
     }
 
     try {
@@ -237,23 +260,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false, message: 'El correo electrónico no es válido.' };
     }
 
-    // URL de redirección compatible según entorno
-    let redirectUrl = 'https://app.cdjesuitas.es/login';
+    // Configuración exacta de la URL de redirección
+    let redirectUrl = 'https://app-cd-jsuitas.vercel.app/reset-password';
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      redirectUrl = `${window.location.origin}/login`;
+      const origin = window.location.origin;
+      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        redirectUrl = `${origin}/reset-password`;
+      } else {
+        redirectUrl = 'https://app-cd-jsuitas.vercel.app/reset-password';
+      }
+    } else if (Platform.OS !== 'web') {
+      redirectUrl = 'jesuitasmobileapp://reset-password';
     }
 
     if (supabase && isSupabaseConfigured) {
       try {
-        await supabase.auth.resetPasswordForEmail(cleanEmail, {
+        const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
           redirectTo: redirectUrl,
         });
+
+        if (error) {
+          return { success: false, message: 'No se ha podido enviar el correo. Inténtalo de nuevo.' };
+        }
       } catch (err) {
         console.error('Error enviando reset password:', err);
+        return { success: false, message: 'No se ha podido enviar el correo. Inténtalo de nuevo.' };
       }
     }
 
-    // Mensaje seguro que no revela si el email existe o no
     return {
       success: true,
       message: 'Te hemos enviado un correo para restablecer tu contraseña.',
@@ -285,16 +319,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const switchContext = (context: ActiveContextType) => {
+    if (user && user.roles.length > 0 && !user.roles.includes(context)) {
+      return; // No permitir cambiar a un rol no autorizado
+    }
+
     if (context === 'ENTRENADOR') {
-      setUser(prev => prev ? { ...prev, full_name: 'Raúl García Trujillo' } : { id: 'mock-entrenador', full_name: 'Raúl García Trujillo', email: '', roles: ['FAMILIA', 'JUGADOR', 'ENTRENADOR', 'COORDINADOR'] });
-      setAssignedTeams([{ id: 't-infantil-a', name: 'Infantil A', sport: 'futbol', category: 'Infantil' }]);
-      setActiveTeamId('t-infantil-a');
+      setUser(prev => prev ? { ...prev, full_name: 'Raúl García Trujillo' } : null);
+      if (isDemoEnabled) {
+        setAssignedTeams([{ id: 't-infantil-a', name: 'Infantil A', sport: 'futbol', category: 'Infantil' }]);
+        setActiveTeamId('t-infantil-a');
+      }
     } else if (context === 'COORDINADOR') {
-      setUser(prev => prev ? { ...prev, full_name: 'Coordinador de Fútbol' } : { id: 'mock-coord', full_name: 'Coordinador de Fútbol', email: '', roles: ['FAMILIA', 'JUGADOR', 'ENTRENADOR', 'COORDINADOR'] });
+      setUser(prev => prev ? { ...prev, full_name: 'Coordinador de Fútbol' } : null);
     } else if (context === 'JUGADOR') {
-      setUser(prev => prev ? { ...prev, full_name: 'Pablo Martínez' } : { id: 'mock-jugador', full_name: 'Pablo Martínez', email: '', roles: ['FAMILIA', 'JUGADOR', 'ENTRENADOR', 'COORDINADOR'] });
-    } else {
-      setUser(prev => prev ? prev : { id: 'mock-123', full_name: 'Familia Martínez', email: 'demo@jesuitas.es', roles: ['FAMILIA', 'JUGADOR', 'ENTRENADOR', 'COORDINADOR'] });
+      setUser(prev => prev ? { ...prev, full_name: 'Pablo Martínez' } : null);
     }
     setActiveContext(context);
   };
@@ -307,8 +345,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setActiveTeamId(teamId);
   };
 
-  // Acceso de Prueba (Protegido para entorno de pruebas/desarrollo)
+  // Acceso de Prueba (Desactivado en producción si DEMO_ACCESS !== 'true')
   const loginAsCoachInfantilA = () => {
+    if (process.env.EXPO_PUBLIC_ENABLE_DEMO_ACCESS !== 'true') {
+      return;
+    }
+
     setIsLoading(true);
     setUser({
       id: 'demo-entrenador-infantil-a',

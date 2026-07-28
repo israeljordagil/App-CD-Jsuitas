@@ -240,17 +240,19 @@ export function SportSelectionScreen() {
           </View>
         </View>
 
-        {/* ACCESO RÁPIDO PROBAR ENTRENADOR */}
-        <TouchableOpacity style={styles.quickCoachBanner} onPress={() => loginAsCoachInfantilA()}>
-          <LinearGradient colors={['#22c55e', '#15803d']} start={{x:0, y:0}} end={{x:1, y:0}} style={styles.quickCoachGradient}>
-            <Text style={{fontSize: 14, marginRight: 6}}>👨‍🏫</Text>
-            <View style={{flex: 1}}>
-              <Text style={styles.quickCoachTitle}>Acceso de Prueba: Entrenador Infantil A</Text>
-              <Text style={styles.quickCoachSub}>Entra directo al panel táctico y plantilla del Infantil A</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={14} color="#fff" />
-          </LinearGradient>
-        </TouchableOpacity>
+        {/* ACCESO RÁPIDO PROBAR ENTRENADOR (SOLO SI DEMO_ACCESS ESTÁ ACTIVADO) */}
+        {process.env.EXPO_PUBLIC_ENABLE_DEMO_ACCESS === 'true' && (
+          <TouchableOpacity style={styles.quickCoachBanner} onPress={() => loginAsCoachInfantilA()}>
+            <LinearGradient colors={['#22c55e', '#15803d']} start={{x:0, y:0}} end={{x:1, y:0}} style={styles.quickCoachGradient}>
+              <Text style={{fontSize: 14, marginRight: 6}}>👨‍🏫</Text>
+              <View style={{flex: 1}}>
+                <Text style={styles.quickCoachTitle}>Acceso de Prueba: Entrenador Infantil A</Text>
+                <Text style={styles.quickCoachSub}>Entra directo al panel táctico y plantilla del Infantil A</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={14} color="#fff" />
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
 
         {/* PARRILLA CON ESTRUCTURA EXPLÍCITA: 2 FILAS x 2 COLUMNAS EN ESCRITORIO / 1 COLUMNA EN MÓVIL */}
         <Text style={styles.sectionLabel}>NUESTROS 4 DEPORTES</Text>
