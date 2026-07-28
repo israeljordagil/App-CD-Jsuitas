@@ -49,11 +49,6 @@ export function getSupabaseConfigError(): string | null {
 // Inicialización limpia: true únicamente cuando ambas variables existen y son válidas
 export const isSupabaseConfigured: boolean = isValidUrl && isValidKey;
 
-// Logs temporales en tiempo de ejecución para diagnóstico
-console.log("SUPABASE URL:", supabaseUrl ? `${supabaseUrl.substring(0, 25)}...` : "UNDEFINED");
-console.log("SUPABASE KEY:", supabaseAnonKey ? `${supabaseAnonKey.substring(0, 15)}...` : "UNDEFINED");
-console.log("Configured:", isSupabaseConfigured);
-
 // Singleton Supabase Client: solo se instancia si la URL es válida para no provocar fallos de Metro/Build
 export const supabase: SupabaseClient | null = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey, {

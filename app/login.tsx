@@ -251,16 +251,6 @@ export default function LoginScreen() {
           {/* MENSAJE INFERIOR DISCRETO INSTITUCIONAL */}
           <Text style={styles.footerText}>Club Deportivo Colegio Jesuitas</Text>
 
-          {/* DIAGNÓSTICO TEMPORAL EN TIEMPO DE EJECUCIÓN */}
-          <View style={{ marginTop: 16, padding: 10, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, maxWidth: 420, width: '100%' }}>
-            <Text style={{ color: '#F59E0B', fontSize: 10, fontFamily: 'monospace' }}>
-              ENV: {JSON.stringify(process.env)}
-            </Text>
-            <Text style={{ color: '#4FC3F7', fontSize: 10, fontFamily: 'monospace', marginTop: 4 }}>
-              CONSTANTS: {JSON.stringify(Constants.expoConfig?.extra || {})}
-            </Text>
-          </View>
-
         </ScrollView>
       </KeyboardAvoidingView>
 

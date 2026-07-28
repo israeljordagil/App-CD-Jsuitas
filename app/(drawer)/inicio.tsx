@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, Text, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Text, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { PremiumHeader } from '../../src/components/ui/PremiumHeader';
 import { useAuth, ActiveContextType } from '../../src/context/AuthContext';
 import { useSport } from '../../src/context/SportContext';
@@ -9,26 +9,43 @@ import { FamiliaDashboard } from '../../src/components/dashboards/FamiliaDashboa
 import { JugadorDashboard } from '../../src/components/dashboards/JugadorDashboard';
 import { EntrenadorDashboard } from '../../src/components/dashboards/EntrenadorDashboard';
 import { CoordinadorDashboard } from '../../src/components/dashboards/CoordinadorDashboard';
+import { DireccionDeportivaDashboard } from '../../src/components/dashboards/DireccionDeportivaDashboard';
+import { AdminGeneralDashboard } from '../../src/components/dashboards/AdminGeneralDashboard';
 
-const PROFILES: { id: ActiveContextType; label: string; icon: string }[] = [
+const ALL_PROFILES: { id: ActiveContextType; label: string; icon: string }[] = [
   { id: 'FAMILIA', label: 'Familia', icon: '👨‍👩‍👧' },
   { id: 'JUGADOR', label: 'Jugador', icon: '👦' },
   { id: 'ENTRENADOR', label: 'Entrenador', icon: '👨‍🏫' },
   { id: 'COORDINADOR', label: 'Coordinación', icon: '🧭' },
+  { id: 'DIR_DEPORTIVA', label: 'Dirección deportiva', icon: '📋' },
+  { id: 'ADMIN_GENERAL', label: 'Administración', icon: '⚙️' },
 ];
 
 export default function DashboardRouterScreen() {
-  const { activeContext, switchContext } = useAuth();
+  const { user, activeContext, switchContext, isLoading } = useAuth();
   const { sport, setSport } = useSport();
   const router = useRouter();
 
-  const getSportName = () => {
+  // Filtrar perfiles únicamente por los roles autorizados del usuario real de Supabase
+  const userRoles = user?.roles || [];
+  const availableProfiles = ALL_PROFILES.filter(p => userRoles.includes(p.id));
+
+  const getHeaderTitle = () => {
+    if (activeContext === 'ADMIN_GENERAL' && !sport) {
+      return 'ADMINISTRACIÓN GENERAL';
+    }
+    if (activeContext === 'DIR_DEPORTIVA' && !sport) {
+      return 'DIRECCIÓN DEPORTIVA';
+    }
     switch (sport) {
       case 'futbol': return '⚽ FÚTBOL';
       case 'futbol_sala': return '⚽🥅 FÚTBOL SALA';
       case 'baloncesto': return '🏀 BALONCESTO';
       case 'voleibol': return '🏐 VOLEIBOL';
-      default: return 'DEPORTE';
+      default: 
+        if (activeContext === 'ADMIN_GENERAL') return 'ADMINISTRACIÓN GENERAL';
+        if (activeContext === 'DIR_DEPORTIVA') return 'DIRECCIÓN DEPORTIVA';
+        return 'DEPORTE';
     }
   };
 
@@ -38,14 +55,26 @@ export default function DashboardRouterScreen() {
   };
 
   const renderDashboard = () => {
+    if (isLoading) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#4FC3F7" />
+        </View>
+      );
+    }
+
     switch (activeContext) {
       case 'FAMILIA': return <FamiliaDashboard />;
       case 'JUGADOR': return <JugadorDashboard />;
       case 'ENTRENADOR': return <EntrenadorDashboard />;
       case 'COORDINADOR': return <CoordinadorDashboard />;
+      case 'DIR_DEPORTIVA': return <DireccionDeportivaDashboard />;
+      case 'ADMIN_GENERAL': return <AdminGeneralDashboard />;
       default: return (
-        <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-           <Text style={{color: 'white'}}>Selecciona un perfil arriba</Text>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <Text style={{ color: '#EF4444', fontSize: 15, fontWeight: '700', textAlign: 'center' }}>
+            No se ha podido cargar tu área de acceso.
+          </Text>
         </View>
       );
     }
@@ -58,7 +87,7 @@ export default function DashboardRouterScreen() {
         {/* Cabecera Fija Compacta */}
         <View style={styles.stickyHeader}>
           <PremiumHeader 
-            title={getSportName()}
+            title={getHeaderTitle()}
             subtitle="CD JESUITAS"
             showSearchAndActions={false}
             showAvatar={false}
@@ -66,31 +95,33 @@ export default function DashboardRouterScreen() {
             onBackPress={handleBackToSports}
           />
 
-          {/* Pestañas de Perfil (Compactas) */}
-          <View style={styles.tabsContainer}>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.tabsScrollContent}
-            >
-              {PROFILES.map((profile) => {
-                const isActive = activeContext === profile.id;
-                return (
-                  <TouchableOpacity
-                    key={profile.id}
-                    style={[styles.tab, isActive ? styles.tabActive : styles.tabInactive]}
-                    activeOpacity={0.8}
-                    onPress={() => switchContext(profile.id)}
-                  >
-                    <Text style={styles.tabIcon}>{profile.icon}</Text>
-                    <Text style={[styles.tabLabel, isActive ? styles.tabLabelActive : styles.tabLabelInactive]}>
-                      {profile.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
+          {/* Pestañas de Perfil (Solo se muestran si el usuario posee MÁS DE UN ROL autorizado) */}
+          {availableProfiles.length > 1 && (
+            <View style={styles.tabsContainer}>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.tabsScrollContent}
+              >
+                {availableProfiles.map((profile) => {
+                  const isActive = activeContext === profile.id;
+                  return (
+                    <TouchableOpacity
+                      key={profile.id}
+                      style={[styles.tab, isActive ? styles.tabActive : styles.tabInactive]}
+                      activeOpacity={0.8}
+                      onPress={() => switchContext(profile.id)}
+                    >
+                      <Text style={styles.tabIcon}>{profile.icon}</Text>
+                      <Text style={[styles.tabLabel, isActive ? styles.tabLabelActive : styles.tabLabelInactive]}>
+                        {profile.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
         </View>
 
         {/* Dashboard del perfil seleccionado con máxima amplitud */}
@@ -135,7 +166,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   tabActive: {
-    backgroundColor: '#4FC3F7', // Celeste cian
+    backgroundColor: '#4FC3F7',
     borderColor: '#FFFFFF',
   },
   tabInactive: {
