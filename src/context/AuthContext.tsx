@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, getSupabaseConfigError } from '../lib/supabase';
 import { Platform } from 'react-native';
 
 export type ActiveContextType = 'FAMILIA' | 'JUGADOR' | 'ENTRENADOR' | 'COORDINADOR' | 'DIR_DEPORTIVA' | 'ADMIN_GENERAL';
@@ -217,7 +217,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (!supabase || !isSupabaseConfigured) {
-      return { error: 'No se ha podido conectar con Supabase. Comprueba la configuración de entorno.' };
+      const configErr = getSupabaseConfigError();
+      return { error: configErr || 'Falta la configuración de Supabase' };
     }
 
     try {
