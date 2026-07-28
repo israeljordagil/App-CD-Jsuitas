@@ -338,7 +338,7 @@ export function FamiliaDashboard() {
           </View>
 
           {/* Botones de Respuesta Rápida 1-Clic */}
-          <Text style={styles.actionPromptText}>¿Confirmas la asistencia de {activeChild.name.split(' ')[0]}?</Text>
+          <Text style={styles.actionPromptText}>¿Asistirá {activeChild.name.split(' ')[0]} al partido?</Text>
           
           <View style={styles.callupBtnGroup}>
             <TouchableOpacity 
@@ -346,7 +346,7 @@ export function FamiliaDashboard() {
               onPress={() => handleConfirmMatch('Confirmado')}
             >
               <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
-              <Text style={styles.btnConfirmText}>SÍ ASISTE</Text>
+              <Text style={styles.btnConfirmText}>Asistirá</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -354,7 +354,7 @@ export function FamiliaDashboard() {
               onPress={() => handleConfirmMatch('Ausente')}
             >
               <Ionicons name="close-circle-outline" size={18} color="#fff" />
-              <Text style={styles.btnConfirmText}>NO ASISTE</Text>
+              <Text style={styles.btnConfirmText}>No asistirá</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -362,7 +362,7 @@ export function FamiliaDashboard() {
               onPress={() => handleConfirmMatch('Duda')}
             >
               <Ionicons name="help-circle-outline" size={18} color="#fff" />
-              <Text style={styles.btnConfirmText}>DUDA</Text>
+              <Text style={styles.btnConfirmText}>Duda</Text>
             </TouchableOpacity>
           </View>
 
