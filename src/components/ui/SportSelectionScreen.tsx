@@ -98,7 +98,8 @@ export function SportSelectionScreen() {
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
 
-  const isTablet = screenWidth >= 768;
+  // Breakpoint para activar la cuadrícula 2x2 en Escritorio / Tablet (ancho >= 640px)
+  const isDesktop = screenWidth >= 640;
 
   // Animaciones
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -116,7 +117,7 @@ export function SportSelectionScreen() {
     // Flotación suave de balones
     Animated.loop(
       Animated.sequence([
-        Animated.timing(floatAnim, { toValue: -3, duration: 2000, useNativeDriver: true }),
+        Animated.timing(floatAnim, { toValue: -2, duration: 2000, useNativeDriver: true }),
         Animated.timing(floatAnim, { toValue: 0, duration: 2000, useNativeDriver: true }),
       ])
     ).start();
@@ -134,7 +135,7 @@ export function SportSelectionScreen() {
     <LinearGradient colors={[colors.navyDeep, colors.navyDark]} style={styles.mainContainer}>
       <ScrollView 
         style={styles.scroll} 
-        contentContainerStyle={[styles.contentContainer, isTablet && styles.contentContainerTablet]} 
+        contentContainerStyle={[styles.contentContainer, isDesktop && styles.contentContainerDesktop]} 
         showsVerticalScrollIndicator={false}
       >
         
@@ -142,7 +143,7 @@ export function SportSelectionScreen() {
         <View style={styles.topContextBar}>
           <View style={styles.userInfoRow}>
             <View style={styles.userAvatarBadge}>
-              <Text style={{ fontSize: 14 }}>{activeContext === 'ENTRENADOR' ? '👨‍🏫' : activeContext === 'JUGADOR' ? '🧑‍🎽' : '👨‍👩‍👧‍👦'}</Text>
+              <Text style={{ fontSize: 13 }}>{activeContext === 'ENTRENADOR' ? '👨‍🏫' : activeContext === 'JUGADOR' ? '🧑‍🎽' : '👨‍👩‍👧‍👦'}</Text>
             </View>
             <View>
               <Text style={styles.userGreeting}>Buenos días,</Text>
@@ -159,7 +160,7 @@ export function SportSelectionScreen() {
                   style={[styles.rolePill, isActive && styles.rolePillActive]}
                   onPress={() => switchContext(r.id)}
                 >
-                  <Text style={{ fontSize: 10 }}>{r.icon}</Text>
+                  <Text style={{ fontSize: 9.5 }}>{r.icon}</Text>
                   <Text style={[styles.rolePillText, isActive && styles.rolePillTextActive]}>{r.label}</Text>
                 </TouchableOpacity>
               );
@@ -181,38 +182,40 @@ export function SportSelectionScreen() {
           <View style={styles.mottoBadge}>
             <Text style={styles.mottoText}>DEPORTE & VALORES • TEMPORADA 2026/2027</Text>
           </View>
-          <Text style={styles.heroSub}>Selecciona la modalidad para acceder a tu área deportiva</Text>
         </View>
 
         {/* ACCESO RÁPIDO PROBAR ENTRENADOR */}
         <TouchableOpacity style={styles.quickCoachBanner} onPress={() => loginAsCoachInfantilA()}>
           <LinearGradient colors={['#22c55e', '#15803d']} start={{x:0, y:0}} end={{x:1, y:0}} style={styles.quickCoachGradient}>
-            <Text style={{fontSize: 16, marginRight: 6}}>👨‍🏫</Text>
+            <Text style={{fontSize: 14, marginRight: 6}}>👨‍🏫</Text>
             <View style={{flex: 1}}>
               <Text style={styles.quickCoachTitle}>Acceso de Prueba: Entrenador Infantil A</Text>
               <Text style={styles.quickCoachSub}>Entra directo al panel táctico y plantilla del Infantil A</Text>
             </View>
-            <Ionicons name="chevron-forward" size={16} color="#fff" />
+            <Ionicons name="chevron-forward" size={14} color="#fff" />
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* PARRILLA RESPONSIVA DE DEPORTES ULTRA-COMPACTA */}
+        {/* PARRILLA RESPONSIVA REAL 2x2 EN ESCRITORIO / 1 COLUMNA EN MÓVIL */}
         <Text style={styles.sectionLabel}>NUESTROS 4 DEPORTES</Text>
         
-        <View style={[styles.sportsGrid, isTablet && styles.sportsGridTablet]}>
+        <View style={styles.sportsGrid}>
           {SPORTS.map((sport) => {
             return (
               <TouchableOpacity
                 key={sport.id}
                 activeOpacity={0.9}
-                style={[styles.cardContainer, isTablet && styles.cardContainerTablet]}
+                style={[
+                  styles.cardContainer, 
+                  { width: isDesktop ? ('48.5%' as any) : ('100%' as any) }
+                ]}
                 onPress={() => handleSelectSport(sport.id as SportType)}
               >
                 <View style={styles.cardFrame}>
                   <ImageBackground source={sport.bgImage} style={styles.cardBgImage} resizeMode="cover">
                     <LinearGradient colors={sport.gradientColors} style={StyleSheet.absoluteFillObject} />
                     
-                    {/* Header compacto de la tarjeta (Categoría y Avisos) */}
+                    {/* Header compacto (Categoría y Avisos) */}
                     <View style={styles.cardHeader}>
                       <View style={styles.badgeCategory}>
                         <Text style={styles.badgeCategoryText}>{sport.category}</Text>
@@ -224,7 +227,7 @@ export function SportSelectionScreen() {
                       )}
                     </View>
 
-                    {/* Fila Central: Nombre del Deporte + Descripción + Balón 3D Elegante */}
+                    {/* Fila Central: Nombre del Deporte + Descripción + Balón Decorativo */}
                     <View style={styles.cardMainRow}>
                       <View style={styles.cardTextCol}>
                         <Text style={styles.sportTitle}>{sport.label}</Text>
@@ -238,16 +241,16 @@ export function SportSelectionScreen() {
                       </Animated.View>
                     </View>
 
-                    {/* Próximo Evento en Franja Compacta */}
+                    {/* Próximo Evento (Franja Compacta) */}
                     <View style={styles.nextEventBox}>
                       <Ionicons name="calendar-outline" size={10} color={colors.skyPrimary} />
                       <Text style={styles.nextEventText} numberOfLines={1}>{sport.nextEvent}</Text>
                     </View>
 
-                    {/* Botón Acceder Elegante y Compacto */}
+                    {/* Botón Acceder Elegante */}
                     <View style={[styles.enterBtn, { backgroundColor: sport.colorAccent }]}>
                       <Text style={styles.enterBtnText}>ACCEDER</Text>
-                      <FontAwesome name="arrow-right" size={10} color="#fff" />
+                      <FontAwesome name="arrow-right" size={9.5} color="#fff" />
                     </View>
                   </ImageBackground>
                 </View>
@@ -278,14 +281,14 @@ const styles = StyleSheet.create({
     width: '100%'
   },
   contentContainer: { 
-    paddingTop: Platform.OS === 'ios' ? 40 : 20, 
-    paddingBottom: 30, 
-    paddingHorizontal: 14,
+    paddingTop: Platform.OS === 'ios' ? 30 : 16, 
+    paddingBottom: 20, 
+    paddingHorizontal: 12,
     minHeight: '100%'
   },
-  contentContainerTablet: { 
-    paddingHorizontal: 30, 
-    maxWidth: 920, 
+  contentContainerDesktop: { 
+    paddingHorizontal: 24, 
+    maxWidth: 880, 
     alignSelf: 'center', 
     width: '100%' 
   },
@@ -293,84 +296,87 @@ const styles = StyleSheet.create({
   // BARRA DE CONTEXTO SUPERIOR
   topContextBar: {
     backgroundColor: colors.navyCard,
-    borderRadius: 14,
-    padding: 8,
-    marginBottom: 12,
+    borderRadius: 12,
+    padding: 6,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: colors.borderGlow,
     flexDirection: 'column',
-    gap: 6,
+    gap: 4,
   },
   userInfoRow: { flexDirection: 'row', alignItems: 'center' },
   userAvatarBadge: {
-    width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.1)',
+    width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center', alignItems: 'center', marginRight: 6
   },
-  userGreeting: { fontSize: 9.5, color: colors.textMuted, fontWeight: '600' },
-  userName: { fontSize: 13, color: colors.white, fontWeight: '900' },
+  userGreeting: { fontSize: 9, color: colors.textMuted, fontWeight: '600' },
+  userName: { fontSize: 12, color: colors.white, fontWeight: '900' },
 
-  roleBadgesGroup: { flexDirection: 'row', gap: 5, flexWrap: 'wrap' },
+  roleBadgesGroup: { flexDirection: 'row', gap: 4, flexWrap: 'wrap' },
   rolePill: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8,
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
     backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)'
   },
   rolePillActive: { backgroundColor: colors.navyDeep, borderColor: colors.skyPrimary },
-  rolePillText: { fontSize: 9.5, fontWeight: '700', color: colors.textMuted },
+  rolePillText: { fontSize: 9, fontWeight: '700', color: colors.textMuted },
   rolePillTextActive: { color: colors.skyPrimary, fontWeight: '900' },
 
   // HERO HEADER
-  heroHeader: { alignItems: 'center', marginBottom: 12 },
-  escudoWrapper: { width: 54, height: 54, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
-  escudoImage: { width: 48, height: 48 },
+  heroHeader: { alignItems: 'center', marginBottom: 8 },
+  escudoWrapper: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
+  escudoImage: { width: 38, height: 38 },
 
-  heroTitle: { fontSize: 20, fontWeight: '900', color: colors.white, letterSpacing: 2, textAlign: 'center' },
+  heroTitle: { fontSize: 18, fontWeight: '900', color: colors.white, letterSpacing: 2, textAlign: 'center' },
   mottoBadge: {
-    backgroundColor: 'rgba(79, 195, 247, 0.15)', paddingHorizontal: 8, paddingVertical: 2,
-    borderRadius: 8, marginTop: 3, borderWidth: 1, borderColor: 'rgba(79, 195, 247, 0.3)'
+    backgroundColor: 'rgba(79, 195, 247, 0.15)', paddingHorizontal: 7, paddingVertical: 2,
+    borderRadius: 6, marginTop: 2, borderWidth: 1, borderColor: 'rgba(79, 195, 247, 0.3)'
   },
-  mottoText: { fontSize: 8.5, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 0.8 },
-  heroSub: { fontSize: 11, color: colors.textMuted, marginTop: 4, textAlign: 'center', fontWeight: '500' },
+  mottoText: { fontSize: 8, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 0.8 },
 
   // BANNER RAPIDO COACH
-  quickCoachBanner: { marginBottom: 12, borderRadius: 12, overflow: 'hidden' },
-  quickCoachGradient: { flexDirection: 'row', alignItems: 'center', padding: 8 },
-  quickCoachTitle: { color: '#fff', fontSize: 12, fontWeight: '900' },
-  quickCoachSub: { color: 'rgba(255,255,255,0.85)', fontSize: 9.5, fontWeight: '600' },
+  quickCoachBanner: { marginBottom: 10, borderRadius: 10, overflow: 'hidden' },
+  quickCoachGradient: { flexDirection: 'row', alignItems: 'center', padding: 6, paddingHorizontal: 10 },
+  quickCoachTitle: { color: '#fff', fontSize: 11, fontWeight: '900' },
+  quickCoachSub: { color: 'rgba(255,255,255,0.85)', fontSize: 9, fontWeight: '600' },
 
-  sectionLabel: { fontSize: 10.5, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 1.5, marginBottom: 10, textAlign: 'center' },
+  sectionLabel: { fontSize: 10, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 1.5, marginBottom: 8, textAlign: 'center' },
 
-  // PARRILLA RESPONSIVA ULTRA-COMPACTA (2 COLUMNAS TAB / 1 COLUMNA MÓVIL)
-  sportsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
-  sportsGridTablet: { gap: 12 },
+  // PARRILLA RESPONSIVA REAL 2x2
+  sportsGrid: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    justifyContent: 'space-between', 
+    rowGap: 10,
+    width: '100%' 
+  },
 
-  cardContainer: { width: '100%', borderRadius: 14, overflow: 'hidden' },
-  cardContainerTablet: { width: '48%' },
+  cardContainer: { borderRadius: 12, overflow: 'hidden' },
 
   cardFrame: {
-    borderRadius: 14, borderWidth: 1, borderColor: colors.borderGlow,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 3
+    borderRadius: 12, borderWidth: 1, borderColor: colors.borderGlow,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 3
   },
-  cardBgImage: { padding: 10, justifyContent: 'space-between' },
+  cardBgImage: { padding: 8, paddingHorizontal: 10, minHeight: 125, justifyContent: 'space-between' },
 
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  badgeCategory: { backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
-  badgeCategoryText: { color: '#fff', fontSize: 8.5, fontWeight: '900', letterSpacing: 0.5 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  badgeCategory: { backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
+  badgeCategoryText: { color: '#fff', fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
 
-  unreadBadge: { backgroundColor: colors.accentGold, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  unreadBadgeText: { color: '#000', fontSize: 8, fontWeight: '900' },
+  unreadBadge: { backgroundColor: colors.accentGold, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 },
+  unreadBadgeText: { color: '#000', fontSize: 7.5, fontWeight: '900' },
 
-  // FILA PRINCIPAL: TEXTOS A LA IZQUIERDA, EMOJI/BALÓN DECORATIVO COMPACTO (-30%) A LA DERECHA
-  cardMainRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 },
+  // FILA PRINCIPAL: TEXTOS Y BALÓN DECORATIVO COMPACTO (28px)
+  cardMainRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 4 },
   cardTextCol: { flex: 1 },
-  sportTitle: { fontSize: 16, fontWeight: '900', color: '#fff', letterSpacing: 0.8 },
-  sportDesc: { fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 14, fontWeight: '500', marginTop: 1 },
+  sportTitle: { fontSize: 15, fontWeight: '900', color: '#fff', letterSpacing: 0.8 },
+  sportDesc: { fontSize: 9.5, color: 'rgba(255,255,255,0.85)', lineHeight: 13, fontWeight: '500', marginTop: 1 },
 
   ballContainer: { justifyContent: 'center', alignItems: 'center' },
   ballCircleContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: 'rgba(0, 0, 0, 0.25)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.4)',
@@ -378,21 +384,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden'
   },
-  ball3DImage: { width: 26, height: 26 },
+  ball3DImage: { width: 22, height: 22 },
 
   nextEventBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, marginBottom: 6
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, marginBottom: 4
   },
-  nextEventText: { fontSize: 9.5, color: colors.skyGlow, fontWeight: '700' },
+  nextEventText: { fontSize: 9, color: colors.skyGlow, fontWeight: '700' },
 
   enterBtn: {
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5,
-    paddingVertical: 5, borderRadius: 8
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4,
+    paddingVertical: 4, borderRadius: 6
   },
-  enterBtnText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  enterBtnText: { color: '#fff', fontSize: 9.5, fontWeight: '900', letterSpacing: 0.8 },
 
-  footer: { marginTop: 20, alignItems: 'center', paddingBottom: 12 },
-  footerClub: { color: colors.white, fontSize: 10, fontWeight: '800' },
-  footerCopy: { color: colors.textMuted, fontSize: 8.5, marginTop: 1 }
+  footer: { marginTop: 14, alignItems: 'center', paddingBottom: 10 },
+  footerClub: { color: colors.white, fontSize: 9.5, fontWeight: '800' },
+  footerCopy: { color: colors.textMuted, fontSize: 8, marginTop: 1 }
 });
