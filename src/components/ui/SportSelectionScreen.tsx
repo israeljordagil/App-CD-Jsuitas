@@ -98,7 +98,7 @@ export function SportSelectionScreen() {
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
 
-  // Breakpoint para activar la cuadrícula 2x2 en Escritorio / Tablet (ancho >= 640px)
+  // Breakpoint para activar la cuadrícula explícita 2x2 en Escritorio / Tablet (ancho >= 640px)
   const isDesktop = screenWidth >= 640;
 
   // Animaciones
@@ -129,6 +129,62 @@ export function SportSelectionScreen() {
       switchContext('FAMILIA');
     }
     router.replace('/(drawer)/inicio' as any);
+  };
+
+  // Función reutilizable para renderizar cada tarjeta deportiva individual
+  const renderSportCard = (sport: typeof SPORTS[0]) => {
+    return (
+      <TouchableOpacity
+        key={sport.id}
+        activeOpacity={0.9}
+        style={styles.cardTouchable}
+        onPress={() => handleSelectSport(sport.id as SportType)}
+      >
+        <View style={styles.cardFrame}>
+          <ImageBackground source={sport.bgImage} style={styles.cardBgImage} resizeMode="cover">
+            <LinearGradient colors={sport.gradientColors} style={StyleSheet.absoluteFillObject} />
+            
+            {/* Header compacto (Categoría y Avisos) */}
+            <View style={styles.cardHeader}>
+              <View style={styles.badgeCategory}>
+                <Text style={styles.badgeCategoryText}>{sport.category}</Text>
+              </View>
+              {sport.unreadCount > 0 && (
+                <View style={styles.unreadBadge}>
+                  <Text style={styles.unreadBadgeText}>{sport.unreadCount} AVISOS</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Fila Central: Nombre del Deporte + Descripción + Balón Decorativo */}
+            <View style={styles.cardMainRow}>
+              <View style={styles.cardTextCol}>
+                <Text style={styles.sportTitle}>{sport.label}</Text>
+                <Text style={styles.sportDesc} numberOfLines={1}>{sport.description}</Text>
+              </View>
+
+              <Animated.View style={[styles.ballContainer, { transform: [{ translateY: floatAnim }] }]}>
+                <View style={styles.ballCircleContainer}>
+                  <Image source={sport.image3D} style={styles.ball3DImage} resizeMode="contain" />
+                </View>
+              </Animated.View>
+            </View>
+
+            {/* Próximo Evento (Franja Compacta) */}
+            <View style={styles.nextEventBox}>
+              <Ionicons name="calendar-outline" size={10} color={colors.skyPrimary} />
+              <Text style={styles.nextEventText} numberOfLines={1}>{sport.nextEvent}</Text>
+            </View>
+
+            {/* Botón Acceder Elegante */}
+            <View style={[styles.enterBtn, { backgroundColor: sport.colorAccent }]}>
+              <Text style={styles.enterBtnText}>ACCEDER</Text>
+              <FontAwesome name="arrow-right" size={9.5} color="#fff" />
+            </View>
+          </ImageBackground>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
   return (
@@ -196,68 +252,42 @@ export function SportSelectionScreen() {
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* PARRILLA RESPONSIVA REAL 2x2 EN ESCRITORIO / 1 COLUMNA EN MÓVIL */}
+        {/* PARRILLA CON ESTRUCTURA EXPLÍCITA: 2 FILAS x 2 COLUMNAS EN ESCRITORIO / 1 COLUMNA EN MÓVIL */}
         <Text style={styles.sectionLabel}>NUESTROS 4 DEPORTES</Text>
         
-        <View style={styles.sportsGrid}>
-          {SPORTS.map((sport) => {
-            return (
-              <TouchableOpacity
-                key={sport.id}
-                activeOpacity={0.9}
-                style={[
-                  styles.cardContainer, 
-                  { width: isDesktop ? ('48.5%' as any) : ('100%' as any) }
-                ]}
-                onPress={() => handleSelectSport(sport.id as SportType)}
-              >
-                <View style={styles.cardFrame}>
-                  <ImageBackground source={sport.bgImage} style={styles.cardBgImage} resizeMode="cover">
-                    <LinearGradient colors={sport.gradientColors} style={StyleSheet.absoluteFillObject} />
-                    
-                    {/* Header compacto (Categoría y Avisos) */}
-                    <View style={styles.cardHeader}>
-                      <View style={styles.badgeCategory}>
-                        <Text style={styles.badgeCategoryText}>{sport.category}</Text>
-                      </View>
-                      {sport.unreadCount > 0 && (
-                        <View style={styles.unreadBadge}>
-                          <Text style={styles.unreadBadgeText}>{sport.unreadCount} AVISOS</Text>
-                        </View>
-                      )}
-                    </View>
+        {isDesktop ? (
+          /* ESTRUCTURA EXPLÍCITA 2x2 EN ESCRITORIO */
+          <View style={styles.desktopGrid}>
+            {/* FILA 1: FÚTBOL + FÚTBOL SALA */}
+            <View style={styles.desktopRow}>
+              <View style={styles.desktopCardWrapper}>
+                {renderSportCard(SPORTS[0])}
+              </View>
+              <View style={styles.desktopCardWrapper}>
+                {renderSportCard(SPORTS[1])}
+              </View>
+            </View>
 
-                    {/* Fila Central: Nombre del Deporte + Descripción + Balón Decorativo */}
-                    <View style={styles.cardMainRow}>
-                      <View style={styles.cardTextCol}>
-                        <Text style={styles.sportTitle}>{sport.label}</Text>
-                        <Text style={styles.sportDesc} numberOfLines={1}>{sport.description}</Text>
-                      </View>
-
-                      <Animated.View style={[styles.ballContainer, { transform: [{ translateY: floatAnim }] }]}>
-                        <View style={styles.ballCircleContainer}>
-                          <Image source={sport.image3D} style={styles.ball3DImage} resizeMode="contain" />
-                        </View>
-                      </Animated.View>
-                    </View>
-
-                    {/* Próximo Evento (Franja Compacta) */}
-                    <View style={styles.nextEventBox}>
-                      <Ionicons name="calendar-outline" size={10} color={colors.skyPrimary} />
-                      <Text style={styles.nextEventText} numberOfLines={1}>{sport.nextEvent}</Text>
-                    </View>
-
-                    {/* Botón Acceder Elegante */}
-                    <View style={[styles.enterBtn, { backgroundColor: sport.colorAccent }]}>
-                      <Text style={styles.enterBtnText}>ACCEDER</Text>
-                      <FontAwesome name="arrow-right" size={9.5} color="#fff" />
-                    </View>
-                  </ImageBackground>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+            {/* FILA 2: BALONCESTO + VOLEIBOL */}
+            <View style={styles.desktopRow}>
+              <View style={styles.desktopCardWrapper}>
+                {renderSportCard(SPORTS[2])}
+              </View>
+              <View style={styles.desktopCardWrapper}>
+                {renderSportCard(SPORTS[3])}
+              </View>
+            </View>
+          </View>
+        ) : (
+          /* ESTRUCTURA VERTICAL EN MÓVIL (<640px) */
+          <View style={styles.mobileList}>
+            {SPORTS.map((sport) => (
+              <View key={sport.id} style={styles.mobileCardWrapper}>
+                {renderSportCard(sport)}
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* PIE DE PÁGINA INSTITUCIONAL */}
         <View style={styles.footer}>
@@ -287,7 +317,7 @@ const styles = StyleSheet.create({
     minHeight: '100%'
   },
   contentContainerDesktop: { 
-    paddingHorizontal: 24, 
+    paddingHorizontal: 20, 
     maxWidth: 880, 
     alignSelf: 'center', 
     width: '100%' 
@@ -342,37 +372,113 @@ const styles = StyleSheet.create({
 
   sectionLabel: { fontSize: 10, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 1.5, marginBottom: 8, textAlign: 'center' },
 
-  // PARRILLA RESPONSIVA REAL 2x2
-  sportsGrid: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    justifyContent: 'space-between', 
-    rowGap: 10,
-    width: '100%' 
+  // ESTRUCTURA EXPLÍCITA ESCRITORIO (2 FILAS x 2 COLUMNAS)
+  desktopGrid: {
+    width: '100%',
+  },
+  desktopRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    marginHorizontal: -6,
+  },
+  desktopCardWrapper: {
+    flex: 1,
+    marginHorizontal: 6,
   },
 
-  cardContainer: { borderRadius: 12, overflow: 'hidden' },
+  // ESTRUCTURA EXPLÍCITA MÓVIL (1 COLUMNA)
+  mobileList: {
+    width: '100%',
+  },
+  mobileCardWrapper: {
+    width: '100%',
+    marginBottom: 10,
+  },
 
+  // ESTILOS DE LA TARJETA REUTILIZABLE
+  cardTouchable: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
   cardFrame: {
-    borderRadius: 12, borderWidth: 1, borderColor: colors.borderGlow,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 3
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.borderGlow,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  cardBgImage: { padding: 8, paddingHorizontal: 10, minHeight: 125, justifyContent: 'space-between' },
+  cardBgImage: {
+    padding: 8,
+    paddingHorizontal: 10,
+    minHeight: 125,
+    justifyContent: 'space-between',
+  },
 
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  badgeCategory: { backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
-  badgeCategoryText: { color: '#fff', fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  badgeCategory: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+  },
+  badgeCategoryText: {
+    color: '#fff',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
 
-  unreadBadge: { backgroundColor: colors.accentGold, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 },
-  unreadBadgeText: { color: '#000', fontSize: 7.5, fontWeight: '900' },
+  unreadBadge: {
+    backgroundColor: colors.accentGold,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 5,
+  },
+  unreadBadgeText: {
+    color: '#000',
+    fontSize: 7.5,
+    fontWeight: '900',
+  },
 
   // FILA PRINCIPAL: TEXTOS Y BALÓN DECORATIVO COMPACTO (28px)
-  cardMainRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 4 },
-  cardTextCol: { flex: 1 },
-  sportTitle: { fontSize: 15, fontWeight: '900', color: '#fff', letterSpacing: 0.8 },
-  sportDesc: { fontSize: 9.5, color: 'rgba(255,255,255,0.85)', lineHeight: 13, fontWeight: '500', marginTop: 1 },
+  cardMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+    marginBottom: 4,
+  },
+  cardTextCol: {
+    flex: 1,
+  },
+  sportTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#fff',
+    letterSpacing: 0.8,
+  },
+  sportDesc: {
+    fontSize: 9.5,
+    color: 'rgba(255,255,255,0.85)',
+    lineHeight: 13,
+    fontWeight: '500',
+    marginTop: 1,
+  },
 
-  ballContainer: { justifyContent: 'center', alignItems: 'center' },
+  ballContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   ballCircleContainer: {
     width: 28,
     height: 28,
@@ -382,23 +488,57 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden'
+    overflow: 'hidden',
   },
-  ball3DImage: { width: 22, height: 22 },
+  ball3DImage: {
+    width: 22,
+    height: 22,
+  },
 
   nextEventBox: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, marginBottom: 4
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+    marginBottom: 4,
   },
-  nextEventText: { fontSize: 9, color: colors.skyGlow, fontWeight: '700' },
+  nextEventText: {
+    fontSize: 9,
+    color: colors.skyGlow,
+    fontWeight: '700',
+  },
 
   enterBtn: {
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4,
-    paddingVertical: 4, borderRadius: 6
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-  enterBtnText: { color: '#fff', fontSize: 9.5, fontWeight: '900', letterSpacing: 0.8 },
+  enterBtnText: {
+    color: '#fff',
+    fontSize: 9.5,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
 
-  footer: { marginTop: 14, alignItems: 'center', paddingBottom: 10 },
-  footerClub: { color: colors.white, fontSize: 9.5, fontWeight: '800' },
-  footerCopy: { color: colors.textMuted, fontSize: 8, marginTop: 1 }
+  footer: {
+    marginTop: 14,
+    alignItems: 'center',
+    paddingBottom: 10,
+  },
+  footerClub: {
+    color: colors.white,
+    fontSize: 9.5,
+    fontWeight: '800',
+  },
+  footerCopy: {
+    color: colors.textMuted,
+    fontSize: 8,
+    marginTop: 1,
+  },
 });
