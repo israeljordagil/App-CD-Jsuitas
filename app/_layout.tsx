@@ -1,22 +1,24 @@
 import { useFonts } from 'expo-font';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { AuthProvider, useAuth } from '../src/context/AuthContext';
+import { SportProvider } from '../src/context/SportContext';
+import { RoleProvider } from '../src/context/RoleContext';
+import { ReviewProvider } from '../src/context/ReviewContext';
 
 export {
-  // Catch any errors thrown by the Layout component.
   ErrorBoundary,
 } from 'expo-router';
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
   initialRouteName: 'index',
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -24,7 +26,6 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
     if (error) throw error;
   }, [error]);
@@ -42,20 +43,43 @@ export default function RootLayout() {
   return <RootLayoutNav />;
 }
 
-import { AuthProvider } from '../src/context/AuthContext';
-import { SportProvider } from '../src/context/SportContext';
-import { RoleProvider } from '../src/context/RoleContext';
-import { ReviewProvider } from '../src/context/ReviewContext';
-import { ContextSelector } from '../src/components/ui/ContextSelector';
-import { REVIEW_MODE } from '../src/config/reviewMode';
-import { useRouter, useSegments } from 'expo-router';
+function NavigationStack() {
+  const { session, isLoading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const inAuthGroup = segments[0] === 'login';
+
+    if (session && inAuthGroup) {
+      // Si el usuario ya está autenticado y está en la pantalla de login, redirige a inicio
+      router.replace('/(drawer)/inicio' as any);
+    }
+  }, [session, isLoading, segments]);
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#020814', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#4FC3F7" />
+      </View>
+    );
+  }
+
+  return (
+    <Stack>
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
+      <Stack.Screen name="review-center" options={{ headerShown: false, presentation: 'modal' }} />
+    </Stack>
+  );
+}
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
-  const router = useRouter();
-  const segments = useSegments();
-
-
 
   return (
     <AuthProvider>
@@ -63,12 +87,7 @@ function RootLayoutNav() {
         <RoleProvider>
           <ReviewProvider>
             <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-              <Stack>
-                <Stack.Screen name="index" options={{ headerShown: false }} />
-                <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-                <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
-                <Stack.Screen name="review-center" options={{ headerShown: false, presentation: 'modal' }} />
-              </Stack>
+              <NavigationStack />
             </ThemeProvider>
           </ReviewProvider>
         </RoleProvider>
