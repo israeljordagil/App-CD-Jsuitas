@@ -94,7 +94,7 @@ export default function EquiposScreen() {
     setFeedbackMsg(null);
   };
 
-  const handleSaveTeam = () => {
+  const handleSaveTeam = async () => {
     if (!selectedTeam) return;
     if (!editedName.trim()) {
       setFeedbackMsg({ type: 'error', text: 'El nombre completo del equipo es obligatorio.' });
@@ -121,7 +121,7 @@ export default function EquiposScreen() {
       updatedAt: new Date().toISOString()
     };
 
-    const res = updateTeam(updatedTeam);
+    const res = await updateTeam(updatedTeam);
     if (!res.success) {
       setFeedbackMsg({ type: 'error', text: res.error || 'No se pudo guardar el equipo.' });
     } else {
@@ -131,13 +131,13 @@ export default function EquiposScreen() {
     }
   };
 
-  const handleCreateTeam = () => {
+  const handleCreateTeam = async () => {
     if (!newNameInput.trim()) {
       Alert.alert('Incompleto', 'Introduce el nombre completo del equipo (ej. Cadete F).');
       return;
     }
 
-    const res = createTeam({
+    const res = await createTeam({
       name: newNameInput.trim(),
       category: newCategoryInput,
       gender: newGenderInput,

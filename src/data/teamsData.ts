@@ -3,7 +3,7 @@ import { ManagedTeam } from '../types/teams';
 export const INITIAL_TEAMS: ManagedTeam[] = [
   // FÚTBOL 11
   {
-    id: 'equ-000001',
+    id: 'b1000001-0000-4000-8000-000000000001',
     internalCode: 'EQU-000001',
     name: 'Juvenil A',
     category: 'Juvenil',
@@ -19,7 +19,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000002',
+    id: 'b1000001-0000-4000-8000-000000000002',
     internalCode: 'EQU-000002',
     name: 'Juvenil B',
     category: 'Juvenil',
@@ -35,7 +35,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000003',
+    id: 'b1000001-0000-4000-8000-000000000003',
     internalCode: 'EQU-000003',
     name: 'Cadete A',
     category: 'Cadete',
@@ -51,7 +51,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000004',
+    id: 'b1000001-0000-4000-8000-000000000004',
     internalCode: 'EQU-000004',
     name: 'Cadete B',
     category: 'Cadete',
@@ -67,7 +67,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000005',
+    id: 'b1000001-0000-4000-8000-000000000005',
     internalCode: 'EQU-000005',
     name: 'Cadete C',
     category: 'Cadete',
@@ -83,7 +83,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000006',
+    id: 'b1000001-0000-4000-8000-000000000006',
     internalCode: 'EQU-000006',
     name: 'Cadete D',
     category: 'Cadete',
@@ -99,7 +99,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000007',
+    id: 'b1000001-0000-4000-8000-000000000007',
     internalCode: 'EQU-000007',
     name: 'Cadete E',
     category: 'Cadete',
@@ -115,7 +115,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000008',
+    id: 'b1000001-0000-4000-8000-000000000008',
     internalCode: 'EQU-000008',
     name: 'Cadete Femenino',
     category: 'Cadete',
@@ -131,7 +131,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000009',
+    id: 'b1000001-0000-4000-8000-000000000009',
     internalCode: 'EQU-000009',
     name: 'Infantil A',
     category: 'Infantil',
@@ -147,7 +147,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000010',
+    id: 'b1000001-0000-4000-8000-000000000010',
     internalCode: 'EQU-000010',
     name: 'Infantil B',
     category: 'Infantil',
@@ -163,7 +163,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000011',
+    id: 'b1000001-0000-4000-8000-000000000011',
     internalCode: 'EQU-000011',
     name: 'Infantil C',
     category: 'Infantil',
@@ -179,7 +179,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000012',
+    id: 'b1000001-0000-4000-8000-000000000012',
     internalCode: 'EQU-000012',
     name: 'Infantil D',
     category: 'Infantil',
@@ -195,7 +195,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000013',
+    id: 'b1000001-0000-4000-8000-000000000013',
     internalCode: 'EQU-000013',
     name: 'Infantil E',
     category: 'Infantil',
@@ -211,7 +211,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000014',
+    id: 'b1000001-0000-4000-8000-000000000014',
     internalCode: 'EQU-000014',
     name: 'Infantil Femenino',
     category: 'Infantil',
@@ -229,7 +229,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
 
   // FÚTBOL 8
   {
-    id: 'equ-000015',
+    id: 'b1000001-0000-4000-8000-000000000015',
     internalCode: 'EQU-000015',
     name: 'Alevín A',
     category: 'Alevín',
@@ -245,7 +245,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000016',
+    id: 'b1000001-0000-4000-8000-000000000016',
     internalCode: 'EQU-000016',
     name: 'Alevín B',
     category: 'Alevín',
@@ -261,7 +261,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000017',
+    id: 'b1000001-0000-4000-8000-000000000017',
     internalCode: 'EQU-000017',
     name: 'Alevín C',
     category: 'Alevín',
@@ -277,7 +277,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000018',
+    id: 'b1000001-0000-4000-8000-000000000018',
     internalCode: 'EQU-000018',
     name: 'Alevín D',
     category: 'Alevín',
@@ -293,7 +293,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000019',
+    id: 'b1000001-0000-4000-8000-000000000019',
     internalCode: 'EQU-000019',
     name: 'Alevín E',
     category: 'Alevín',
@@ -309,7 +309,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000020',
+    id: 'b1000001-0000-4000-8000-000000000020',
     internalCode: 'EQU-000020',
     name: 'Alevín F',
     category: 'Alevín',
@@ -325,7 +325,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000021',
+    id: 'b1000001-0000-4000-8000-000000000021',
     internalCode: 'EQU-000021',
     name: 'Alevín G',
     category: 'Alevín',
@@ -341,7 +341,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000022',
+    id: 'b1000001-0000-4000-8000-000000000022',
     internalCode: 'EQU-000022',
     name: 'Alevín H',
     category: 'Alevín',
@@ -357,7 +357,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000023',
+    id: 'b1000001-0000-4000-8000-000000000023',
     internalCode: 'EQU-000023',
     name: 'Benjamín A',
     category: 'Benjamín',
@@ -373,7 +373,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000024',
+    id: 'b1000001-0000-4000-8000-000000000024',
     internalCode: 'EQU-000024',
     name: 'Benjamín B',
     category: 'Benjamín',
@@ -389,7 +389,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000025',
+    id: 'b1000001-0000-4000-8000-000000000025',
     internalCode: 'EQU-000025',
     name: 'Benjamín C',
     category: 'Benjamín',
@@ -405,7 +405,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000026',
+    id: 'b1000001-0000-4000-8000-000000000026',
     internalCode: 'EQU-000026',
     name: 'Benjamín D',
     category: 'Benjamín',
@@ -421,7 +421,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000027',
+    id: 'b1000001-0000-4000-8000-000000000027',
     internalCode: 'EQU-000027',
     name: 'Benjamín E',
     category: 'Benjamín',
@@ -437,7 +437,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000028',
+    id: 'b1000001-0000-4000-8000-000000000028',
     internalCode: 'EQU-000028',
     name: 'Prebenjamín A',
     category: 'Prebenjamín',
@@ -453,7 +453,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000029',
+    id: 'b1000001-0000-4000-8000-000000000029',
     internalCode: 'EQU-000029',
     name: 'Prebenjamín B',
     category: 'Prebenjamín',
@@ -469,7 +469,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000030',
+    id: 'b1000001-0000-4000-8000-000000000030',
     internalCode: 'EQU-000030',
     name: 'Prebenjamín C',
     category: 'Prebenjamín',
@@ -485,7 +485,7 @@ export const INITIAL_TEAMS: ManagedTeam[] = [
     updatedBy: 'Israel Jordá'
   },
   {
-    id: 'equ-000031',
+    id: 'b1000001-0000-4000-8000-000000000031',
     internalCode: 'EQU-000031',
     name: 'Querubines',
     category: 'Querubín',

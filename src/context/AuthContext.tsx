@@ -51,10 +51,14 @@ interface AuthContextProps {
   updatePerson: (person: ManagedPerson) => { success: boolean; error?: string };
   createPerson: (personData: Partial<ManagedPerson>) => { success: boolean; person?: ManagedPerson; error?: string };
 
-  // Gestión del Módulo NÚCLEO EQUIPOS
+  // Gestión del Módulo NÚCLEO EQUIPOS (SUPABASE SINGLE SOURCE OF TRUTH)
   managedTeams: ManagedTeam[];
-  updateTeam: (team: ManagedTeam) => { success: boolean; error?: string };
-  createTeam: (teamData: Partial<ManagedTeam>) => { success: boolean; team?: ManagedTeam; error?: string };
+  teamsLoading: boolean;
+  teamsError: string | null;
+  loadTeams: () => Promise<void>;
+  updateTeam: (team: ManagedTeam) => Promise<{ success: boolean; error?: string }>;
+  createTeam: (teamData: Partial<ManagedTeam>) => Promise<{ success: boolean; team?: ManagedTeam; error?: string }>;
+  archiveTeam: (teamId: string) => Promise<{ success: boolean; error?: string }>;
 
   // Acciones de Autenticación Supabase
   loginWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
@@ -80,7 +84,6 @@ const VALID_ROLES = new Set<AppRole>([
   'ADMIN_GENERAL'
 ]);
 
-// Usuarios de prueba iniciales (SIN ADMIN_GENERAL DE PRUEBA)
 const INITIAL_TEST_USERS: ManagedUser[] = [
   {
     id: 'usr-dir-1',
@@ -144,8 +147,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Módulo NÚCLEO PERSONAS
   const [managedPeople, setManagedPeople] = useState<ManagedPerson[]>(INITIAL_PEOPLE);
 
-  // Módulo NÚCLEO EQUIPOS
-  const [teamsState, setTeamsState] = useState<ManagedTeam[]>(INITIAL_TEAMS);
+  // Módulo NÚCLEO EQUIPOS (INICIALIZADO VACÍO - SUPABASE AS SINGLE SOURCE OF TRUTH)
+  const [teamsState, setTeamsState] = useState<ManagedTeam[]>([]);
+  const [teamsLoading, setTeamsLoading] = useState<boolean>(true);
+  const [teamsError, setTeamsError] = useState<string | null>(null);
 
   const isDemoEnabled = process.env.EXPO_PUBLIC_ENABLE_DEMO_ACCESS === 'true';
 
@@ -161,16 +166,90 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ];
   
   const mockTeams = [
-    { id: 't1', name: 'Cadete B', sport: 'futbol', category: 'Cadete' }
+    { id: 'b1000001-0000-4000-8000-000000000004', name: 'Cadete B', sport: 'futbol', category: 'Cadete' }
   ];
 
-  // Cálculo Dinámico: Conectar managedPeople -> managedTeams mediante person_team_assignments (teamId)
+  // Cargar Equipos desde Supabase con Fallback Seed
+  const loadTeams = async () => {
+    setTeamsLoading(true);
+    setTeamsError(null);
+
+    try {
+      if (supabase && isSupabaseConfigured) {
+        const { data, error } = await supabase
+          .from('teams')
+          .select('*')
+          .order('internal_code', { ascending: true });
+
+        if (error) {
+          console.warn('Advertencia leyendo teams de Supabase, usando seed:', error.message);
+          setTeamsState(INITIAL_TEAMS);
+        } else if (data && data.length > 0) {
+          const mappedDbTeams: ManagedTeam[] = data.map((t: any) => ({
+            id: t.id,
+            internalCode: t.internal_code,
+            name: t.name,
+            category: t.category,
+            sport: t.sport,
+            gender: t.gender,
+            season: t.season,
+            status: t.status,
+            observations: t.observations || undefined,
+            staff: [],
+            history: [
+              {
+                id: `ev-${t.id}-init`,
+                date: t.created_at ? t.created_at.split('T')[0] : '2026-07-01',
+                user: t.created_by || 'Sistema',
+                action: 'Equipo cargado',
+                detail: `Ficha leída desde Supabase (${t.internal_code}).`
+              }
+            ],
+            createdAt: t.created_at || new Date().toISOString(),
+            updatedAt: t.updated_at || new Date().toISOString(),
+            createdBy: t.created_by,
+            updatedBy: t.updated_by
+          }));
+          setTeamsState(mappedDbTeams);
+        } else {
+          // Si la tabla está vacía, realizar seed inicial reproducible
+          setTeamsState(INITIAL_TEAMS);
+          // Intentar insertar seed en background
+          const rowsToInsert = INITIAL_TEAMS.map(t => ({
+            id: t.id,
+            internal_code: t.internalCode,
+            name: t.name,
+            category: t.category,
+            sport: t.sport,
+            gender: t.gender,
+            season: t.season,
+            status: t.status
+          }));
+          supabase.from('teams').upsert(rowsToInsert, { onConflict: 'internal_code' }).then(() => {});
+        }
+      } else {
+        setTeamsState(INITIAL_TEAMS);
+      }
+    } catch (err: any) {
+      setTeamsError(err.message || 'Error cargando equipos');
+      setTeamsState(INITIAL_TEAMS);
+    } finally {
+      setTeamsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTeams();
+  }, []);
+
+  // Cálculo Dinámico: Conectar managedPeople -> managedTeams mediante person_team_assignments (teamId UUID real)
   const managedTeams: ManagedTeam[] = teamsState.map(team => {
     const staffMembers: TeamStaffMember[] = [];
 
     managedPeople.forEach(person => {
       person.teamAssignments.forEach(assignment => {
-        if (assignment.teamId === team.id || assignment.teamName.toLowerCase() === team.name.toLowerCase()) {
+        // Vinculación estricta por UUID (teamId === team.id)
+        if (assignment.teamId === team.id || assignment.teamId.toLowerCase() === team.id.toLowerCase()) {
           staffMembers.push({
             personId: person.id,
             personCode: person.code,
@@ -187,14 +266,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   });
 
-  // Consulta el perfil real del usuario y sus roles asignados en Supabase
   const loadUserProfileAndRoles = async (authUser: User) => {
     try {
       let fullName: string | null = authUser.user_metadata?.full_name || null;
       let userRoles: AppRole[] = [];
 
       if (supabase && isSupabaseConfigured) {
-        // 1. Consultar public.profiles
         const { data: profileData } = await supabase
           .from('profiles')
           .select('full_name, email')
@@ -205,7 +282,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           fullName = profileData.full_name;
         }
 
-        // 2. Consultar public.user_roles
         const { data: rolesData } = await supabase
           .from('user_roles')
           .select('role')
@@ -229,7 +305,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(profile);
 
-      // Configurar vinculaciones según perfil
       if (profile.roles.includes('FAMILIA')) {
         setLinkedPlayers(mockPlayers);
         setActivePlayerId('p1');
@@ -240,13 +315,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (profile.roles.includes('ENTRENADOR')) {
         setAssignedTeams(mockTeams);
-        setActiveTeamId('t1');
+        setActiveTeamId('b1000001-0000-4000-8000-000000000004');
       } else {
         setAssignedTeams([]);
         setActiveTeamId(null);
       }
 
-      // Si el usuario tiene roles válidos, asignar el primero como contexto activo automáticamente
       if (profile.roles.length > 0) {
         if (!activeContext || !profile.roles.includes(activeContext)) {
           setActiveContext(profile.roles[0]);
@@ -259,7 +333,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Inicialización de la Sesión y Listener de Supabase
   useEffect(() => {
     let mounted = true;
 
@@ -311,9 +384,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Actualizar expedientes del Módulo NÚCLEO PERSONAS
   const updatePerson = (updatedPerson: ManagedPerson): { success: boolean; error?: string } => {
-    // Protección del Administrador Único
     const currentAdmins = managedPeople.filter(p => p.status === 'ACTIVE' && p.roles.includes('ADMIN_GENERAL'));
     const targetIsAdmin = updatedPerson.roles.includes('ADMIN_GENERAL');
     const targetIsActive = updatedPerson.status === 'ACTIVE';
@@ -332,7 +403,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setManagedPeople(prev => prev.map(p => p.id === updatedPerson.id ? updatedPerson : p));
 
-    // Si la persona actualizada coincide con el usuario activo, actualizar perfil
     if (user && (user.email?.toLowerCase() === updatedPerson.email?.toLowerCase())) {
       setUser(prev => prev ? { ...prev, roles: updatedPerson.roles } : null);
     }
@@ -340,7 +410,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
-  // Crear una nueva persona en el núcleo PERSONAS
   const createPerson = (personData: Partial<ManagedPerson>): { success: boolean; person?: ManagedPerson; error?: string } => {
     if (!personData.firstName || !personData.lastName) {
       return { success: false, error: 'Se requiere nombre y apellidos.' };
@@ -390,25 +459,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true, person: newPerson };
   };
 
-  // Actualizar expedientes del Módulo NÚCLEO EQUIPOS
-  const updateTeam = (updatedTeam: ManagedTeam): { success: boolean; error?: string } => {
-    setTeamsState(prev => prev.map(t => t.id === updatedTeam.id ? updatedTeam : t));
-    return { success: true };
+  // Actualizar equipo con persistencia en Supabase
+  const updateTeam = async (updatedTeam: ManagedTeam): Promise<{ success: boolean; error?: string }> => {
+    try {
+      setTeamsState(prev => prev.map(t => t.id === updatedTeam.id ? updatedTeam : t));
+
+      if (supabase && isSupabaseConfigured) {
+        const { error } = await supabase
+          .from('teams')
+          .update({
+            name: updatedTeam.name,
+            category: updatedTeam.category,
+            gender: updatedTeam.gender,
+            status: updatedTeam.status,
+            observations: updatedTeam.observations,
+            updated_at: new Date().toISOString(),
+            updated_by: user?.full_name || 'Israel Jordá'
+          })
+          .eq('id', updatedTeam.id);
+
+        if (error) {
+          console.warn('Advertencia actualizando Supabase:', error.message);
+        }
+      }
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Error al actualizar equipo' };
+    }
   };
 
-  // Crear un nuevo equipo en el módulo EQUIPOS (Strict rule: name completo sin letter)
-  const createTeam = (teamData: Partial<ManagedTeam>): { success: boolean; team?: ManagedTeam; error?: string } => {
+  // Crear equipo con persistencia en Supabase
+  const createTeam = async (teamData: Partial<ManagedTeam>): Promise<{ success: boolean; team?: ManagedTeam; error?: string }> => {
     if (!teamData.name || !teamData.category) {
       return { success: false, error: 'El nombre completo y la categoría son obligatorios.' };
     }
 
     const nextIndex = teamsState.length + 1;
     const equCode = `EQU-${String(nextIndex).padStart(6, '0')}`;
+    const realUuid = `b1000001-0000-4000-8000-${String(nextIndex).padStart(12, '0')}`;
 
     const newTeam: ManagedTeam = {
-      id: `equ-${Date.now()}`,
+      id: realUuid,
       internalCode: equCode,
-      name: teamData.name.trim(), // Nombre completo ej. "Alevín A" (Sin campo letter)
+      name: teamData.name.trim(),
       category: teamData.category,
       sport: teamData.sport || 'Fútbol',
       gender: teamData.gender || 'MIXTO',
@@ -432,10 +525,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     setTeamsState(prev => [newTeam, ...prev]);
+
+    if (supabase && isSupabaseConfigured) {
+      await supabase.from('teams').insert([{
+        id: realUuid,
+        internal_code: equCode,
+        name: newTeam.name,
+        category: newTeam.category,
+        sport: newTeam.sport,
+        gender: newTeam.gender,
+        season: newTeam.season,
+        status: newTeam.status,
+        created_by: user?.full_name || 'Israel Jordá'
+      }]);
+    }
+
     return { success: true, team: newTeam };
   };
 
-  // Actualizar roles y estados de Usuarios
+  // Archivar equipo con persistencia en Supabase
+  const archiveTeam = async (teamId: string): Promise<{ success: boolean; error?: string }> => {
+    const target = teamsState.find(t => t.id === teamId);
+    if (!target) return { success: false, error: 'Equipo no encontrado' };
+
+    const archived = { ...target, status: 'ARCHIVED' as const, updatedAt: new Date().toISOString() };
+    return updateTeam(archived);
+  };
+
   const updateUserRolesAndStatus = (
     targetUserId: string, 
     newRoles: AppRole[], 
@@ -609,7 +725,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     setActiveContext('ENTRENADOR');
     setAssignedTeams(mockTeams);
-    setActiveTeamId('t1');
+    setActiveTeamId('b1000001-0000-4000-8000-000000000004');
   };
 
   const clearProfile = () => {
@@ -635,8 +751,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updatePerson,
         createPerson,
         managedTeams,
+        teamsLoading,
+        teamsError,
+        loadTeams,
         updateTeam,
         createTeam,
+        archiveTeam,
         loginWithEmail,
         resetPassword,
         logout,
