@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 
 // Colores corporativos de lujo
@@ -28,6 +29,7 @@ const colors = {
 };
 
 export function FamiliaDashboard() {
+  const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
   const isTablet = screenWidth >= 768;
 
@@ -169,6 +171,33 @@ export function FamiliaDashboard() {
               );
             })}
           </View>
+
+          {/* ACCESO DIRECTO DESTACADO A MI ZONA */}
+          <TouchableOpacity 
+            style={styles.miZonaCardBanner} 
+            activeOpacity={0.9}
+            onPress={() => router.push('/(drawer)/mi-zona')}
+          >
+            <LinearGradient
+              colors={['#0E2E6B', '#071A3D']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.miZonaCardGradient}
+            >
+              <View style={styles.miZonaCardLeft}>
+                <View style={styles.miZonaIconCircle}>
+                  <Text style={{ fontSize: 22 }}>🌟</Text>
+                </View>
+                <View>
+                  <Text style={styles.miZonaTitle}>MI ZONA • ESPACIO GAMIFICADO</Text>
+                  <Text style={styles.miZonaSub}>Cromo, retos, racha e insignias de {activeChild?.name?.split(' ')[0] || 'tu hijo/a'}</Text>
+                </View>
+              </View>
+              <View style={styles.miZonaArrowBtn}>
+                <Ionicons name="arrow-forward" size={18} color={colors.navyDark} />
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
 
           {/* 1. ENTRENAMIENTOS DE LA SEMANA (AL DÍA) */}
           <Text style={styles.sectionTitle}>1. ENTRENAMIENTOS DE LA SEMANA (AL DÍA)</Text>
@@ -436,6 +465,57 @@ const styles = StyleSheet.create({
   childNameActive: { color: colors.skyGlow },
   childTeamSub: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
   activeCheckBadge: {},
+
+  // TARJETA ACCESO MI ZONA
+  miZonaCardBanner: {
+    marginVertical: 10,
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: colors.skyPrimary,
+  },
+  miZonaCardGradient: {
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  miZonaCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  miZonaIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(79, 195, 247, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.skyPrimary,
+  },
+  miZonaTitle: {
+    color: colors.white,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  miZonaSub: {
+    color: colors.skyGlow,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  miZonaArrowBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.skyPrimary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   // CARD BOX CONTENEDOR
   cardBox: { borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderGlow, backgroundColor: colors.navyCard },

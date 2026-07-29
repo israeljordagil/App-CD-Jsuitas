@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { CromoJugador } from '../ui/CromoJugador';
 
 // Colores corporativos de lujo
 const colors = {
@@ -154,16 +155,21 @@ export function FamiliaMiHijo() {
         })}
       </View>
 
-      {/* 3. VISTA 1: CROMO OFICIAL IDÉNTICO A LA FOTO DE REFERENCIA DEL USUARIO */}
+      {/* 3. VISTA 1: CROMO OFICIAL COMPARTIDO */}
       {activeSubTab === 'cromo' && (
         <View style={styles.cromoContainer}>
-          <View style={styles.cardFrameWrapper}>
-            <Image 
-              source={player.cardImage} 
-              style={styles.cardImageRender}
-              resizeMode="contain"
-            />
-          </View>
+          <CromoJugador
+            name={player.fullName}
+            dorsal={player.dorsal}
+            position={player.position}
+            team={player.team}
+            category={player.category}
+            level={14}
+            currentXp={1250}
+            nextLevelXp={2000}
+            streakWeeks={4}
+            photo="👦"
+          />
 
           {/* BOTÓN COMPARTIR CROMO EN ORO METÁLICO */}
           <TouchableOpacity style={styles.btnShareFifaGold} onPress={handleShareCard}>

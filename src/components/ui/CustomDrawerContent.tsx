@@ -18,6 +18,7 @@ const clubColors = {
 const FAMILIAS_MENU_ITEMS = [
   { label: 'Inicio', route: 'index', icon: '🏠' },
   { label: 'Mis hijos', route: 'jugadores', icon: '👦' },
+  { label: 'Mi Zona', route: 'mi-zona', icon: '🌟' },
   { label: 'Calendario', route: 'calendario', icon: '📅' },
   { label: 'Convocatorias', route: 'convocatorias', icon: '📋' },
   { label: 'Entrenamientos', route: 'entrenamientos', icon: '🏃' },
