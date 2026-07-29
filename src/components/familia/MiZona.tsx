@@ -6,20 +6,18 @@ import {
   ScrollView, 
   TouchableOpacity, 
   useWindowDimensions,
-  ActivityIndicator
+  ActivityIndicator,
+  Share
 } from 'react-native';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { usePlayerGamification } from '../../hooks/usePlayerGamification';
 import { CromoJugador } from '../ui/CromoJugador';
-import { DEMO_FAMILY } from '../../data/demoFamilyData';
 import { 
   INSIGNIAS, 
   RETO_TABS, 
-  getRetosByCategory,
-  Insignia,
-  Reto
+  getRetosByCategory 
 } from '../../data/gamificationData';
 
 const colors = {
@@ -36,15 +34,89 @@ const colors = {
   borderGlow: 'rgba(79, 195, 247, 0.25)',
 };
 
-interface NormalizedPlayer {
+export interface UnifiedPlayer {
   id: string;
   name: string;
   fullName: string;
   team: string;
   category: string;
-  dorsal?: number | string;
-  position?: string;
-  avatarIcon?: string;
+  dorsal: string;
+  position: string;
+  avatarIcon: string;
+  cardImage?: any;
+  level: number;
+  currentXp: number;
+  nextLevelXp: number;
+  streakWeeks: number;
+}
+
+// Función unificadora para la fuente de datos de deportistas familiares (Supabase / Demo)
+export function getUnifiedFamilyPlayers(linkedPlayers: any[]): UnifiedPlayer[] {
+  if (Array.isArray(linkedPlayers) && linkedPlayers.length > 0) {
+    return linkedPlayers.map((p, idx) => ({
+      id: p.id || `linked-${idx}`,
+      name: p.name || p.shortName || p.fullName || 'Deportista',
+      fullName: p.fullName || p.name || 'Deportista',
+      team: p.team || p.teamName || 'Equipo CD Jesuitas',
+      category: p.category || 'Formativo',
+      dorsal: p.dorsal ? String(p.dorsal) : '10',
+      position: p.position || 'DEPORTISTA',
+      avatarIcon: p.avatarIcon || '👦',
+      cardImage: p.cardImage || null,
+      level: p.level || 14,
+      currentXp: p.currentXp || p.xpTotal || 1250,
+      nextLevelXp: p.nextLevelXp || 2000,
+      streakWeeks: p.streakWeeks || p.rachaActual || 4,
+    }));
+  }
+
+  // En demo sin datos de Supabase, retornar la lista de cromo aprobada de Pablo, Hugo y Sergio
+  return [
+    {
+      id: 'a1000001-0000-4000-8000-000000000046',
+      name: 'Pablo Martínez',
+      fullName: 'Pablo Martínez García',
+      team: 'Cadete B Fútbol',
+      category: 'Cadete F11',
+      dorsal: '10',
+      position: 'CENTROCAMPISTA',
+      avatarIcon: '👦',
+      cardImage: require('../../../assets/images/cromo_pablo_gold.jpg'),
+      level: 14,
+      currentXp: 1250,
+      nextLevelXp: 2000,
+      streakWeeks: 4,
+    },
+    {
+      id: 'a1000001-0000-4000-8000-000000000047',
+      name: 'Hugo Martínez',
+      fullName: 'Hugo Martínez García',
+      team: 'Infantil A Fútbol',
+      category: 'Infantil F11',
+      dorsal: '9',
+      position: 'DELANTERO',
+      avatarIcon: '👦',
+      cardImage: require('../../../assets/images/cromo_hugo_gold.jpg'),
+      level: 12,
+      currentXp: 980,
+      nextLevelXp: 1500,
+      streakWeeks: 3,
+    },
+    {
+      id: 'a1000001-0000-4000-8000-000000000048',
+      name: 'Sergio García',
+      fullName: 'Sergio García Martínez',
+      team: 'Benjamín A Futsal',
+      category: 'Benjamín 5v5',
+      dorsal: '5',
+      position: 'CIERRE',
+      avatarIcon: '👦',
+      level: 8,
+      currentXp: 450,
+      nextLevelXp: 1000,
+      streakWeeks: 2,
+    }
+  ];
 }
 
 export function MiZona() {
@@ -61,25 +133,11 @@ export function MiZona() {
 
   const [activeRetoTab, setActiveRetoTab] = useState<string>('Ataque');
 
-  // Normalización defensiva de datos demo y Supabase para evitar TypeErrors
-  const demoChildren = (DEMO_FAMILY && Array.isArray(DEMO_FAMILY.children)) ? DEMO_FAMILY.children : [];
-  const rawChildrenList = (Array.isArray(linkedPlayers) && linkedPlayers.length > 0)
-    ? linkedPlayers
-    : demoChildren;
+  // Fuente única y unificada de deportistas
+  const playersList = getUnifiedFamilyPlayers(linkedPlayers);
 
-  const normalizedChildren: NormalizedPlayer[] = rawChildrenList.map((c: any) => ({
-    id: c.id || c.playerId || 'demo-child-id',
-    name: c.name || c.fullName || 'Deportista',
-    fullName: c.fullName || c.name || 'Deportista',
-    team: c.team || c.teamName || c.sportLabel || 'Equipo CD Jesuitas',
-    category: c.category || 'Formativo',
-    dorsal: c.dorsal || 10,
-    position: c.position || 'DEPORTISTA',
-    avatarIcon: c.avatarIcon || '👦',
-  }));
-
-  const selectedPlayerId = activePlayerId || normalizedChildren[0]?.id || null;
-  const activeChild = normalizedChildren.find(c => c.id === selectedPlayerId) || normalizedChildren[0] || null;
+  const selectedPlayerId = activePlayerId || playersList[0]?.id || null;
+  const activeChild = playersList.find(c => c.id === selectedPlayerId) || playersList[0] || null;
 
   // Hook de gamificación persistida en Supabase por jugador_id
   const { 
@@ -91,19 +149,29 @@ export function MiZona() {
   const isLoading = authLoading || gamiLoading;
   const errorMessage = authError || gamiError;
 
-  // Valores de gamificación con fallbacks seguros para evitar ocultar el Cromo
+  // Valores de gamificación con fallbacks seguros basados en la ficha del jugador
   const safeGamification = {
-    level: gamification?.level ?? 1,
-    xpTotal: gamification?.xpTotal ?? 0,
-    nextLevelXp: gamification?.nextLevelXp ?? 1000,
-    rachaActual: gamification?.rachaActual ?? 0,
+    level: gamification?.level ?? activeChild?.level ?? 1,
+    xpTotal: gamification?.xpTotal ?? activeChild?.currentXp ?? 0,
+    nextLevelXp: gamification?.nextLevelXp ?? activeChild?.nextLevelXp ?? 1000,
+    rachaActual: gamification?.rachaActual ?? activeChild?.streakWeeks ?? 0,
     insigniasConseguidasCount: gamification?.insigniasConseguidasCount ?? 0,
     badgesMap: gamification?.badgesMap ?? {},
     challengesMap: gamification?.challengesMap ?? {},
   };
 
-  // Retos por categoría seleccionada
   const retosCurrentCategory = getRetosByCategory(activeRetoTab);
+
+  const handleShareCard = async () => {
+    if (!activeChild) return;
+    try {
+      await Share.share({
+        message: `🔥 ¡MIRA EL CROMO OFICIAL FFCV 2026 DE ${activeChild.fullName.toUpperCase()}! Dorsal #${activeChild.dorsal} - ${activeChild.team}.`,
+      });
+    } catch (e) {
+      console.log(e);
+    }
+  };
 
   return (
     <ScrollView 
@@ -111,7 +179,7 @@ export function MiZona() {
       contentContainerStyle={[styles.content, isTablet && styles.contentTablet]} 
       showsVerticalScrollIndicator={false}
     >
-      {/* 1. ENCABEZADO DE SECCIÓN */}
+      {/* ENCABEZADO DE SECCIÓN */}
       <View style={styles.headerBanner}>
         <LinearGradient
           colors={['rgba(79, 195, 247, 0.15)', 'transparent']}
@@ -120,12 +188,12 @@ export function MiZona() {
         <View style={styles.headerTopRow}>
           <View style={styles.badgeSparkle}>
             <Ionicons name="star" size={16} color={colors.accentGold} />
-            <Text style={styles.badgeSparkleTxt}>GAMIFICACIÓN OFICIAL • CD JESUITAS</Text>
+            <Text style={styles.badgeSparkleTxt}>EXPERIENCIA ÚNICA • CD JESUITAS</Text>
           </View>
         </View>
         <Text style={styles.headerTitle}>🌟 MI ZONA</Text>
         <Text style={styles.headerSubtitle}>
-          Cromo oficial, nivel, racha y retos de {activeChild?.name || 'deportista'}
+          Cromo oficial, nivel, racha y retos de {activeChild?.fullName || 'deportista'}
         </Text>
       </View>
 
@@ -138,7 +206,7 @@ export function MiZona() {
       )}
 
       {/* ESTADO VACÍO DEFENSIVO */}
-      {normalizedChildren.length === 0 ? (
+      {playersList.length === 0 ? (
         <View style={styles.emptyBox}>
           <Ionicons name="shield-outline" size={44} color={colors.skyGlow} />
           <Text style={styles.emptyTitle}>No hay un jugador vinculado a esta cuenta</Text>
@@ -149,11 +217,11 @@ export function MiZona() {
       ) : (
         <>
           {/* ORDEN VISUAL MANDATORIO 1: SELECTOR DE HIJO (SI HAY MÁS DE UNO) */}
-          {normalizedChildren.length > 1 && (
+          {playersList.length > 1 && (
             <View style={styles.childSelectorGroup}>
               <Text style={styles.selectorLabel}>DEPORTISTA SELECCIONADO:</Text>
               <View style={styles.selectorRow}>
-                {normalizedChildren.map((child) => {
+                {playersList.map((child) => {
                   const isSelected = child.id === selectedPlayerId;
                   return (
                     <TouchableOpacity
@@ -176,14 +244,14 @@ export function MiZona() {
             </View>
           )}
 
-          {/* ORDEN VISUAL MANDATORIO 2: CROMO COMPLETO DEL JUGADOR (ELEMENTO PRINCIPAL) */}
+          {/* ORDEN VISUAL MANDATORIO 2: CROMO COMPLETO APROBADO DEL JUGADOR */}
           {activeChild && (
             <View style={styles.cromoSectionContainer}>
               <Text style={styles.sectionTitle}>1. CROMO OFICIAL DEL DEPORTISTA</Text>
               <CromoJugador
-                name={activeChild.name}
-                dorsal={activeChild.dorsal ? String(activeChild.dorsal) : '10'}
-                position={activeChild.position || 'DEPORTISTA'}
+                name={activeChild.fullName}
+                dorsal={activeChild.dorsal}
+                position={activeChild.position}
                 team={activeChild.team}
                 category={activeChild.category}
                 level={safeGamification.level}
@@ -192,6 +260,23 @@ export function MiZona() {
                 streakWeeks={safeGamification.rachaActual}
                 photo={activeChild.avatarIcon || '👦'}
               />
+
+              {/* Botón de Compartir Cromo en Redes / WhatsApp */}
+              <TouchableOpacity 
+                style={styles.btnShareFifaGold} 
+                onPress={handleShareCard}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={['#EAB308', '#CA8A04']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.btnShareFifaGradient}
+                >
+                  <Ionicons name="share-social" size={18} color="#030200" />
+                  <Text style={styles.btnShareFifaText}>COMPARTIR CROMO OFICIAL EN WHATSAPP</Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -263,7 +348,6 @@ export function MiZona() {
                     </View>
                   </View>
 
-                  {/* Barra de progreso visual */}
                   <View style={styles.retoProgressTrack}>
                     <View 
                       style={[
@@ -488,6 +572,26 @@ const styles = StyleSheet.create({
   },
   cromoSectionContainer: {
     marginBottom: 10,
+  },
+  btnShareFifaGold: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginTop: 12,
+    marginBottom: 10,
+    width: '100%',
+  },
+  btnShareFifaGradient: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+  },
+  btnShareFifaText: {
+    color: '#030200',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
   sectionTitle: {
     color: colors.skyPrimary,
