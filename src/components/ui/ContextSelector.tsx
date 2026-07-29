@@ -6,7 +6,6 @@ import { useRole } from '../../context/RoleContext';
 
 const TABS: { id: ActiveContextType; label: string; icon: string }[] = [
   { id: 'FAMILIA', label: 'FAMILIA', icon: '👨‍👩‍👧' },
-  { id: 'JUGADOR', label: 'JUGADOR', icon: '👦' },
   { id: 'ENTRENADOR', label: 'ENTRENADOR', icon: '👨‍🏫' },
   { id: 'COORDINADOR', label: 'COORDINACIÓN', icon: '🧭' },
 ];
@@ -23,7 +22,6 @@ export function ContextSelector() {
   const handleSelectTab = (tabId: ActiveContextType) => {
     switchContext(tabId);
     if (tabId === 'FAMILIA') setRole('familias');
-    else if (tabId === 'JUGADOR') setRole('jugadores');
     else if (tabId === 'ENTRENADOR') setRole('entrenadores');
     else if (tabId === 'COORDINADOR') setRole('coordinadores');
   };
@@ -36,7 +34,7 @@ export function ContextSelector() {
         contentContainerStyle={styles.scrollContent}
       >
         {TABS.map((tab) => {
-          const isActive = activeContext === tab.id || (role === 'jugadores' && tab.id === 'JUGADOR') || (role === 'familias' && tab.id === 'FAMILIA');
+          const isActive = activeContext === tab.id || (role === 'familias' && tab.id === 'FAMILIA');
           return (
             <TouchableOpacity 
               key={tab.id}

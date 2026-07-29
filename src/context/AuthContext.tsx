@@ -80,7 +80,6 @@ const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
 const VALID_ROLES = new Set<AppRole>([
   'FAMILIA', 
-  'JUGADOR', 
   'ENTRENADOR', 
   'COORDINADOR', 
   'DIR_DEPORTIVA', 
@@ -121,14 +120,6 @@ const INITIAL_TEST_USERS: ManagedUser[] = [
     email: 'familia.prueba@cdjesuitas.es',
     status: 'ACTIVE',
     roles: ['FAMILIA'],
-    createdAt: '2026-07-01T10:00:00Z'
-  },
-  {
-    id: 'usr-jug-1',
-    fullName: 'Jugador Prueba',
-    email: 'jugador.prueba@cdjesuitas.es',
-    status: 'ACTIVE',
-    roles: ['JUGADOR'],
     createdAt: '2026-07-01T10:00:00Z'
   }
 ];
@@ -369,7 +360,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .filter((role: AppRole) => VALID_ROLES.has(role));
         }
       } else if (isDemoEnabled) {
-        userRoles = ['FAMILIA', 'JUGADOR', 'ENTRENADOR', 'COORDINADOR'];
+        userRoles = ['FAMILIA', 'ENTRENADOR', 'COORDINADOR'];
       }
 
       const profile: UserProfile = {

@@ -87,7 +87,6 @@ const SPORTS = [
 
 const ROLES_INFO: { id: ActiveContextType; label: string; icon: string }[] = [
   { id: 'FAMILIA', label: 'Familia', icon: '👨‍👩‍👧‍👦' },
-  { id: 'JUGADOR', label: 'Jugador', icon: '🧑‍🎽' },
   { id: 'ENTRENADOR', label: 'Entrenador', icon: '👨‍🏫' },
   { id: 'COORDINADOR', label: 'Coordinación', icon: '🧭' },
 ];
@@ -199,7 +198,7 @@ export function SportSelectionScreen() {
         <View style={styles.topContextBar}>
           <View style={styles.userInfoRow}>
             <View style={styles.userAvatarBadge}>
-              <Text style={{ fontSize: 13 }}>{activeContext === 'ENTRENADOR' ? '👨‍🏫' : activeContext === 'JUGADOR' ? '🧑‍🎽' : '👨‍👩‍👧‍👦'}</Text>
+              <Text style={{ fontSize: 13 }}>{activeContext === 'ENTRENADOR' ? '👨‍🏫' : activeContext === 'COORDINADOR' ? '🧭' : '👨‍👩‍👧‍👦'}</Text>
             </View>
             <View>
               <Text style={styles.userGreeting}>Buenos días,</Text>

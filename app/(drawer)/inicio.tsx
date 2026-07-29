@@ -6,7 +6,6 @@ import { useSport } from '../../src/context/SportContext';
 import { useRouter } from 'expo-router';
 
 import { FamiliaDashboard } from '../../src/components/dashboards/FamiliaDashboard';
-import { JugadorDashboard } from '../../src/components/dashboards/JugadorDashboard';
 import { EntrenadorDashboard } from '../../src/components/dashboards/EntrenadorDashboard';
 import { CoordinadorDashboard } from '../../src/components/dashboards/CoordinadorDashboard';
 import { DireccionDeportivaDashboard } from '../../src/components/dashboards/DireccionDeportivaDashboard';
@@ -14,7 +13,6 @@ import { AdminGeneralDashboard } from '../../src/components/dashboards/AdminGene
 
 const ALL_PROFILES: { id: ActiveContextType; label: string; icon: string }[] = [
   { id: 'FAMILIA', label: 'Familia', icon: '👨‍👩‍👧' },
-  { id: 'JUGADOR', label: 'Jugador', icon: '👦' },
   { id: 'ENTRENADOR', label: 'Entrenador', icon: '👨‍🏫' },
   { id: 'COORDINADOR', label: 'Coordinación', icon: '🧭' },
   { id: 'DIR_DEPORTIVA', label: 'Dirección deportiva', icon: '📋' },
@@ -65,7 +63,6 @@ export default function DashboardRouterScreen() {
 
     switch (activeContext) {
       case 'FAMILIA': return <FamiliaDashboard />;
-      case 'JUGADOR': return <JugadorDashboard />;
       case 'ENTRENADOR': return <EntrenadorDashboard />;
       case 'COORDINADOR': return <CoordinadorDashboard />;
       case 'DIR_DEPORTIVA': return <DireccionDeportivaDashboard />;

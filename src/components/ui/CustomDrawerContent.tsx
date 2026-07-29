@@ -84,86 +84,9 @@ export function CustomDrawerContent(props: any) {
   
   const currentRole = role || activeContext || user?.role || 'FAMILIA';
 
-  const isJugador = currentRole === 'jugadores' || currentRole === 'jugador' || currentRole === 'JUGADOR';
   const isEntrenador = currentRole === 'entrenadores' || currentRole === 'entrenador' || currentRole === 'ENTRENADOR';
   const isCoordinador = currentRole === 'coordinadores' || currentRole === 'coordinador' || currentRole === 'COORDINADOR';
-  const isFamilias = !isJugador && !isEntrenador && !isCoordinador;
-
-  const activePlayer = linkedPlayers?.find(p => p.id === activePlayerId);
-  const activeTeam = assignedTeams?.[0]?.name || 'Equipo';
-
-  const BottomActions = () => (
-    <View style={styles.bottomActionsContainer}>
-      <TouchableOpacity style={styles.bottomActionBtn} onPress={() => { clearProfile(); setSport(null); router.replace('/'); }} activeOpacity={0.7}>
-        <Text style={styles.bottomActionIcon}>🏅</Text>
-        <Text style={styles.bottomActionText}>Cambiar de deporte</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  if (isJugador) {
-    return (
-      <ScrollView style={styles.containerFamilias} contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* HEADER JUGADOR */}
-        <View style={styles.headerFamilias}>
-          <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16}}>
-             <FontAwesome name={sport === 'baloncesto' ? 'dribbble' : 'shield'} size={56} color={clubColors.white} />
-             <View style={styles.streakBadge}>
-                <Text style={styles.streakText}>🔥 5 Rachas</Text>
-             </View>
-          </View>
-
-          <View style={styles.headerFamiliasInfoRow}>
-             <View style={styles.avatarFamilias}>
-                <FontAwesome name="user" size={24} color={clubColors.navy} />
-             </View>
-             <View style={styles.textFamiliasBox}>
-                <Text style={styles.tutorName}>Pablo Martínez</Text>
-                <Text style={styles.tutorRole}>#10 • Cadete B Fútbol</Text>
-             </View>
-          </View>
-          
-          <View style={styles.levelCardJugador}>
-             <View style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8}}>
-                <Text style={styles.levelLabel}>Nivel 14</Text>
-                <Text style={styles.levelPoints}>1,250 / 2,000 XP</Text>
-             </View>
-             <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, {width: '62%'}]} />
-             </View>
-          </View>
-        </View>
-
-        {/* MENU JUGADOR */}
-        <View style={styles.menuContainerFamilias}>
-           {PLAYER_MENU_ITEMS.map((item, idx) => (
-             <TouchableOpacity 
-               key={idx}
-               style={styles.menuItemFamilias}
-               onPress={() => {
-                 if (item.route === 'index') {
-                   router.replace('/(drawer)/inicio' as any);
-                 } else {
-                   router.push(`/(drawer)/${item.route}` as any);
-                 }
-               }}
-               activeOpacity={0.7}
-             >
-               <View style={styles.menuItemFamiliasLeft}>
-                  <Text style={{ fontSize: 20, marginRight: 16, width: 28, textAlign: 'center' }}>
-                    {item.icon}
-                  </Text>
-                  <Text style={styles.menuLabelFamilias}>
-                    {item.label}
-                  </Text>
-               </View>
-             </TouchableOpacity>
-           ))}
-        </View>
-        <BottomActions />
-      </ScrollView>
-    );
-  }
+  const isFamilias = !isEntrenador && !isCoordinador;
 
   if (isEntrenador) {
     return (
