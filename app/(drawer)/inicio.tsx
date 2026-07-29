@@ -91,7 +91,7 @@ export default function DashboardRouterScreen() {
             subtitle="CD JESUITAS"
             showSearchAndActions={false}
             showAvatar={false}
-            showBackButton={true}
+            showBackButton={activeContext !== 'ADMIN_GENERAL' && activeContext !== 'DIR_DEPORTIVA'}
             onBackPress={handleBackToSports}
           />
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -7,12 +7,15 @@ import {
   TouchableOpacity, 
   Modal, 
   useWindowDimensions,
-  Linking
+  Linking,
+  ActivityIndicator
 } from 'react-native';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
-// Colores corporativos de lujo
+// TODO: sustituir por convocatoria real vinculada a family_player_links y convocatorias.
+
+// Colores corporativos institucionales de CD Jesuitas
 const colors = {
   navyDark: '#071A3D',
   navyCard: '#0B224F',
@@ -29,7 +32,41 @@ const colors = {
 
 const DEFAULT_SCHOOL_ADDRESS = 'Puerta del Colegio (Avda. Cortes Valencianas nº 1)';
 
-const INITIAL_CALLUPS = {
+interface ChecklistItem {
+  id: string;
+  label: string;
+  checked: boolean;
+}
+
+interface CallupHistoryItem {
+  id: string;
+  date: string;
+  rival: string;
+  result: string;
+  status: string;
+}
+
+interface CallupData {
+  childName: string;
+  team: string;
+  rival: string;
+  competition: string;
+  date: string;
+  matchTime: string;
+  citationTime: string;
+  location: string;
+  dressingRoom: string;
+  kit: string;
+  weather: string;
+  carDeparture: string;
+  delegateName: string;
+  delegatePhone: string;
+  coachNote: string;
+  checklist: ChecklistItem[];
+  history: CallupHistoryItem[];
+}
+
+const INITIAL_CALLUPS: Record<string, CallupData> = {
   p1: {
     childName: 'Pablo Martínez',
     team: 'Cadete B (Fútbol 11)',
@@ -93,23 +130,35 @@ export function FamiliaConvocatorias() {
   const { width: screenWidth } = useWindowDimensions();
   const isTablet = screenWidth >= 768;
 
+  // Estados de control de datos y pantalla
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const [selectedChildKey, setSelectedChildKey] = useState<'p1' | 'p2'>('p1');
   const [activeTab, setActiveTab] = useState<'proxima' | 'historial'>('proxima');
-  const [myStatus, setMyStatus] = useState<'confirmado' | 'pendiente' | 'no_disponible' | 'tarde'>('confirmado');
+  const [myStatus, setMyStatus] = useState<'confirmado' | 'duda' | 'no_disponible'>('confirmado');
+  
+  // Modales
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false);
-
-  // ESTADO CARPOOLING (COCHE COMPARTIDO)
   const [isOfferCarModalOpen, setIsOfferCarModalOpen] = useState(false);
   const [offeredSeats, setOfferedSeats] = useState(2);
   const [selectedContactFamily, setSelectedContactFamily] = useState<any>(null);
 
+  // Coche compartido
   const [carpoolList, setCarpoolList] = useState([
     { id: 'cp1', family: 'Familia de Dani García', type: 'offer', seats: 2, pickup: DEFAULT_SCHOOL_ADDRESS, phone: '677888999' },
     { id: 'cp2', family: 'Familia de Lucas Pérez', type: 'need', seats: 1, pickup: DEFAULT_SCHOOL_ADDRESS, phone: '611222333' }
   ]);
 
-  const callup = INITIAL_CALLUPS[selectedChildKey];
-  const [checklistItems, setChecklistItems] = useState(callup.checklist);
+  // Selección segura de datos de la convocatoria
+  const callup: CallupData = INITIAL_CALLUPS[selectedChildKey] || INITIAL_CALLUPS.p1;
+  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>(callup?.checklist || []);
+
+  // Actualizar la checklist de forma segura cuando cambia de hijo/a
+  useEffect(() => {
+    if (callup && callup.checklist) {
+      setChecklistItems(callup.checklist);
+    }
+  }, [selectedChildKey]);
 
   const toggleChecklistItem = (id: string) => {
     setChecklistItems(prev => prev.map(item => item.id === id ? { ...item, checked: !item.checked } : item));
@@ -118,7 +167,7 @@ export function FamiliaConvocatorias() {
   const handlePublishMyCar = () => {
     const newOffer = {
       id: Date.now().toString(),
-      family: `Familia de ${callup.childName}`,
+      family: `Familia de ${callup?.childName || 'Jugador'}`,
       type: 'offer',
       seats: offeredSeats,
       pickup: DEFAULT_SCHOOL_ADDRESS,
@@ -129,28 +178,68 @@ export function FamiliaConvocatorias() {
   };
 
   const handleCallParentDirect = (phone: string) => {
+    if (!phone) return;
     Linking.openURL(`tel:${phone}`).catch(() => {});
   };
 
   const handleWhatsAppParentDirect = (phone: string, familyName: string) => {
-    const text = `Hola, soy la familia de ${callup.childName}. Te contacto por la plaza libre en coche para el partido vs ${callup.rival}.`;
+    if (!phone) return;
+    const text = `Hola, soy la familia de ${callup?.childName || 'nuestro hijo'}. Te contacto por la plaza libre en coche para el partido vs ${callup?.rival || 'el rival'}.`;
     Linking.openURL(`https://wa.me/34${phone}?text=${encodeURIComponent(text)}`).catch(() => {});
   };
 
   const handleOpenMaps = () => {
+    if (!callup?.location) return;
     const url = `https://maps.apple.com/?q=${encodeURIComponent(callup.location)}`;
     Linking.openURL(url).catch(() => {});
   };
 
   const handleCallDelegate = () => {
+    if (!callup?.delegatePhone) return;
     Linking.openURL(`tel:${callup.delegatePhone}`).catch(() => {});
   };
 
   const handleWhatsAppCoach = () => {
-    const text = `Hola Míster, soy la familia de ${callup.childName}. Te confirmo la asistencia para el partido vs ${callup.rival}.`;
+    const text = `Hola Míster, soy la familia de ${callup?.childName || 'nuestro hijo'}. Te confirmo la asistencia para el partido vs ${callup?.rival || 'el rival'}.`;
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     Linking.openURL(url).catch(() => {});
   };
+
+  const childFirstName = callup?.childName ? callup.childName.split(' ')[0] : 'Pablo';
+
+  // 1. ESTADO DE CARGA INSTITUCIONAL
+  if (isLoading) {
+    return (
+      <View style={styles.stateContainer}>
+        <ActivityIndicator size="large" color={colors.skyPrimary} />
+        <Text style={styles.stateText}>Cargando convocatorias...</Text>
+      </View>
+    );
+  }
+
+  // 2. ESTADO DE ERROR
+  if (hasError) {
+    return (
+      <View style={styles.stateContainer}>
+        <Ionicons name="alert-circle-outline" size={48} color={colors.accentRed} style={{ marginBottom: 12 }} />
+        <Text style={styles.stateTitle}>No se han podido cargar las convocatorias</Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={() => { setHasError(false); setIsLoading(false); }}>
+          <Text style={styles.retryBtnTxt}>Reintentar</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // 3. ESTADO VACÍO (SIN CONVOCATORIAS)
+  if (!callup) {
+    return (
+      <View style={styles.stateContainer}>
+        <Ionicons name="calendar-outline" size={48} color={colors.skyPrimary} style={{ marginBottom: 12 }} />
+        <Text style={styles.stateTitle}>No hay convocatorias disponibles</Text>
+        <Text style={styles.stateSub}>Cuando el entrenador publique una convocatoria aparecerá aquí.</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, isTablet && styles.contentTablet]} showsVerticalScrollIndicator={false}>
@@ -159,20 +248,14 @@ export function FamiliaConvocatorias() {
       <View style={styles.childSelectorRow}>
         <TouchableOpacity 
           style={[styles.childBtn, selectedChildKey === 'p1' && styles.childBtnActive]}
-          onPress={() => {
-            setSelectedChildKey('p1');
-            setChecklistItems(INITIAL_CALLUPS.p1.checklist);
-          }}
+          onPress={() => setSelectedChildKey('p1')}
         >
           <Text style={[styles.childBtnText, selectedChildKey === 'p1' && styles.childBtnTextActive]}>👦 Pablo (Cadete B)</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
           style={[styles.childBtn, selectedChildKey === 'p2' && styles.childBtnActive]}
-          onPress={() => {
-            setSelectedChildKey('p2');
-            setChecklistItems(INITIAL_CALLUPS.p2.checklist);
-          }}
+          onPress={() => setSelectedChildKey('p2')}
         >
           <Text style={[styles.childBtnText, selectedChildKey === 'p2' && styles.childBtnTextActive]}>👦 Hugo (Infantil A Futsal)</Text>
         </TouchableOpacity>
@@ -209,28 +292,30 @@ export function FamiliaConvocatorias() {
             <View style={[
               styles.statusBadge,
               myStatus === 'confirmado' ? styles.statusConfirmed :
-              myStatus === 'tarde' ? styles.statusLate : styles.statusAbsent
+              myStatus === 'duda' ? styles.statusLate : styles.statusAbsent
             ]}>
               <Ionicons 
                 name={
                   myStatus === 'confirmado' ? 'checkmark-circle' :
-                  myStatus === 'tarde' ? 'time' : 'alert-circle'
+                  myStatus === 'duda' ? 'help-circle' : 'close-circle'
                 } 
                 size={16} 
                 color={colors.white} 
               />
               <Text style={styles.statusBadgeText}>
-                {myStatus === 'confirmado' ? 'CONFIRMADO' :
-                 myStatus === 'tarde' ? 'LLEGARÁ TARDE' : 'NO ASISTIRÁ'}
+                {myStatus === 'confirmado' ? 'ASISTIRÁ' :
+                 myStatus === 'duda' ? 'DUDA' : 'NO ASISTIRÁ'}
               </Text>
             </View>
           </View>
 
           {/* 4. NOTA DEL ENTRENADOR */}
-          <View style={styles.coachNoteBanner}>
-            <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.accentGold} />
-            <Text style={styles.coachNoteText}>{callup.coachNote}</Text>
-          </View>
+          {Boolean(callup.coachNote) && (
+            <View style={styles.coachNoteBanner}>
+              <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.accentGold} />
+              <Text style={styles.coachNoteText}>{callup.coachNote}</Text>
+            </View>
+          )}
 
           {/* 5. TARJETA PRINCIPAL DE LA CONVOCATORIA DEL PARTIDO */}
           <View style={styles.matchHeroCard}>
@@ -325,7 +410,7 @@ export function FamiliaConvocatorias() {
             ))}
           </View>
 
-          {/* 7. RED DE COCHE COMPARTIDO ENTRE FAMILIAS (OFRECER Y CONTACTAR DIRECTO A TELÉFONO DE LOS PADRES) */}
+          {/* 7. RED DE COCHE COMPARTIDO ENTRE FAMILIAS */}
           <View style={styles.carpoolHeaderRow}>
             <Text style={styles.sectionTitleNoMargin}>🚗 COCHE COMPARTIDO & PLAZAS LIBRES</Text>
             <TouchableOpacity style={styles.carpoolActionBtn} onPress={() => setIsOfferCarModalOpen(true)}>
@@ -361,32 +446,36 @@ export function FamiliaConvocatorias() {
             ))}
           </View>
 
-          {/* 8. TRES BOTONES GRANDES DE RESPUESTA DIRECTA */}
-          <Text style={styles.sectionTitle}>RESPUESTA RÁPIDA DE LA FAMILIA</Text>
-          <View style={styles.actionButtonsCol}>
-            <TouchableOpacity 
-              style={[styles.btnMassive, styles.btnConfirm]}
-              onPress={() => setMyStatus('confirmado')}
-            >
-              <Ionicons name="checkmark-circle" size={22} color={colors.navyDark} style={{ marginRight: 8 }} />
-              <Text style={styles.btnMassiveText}>CONFIRMAR ASISTENCIA DE {callup.childName.toUpperCase()}</Text>
-            </TouchableOpacity>
-
-            <View style={styles.secondaryBtnsRow}>
+          {/* 8. TARJETA DE ASISTENCIA CON NOMENCLATURA APROBADA */}
+          <Text style={styles.sectionTitle}>CONFIRMACIÓN DE ASISTENCIA</Text>
+          <View style={styles.attendanceCard}>
+            <Text style={styles.attendanceQuestion}>¿Asistirá {childFirstName} al partido?</Text>
+            <View style={styles.attendanceButtonsRow}>
+              {/* Botón Verde: Asistirá */}
               <TouchableOpacity 
-                style={styles.btnHalfLate}
-                onPress={() => setMyStatus('tarde')}
+                style={[styles.btnAttendance, styles.btnGreen, myStatus === 'confirmado' && styles.btnActiveGlow]}
+                onPress={() => setMyStatus('confirmado')}
               >
-                <Ionicons name="time-outline" size={16} color={colors.accentGold} />
-                <Text style={styles.btnHalfTextLate}>Llegaré Tarde</Text>
+                <Ionicons name="checkmark-circle" size={18} color={colors.white} style={{ marginRight: 4 }} />
+                <Text style={styles.btnAttendanceTxt}>Asistirá</Text>
               </TouchableOpacity>
 
+              {/* Botón Rojo: No asistirá */}
               <TouchableOpacity 
-                style={styles.btnHalfAbsent}
+                style={[styles.btnAttendance, styles.btnRed, myStatus === 'no_disponible' && styles.btnActiveGlow]}
                 onPress={() => setIsAbsenceModalOpen(true)}
               >
-                <Ionicons name="close-circle-outline" size={16} color={colors.accentRed} />
-                <Text style={styles.btnHalfTextAbsent}>No Asistiré</Text>
+                <Ionicons name="close-circle" size={18} color={colors.white} style={{ marginRight: 4 }} />
+                <Text style={styles.btnAttendanceTxt}>No asistirá</Text>
+              </TouchableOpacity>
+
+              {/* Botón Naranja: Duda */}
+              <TouchableOpacity 
+                style={[styles.btnAttendance, styles.btnOrange, myStatus === 'duda' && styles.btnActiveGlow]}
+                onPress={() => setMyStatus('duda')}
+              >
+                <Ionicons name="help-circle" size={18} color={colors.white} style={{ marginRight: 4 }} />
+                <Text style={styles.btnAttendanceTxt}>Duda</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -415,7 +504,7 @@ export function FamiliaConvocatorias() {
         <View style={styles.historyContainer}>
           <Text style={styles.sectionTitle}>ASISTENCIA DE LA TEMPORADA (100%)</Text>
           
-          {callup.history.map(item => (
+          {(callup.history || []).map(item => (
             <View key={item.id} style={styles.historyCard}>
               <View style={styles.hHeader}>
                 <Text style={styles.hDate}>{item.date}</Text>
@@ -428,18 +517,18 @@ export function FamiliaConvocatorias() {
         </View>
       )}
 
-      {/* MODAL DE SELECCIÓN DE CONTACTO DIRECTO (LLAMADA O WHATSAPP AL PADRE/MADRE) */}
-      <Modal visible={!!selectedContactFamily} transparent animationType="fade">
+      {/* MODAL DE SELECCIÓN DE CONTACTO DIRECTO */}
+      <Modal visible={!!selectedContactFamily} transparent animationType="fade" onRequestClose={() => setSelectedContactFamily(null)}>
         <View style={styles.modalBgCenter}>
           <View style={styles.modalCardCenter}>
             <Ionicons name="person-circle" size={54} color={colors.skyPrimary} />
-            <Text style={styles.modalTitleCenter}>CONTACTAR CON {selectedContactFamily?.family.toUpperCase()}</Text>
+            <Text style={styles.modalTitleCenter}>CONTACTAR CON {selectedContactFamily?.family?.toUpperCase() || 'FAMILIA'}</Text>
             <Text style={styles.modalSubCenter}>Teléfono directo de la familia: <Text style={{fontWeight: '900', color: colors.white}}>{selectedContactFamily?.phone}</Text></Text>
 
             <TouchableOpacity 
               style={styles.modalCallOptionBtn}
               onPress={() => {
-                handleCallParentDirect(selectedContactFamily.phone);
+                handleCallParentDirect(selectedContactFamily?.phone);
                 setSelectedContactFamily(null);
               }}
             >
@@ -450,7 +539,7 @@ export function FamiliaConvocatorias() {
             <TouchableOpacity 
               style={styles.modalWhatsAppOptionBtn}
               onPress={() => {
-                handleWhatsAppParentDirect(selectedContactFamily.phone, selectedContactFamily.family);
+                handleWhatsAppParentDirect(selectedContactFamily?.phone, selectedContactFamily?.family);
                 setSelectedContactFamily(null);
               }}
             >
@@ -466,7 +555,7 @@ export function FamiliaConvocatorias() {
       </Modal>
 
       {/* MODAL DE MOTIVO DE AUSENCIA */}
-      <Modal visible={isAbsenceModalOpen} transparent animationType="slide">
+      <Modal visible={isAbsenceModalOpen} transparent animationType="slide" onRequestClose={() => setIsAbsenceModalOpen(false)}>
         <View style={styles.modalBg}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>MOTIVO DE LA AUSENCIA</Text>
@@ -493,15 +582,14 @@ export function FamiliaConvocatorias() {
         </View>
       </Modal>
 
-      {/* MODAL INTERACTIVO PARA OFRECER COCHE CON PUNTO DE RECOGIDA EN COLEGIO */}
-      <Modal visible={isOfferCarModalOpen} transparent animationType="fade">
+      {/* MODAL DE COCHE COMPARTIDO */}
+      <Modal visible={isOfferCarModalOpen} transparent animationType="fade" onRequestClose={() => setIsOfferCarModalOpen(false)}>
         <View style={styles.modalBgCenter}>
           <View style={styles.modalCardCenter}>
             <Ionicons name="car-sport" size={44} color={colors.accentGreen} />
             <Text style={styles.modalTitleCenter}>OFRECER PLAZAS EN MI COCHE</Text>
             <Text style={styles.modalSubCenter}>Ayuda a otras familias del equipo ofreciendo plazas en tu vehículo para el partido.</Text>
 
-            {/* Número de plazas */}
             <Text style={styles.inputLabel}>¿Cuántas plazas libres tienes en tu coche?</Text>
             <View style={styles.seatsRow}>
               {[1, 2, 3, 4].map(num => (
@@ -515,7 +603,6 @@ export function FamiliaConvocatorias() {
               ))}
             </View>
 
-            {/* Punto de encuentro FIJO */}
             <Text style={styles.inputLabel}>Punto de Recogida Oficial:</Text>
             <View style={styles.fixedAddressBox}>
               <Ionicons name="location" size={16} color={colors.skyPrimary} />
@@ -541,6 +628,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.navyDark },
   content: { padding: 16, paddingBottom: 60 },
   contentTablet: { maxWidth: 900, alignSelf: 'center', width: '100%' },
+
+  // ESTADOS DE CARGA, ERROR Y VACÍO
+  stateContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.navyDark, padding: 24, minHeight: 400 },
+  stateText: { color: colors.skyGlow, fontSize: 14, fontWeight: '700', marginTop: 12 },
+  stateTitle: { color: colors.white, fontSize: 18, fontWeight: '900', textAlign: 'center', marginTop: 8 },
+  stateSub: { color: colors.textMuted, fontSize: 13, textAlign: 'center', marginTop: 4, lineHeight: 18 },
+  retryBtn: { marginTop: 16, backgroundColor: colors.skyPrimary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
+  retryBtnTxt: { color: colors.navyDark, fontSize: 13, fontWeight: '900' },
 
   // SELECTOR HIJOS
   childSelectorRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
@@ -603,7 +698,7 @@ const styles = StyleSheet.create({
   checkLabel: { color: colors.white, fontSize: 12, fontWeight: '700' },
   checkLabelChecked: { textDecorationLine: 'line-through', color: colors.textMuted },
 
-  // CARPOOLING MULTIDIRECCIONAL Y TELÉFONO DIRECTO
+  // CARPOOLING
   carpoolHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   carpoolActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.skyPrimary, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   carpoolActionBtnTxt: { color: colors.navyDark, fontSize: 11, fontWeight: '900' },
@@ -619,22 +714,21 @@ const styles = StyleSheet.create({
   contactBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.skyPrimary, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   contactBtnTxt: { color: colors.navyDark, fontSize: 11, fontWeight: '900' },
 
-  // ACTION BUTTONS
+  // TARJETA DE CONFIRMACIÓN DE ASISTENCIA
   sectionTitle: { fontSize: 11, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 1.5, marginBottom: 10 },
   sectionTitleNoMargin: { fontSize: 11, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 1.5 },
+  
+  attendanceCard: { backgroundColor: colors.navyCard, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.borderGlow, marginBottom: 20 },
+  attendanceQuestion: { color: colors.white, fontSize: 14, fontWeight: '900', textAlign: 'center', marginBottom: 14 },
+  attendanceButtonsRow: { flexDirection: 'row', gap: 8 },
+  btnAttendance: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12 },
+  btnGreen: { backgroundColor: colors.accentGreen },
+  btnRed: { backgroundColor: colors.accentRed },
+  btnOrange: { backgroundColor: colors.accentGold },
+  btnActiveGlow: { borderWidth: 2, borderColor: colors.white },
+  btnAttendanceTxt: { color: colors.white, fontSize: 12, fontWeight: '900' },
 
-  actionButtonsCol: { marginBottom: 16 },
-  btnMassive: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 16, marginBottom: 10 },
-  btnConfirm: { backgroundColor: colors.skyPrimary },
-  btnMassiveText: { color: colors.navyDark, fontSize: 13, fontWeight: '900', letterSpacing: 1 },
-
-  secondaryBtnsRow: { flexDirection: 'row', gap: 10 },
-  btnHalfLate: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.navyCard, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.accentGold },
-  btnHalfTextLate: { color: colors.accentGold, fontSize: 12, fontWeight: '800' },
-  btnHalfAbsent: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.navyCard, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.accentRed },
-  btnHalfTextAbsent: { color: colors.accentRed, fontSize: 12, fontWeight: '800' },
-
-  // QUICK TOOLS (MAPS & WHATSAPP)
+  // QUICK TOOLS
   quickToolsRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
   toolBtnCard: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.navyCard, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   toolBtnText: { color: colors.white, fontSize: 10, fontWeight: '800' },
