@@ -228,6 +228,8 @@ function NavigationStack() {
   );
 }
 
+import { DemoNavigationProvider } from '../src/context/DemoNavigationContext';
+
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
@@ -236,9 +238,11 @@ function RootLayoutNav() {
       <SportProvider>
         <RoleProvider>
           <ReviewProvider>
-            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-              <NavigationStack />
-            </ThemeProvider>
+            <DemoNavigationProvider>
+              <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+                <NavigationStack />
+              </ThemeProvider>
+            </DemoNavigationProvider>
           </ReviewProvider>
         </RoleProvider>
       </SportProvider>

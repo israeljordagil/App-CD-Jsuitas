@@ -12,6 +12,8 @@ import { DireccionDeportivaDashboard } from '../../src/components/dashboards/Dir
 import { AdminGeneralDashboard } from '../../src/components/dashboards/AdminGeneralDashboard';
 import { LargeProfileSelectorScreen } from '../../src/components/ui/LargeProfileSelectorScreen';
 
+import { useDemoNavigation } from '../../src/context/DemoNavigationContext';
+
 const ALL_PROFILES: { id: ActiveContextType; label: string; icon: string }[] = [
   { id: 'FAMILIA', label: 'Familia', icon: '👨‍👩‍👧' },
   { id: 'ENTRENADOR', label: 'Entrenador', icon: '👨‍🏫' },
@@ -21,30 +23,24 @@ const ALL_PROFILES: { id: ActiveContextType; label: string; icon: string }[] = [
 ];
 
 export default function DashboardRouterScreen() {
+  const { selectedDemoProfile, setSelectedDemoProfile } = useDemoNavigation();
   const { user, activeContext, switchContext, isLoading } = useAuth();
   const { sport, setSport } = useSport();
   const router = useRouter();
 
-  // Filtrar perfiles únicamente por los roles autorizados del usuario real de Supabase
+  // El perfil de demo prevalece de forma absoluta durante la demostración
+  const effectiveProfile = selectedDemoProfile || activeContext || 'FAMILIA';
+
   const userRoles = user?.roles || [];
   const availableProfiles = ALL_PROFILES.filter(p => userRoles.includes(p.id));
 
   const getHeaderTitle = () => {
-    if (activeContext === 'ADMIN_GENERAL' && !sport) {
-      return 'ADMINISTRACIÓN GENERAL';
-    }
-    if (activeContext === 'DIR_DEPORTIVA' && !sport) {
-      return 'DIRECCIÓN DEPORTIVA';
-    }
     switch (sport) {
       case 'futbol': return '⚽ FÚTBOL';
       case 'futbol_sala': return '⚽🥅 FÚTBOL SALA';
       case 'baloncesto': return '🏀 BALONCESTO';
       case 'voleibol': return '🏐 VOLEIBOL';
-      default: 
-        if (activeContext === 'ADMIN_GENERAL') return 'ADMINISTRACIÓN GENERAL';
-        if (activeContext === 'DIR_DEPORTIVA') return 'DIRECCIÓN DEPORTIVA';
-        return 'DEPORTE';
+      default: return 'DEPORTE';
     }
   };
 
@@ -55,11 +51,10 @@ export default function DashboardRouterScreen() {
 
   const handleChangeProfile = () => {
     setSport(null);
+    setSelectedDemoProfile(null);
     switchContext(null as any);
     router.replace('/');
   };
-
-
 
   const renderDashboard = () => {
     if (isLoading) {
@@ -70,19 +65,20 @@ export default function DashboardRouterScreen() {
       );
     }
 
-    switch (activeContext) {
-      case 'FAMILIA': return <FamiliaDashboard />;
-      case 'ENTRENADOR': return <EntrenadorDashboard />;
-      case 'COORDINADOR': return <CoordinadorDashboard />;
-      case 'DIR_DEPORTIVA': return <DireccionDeportivaDashboard />;
-      case 'ADMIN_GENERAL': return <AdminGeneralDashboard />;
-      default: return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <Text style={{ color: '#EF4444', fontSize: 15, fontWeight: '700', textAlign: 'center' }}>
-            No se ha podido cargar tu área de acceso.
-          </Text>
-        </View>
-      );
+    // MODO DEMO:selectedDemoProfile / effectiveProfile determina el Dashboard de forma limpia y directa
+    switch (effectiveProfile) {
+      case 'FAMILIA': 
+        return <FamiliaDashboard />;
+      case 'ENTRENADOR': 
+        return <EntrenadorDashboard />;
+      case 'COORDINADOR': 
+        return <CoordinadorDashboard />;
+      case 'DIR_DEPORTIVA': 
+        return <DireccionDeportivaDashboard />;
+      case 'ADMIN_GENERAL': 
+        return <AdminGeneralDashboard />;
+      default: 
+        return <FamiliaDashboard />;
     }
   };
 
@@ -94,7 +90,7 @@ export default function DashboardRouterScreen() {
         <View style={styles.stickyHeader}>
           <PremiumHeader 
             title={getHeaderTitle()}
-            subtitle={`Perfil activo: ${activeContext === 'ENTRENADOR' ? 'Entrenador' : activeContext === 'COORDINADOR' ? 'Coordinación' : 'Familia'}`}
+            subtitle={`Perfil activo: ${effectiveProfile === 'ENTRENADOR' ? 'Entrenador' : effectiveProfile === 'COORDINADOR' ? 'Coordinación' : 'Familia'}`}
             showSearchAndActions={false}
             showAvatar={false}
             showBackButton={true}
