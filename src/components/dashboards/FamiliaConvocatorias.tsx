@@ -158,10 +158,7 @@ export class FamiliaConvocatoriasErrorBoundary extends Component<{ children: Rea
       return (
         <View style={styles.errorBoundaryBox}>
           <Ionicons name="alert-circle-outline" size={54} color={colors.accentRed} style={{ marginBottom: 12 }} />
-          <Text style={styles.errorBoundaryTitle}>No se han podido cargar las convocatorias</Text>
-          <Text style={styles.errorBoundarySub}>
-            {this.state.error?.message || "Ha ocurrido un error inesperado al renderizar la pantalla."}
-          </Text>
+          <Text style={styles.errorBoundaryTitle}>No se han podido cargar las convocatorias.</Text>
           <TouchableOpacity 
             style={styles.retryBtn} 
             onPress={() => this.setState({ hasError: false, error: null })}

@@ -19,17 +19,16 @@ const clubColors = {
 export default function ConvocatoriasScreen() {
   const { activeContext, activeTeamId, isLoading } = useAuth();
 
-  if (isLoading) {
+  if (isLoading || activeContext === null) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={clubColors.skyPrimary} />
-        <Text style={styles.loadingText}>Cargando convocatorias...</Text>
+        <Text style={styles.loadingText}>Cargando tu perfil...</Text>
       </View>
     );
   }
 
-  // Perfil Familia o por defecto si es Familia
-  if (activeContext === 'FAMILIA' || !activeContext) {
+  if (activeContext === 'FAMILIA') {
     return <FamiliaConvocatorias />;
   }
 
