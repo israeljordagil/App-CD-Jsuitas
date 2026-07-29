@@ -68,6 +68,9 @@ export function CustomDrawerContent(props: any) {
   const { role } = useRole();
   const { sport, setSport } = useSport();
 
+  const activePlayer = linkedPlayers.find(p => p.id === activePlayerId) || linkedPlayers[0] || null;
+  const activeTeam = (assignedTeams && assignedTeams[0] && assignedTeams[0].name) ? assignedTeams[0].name : 'Infantil A';
+
   const targetContext = activeContext || (role === 'coordinadores' ? 'COORDINADOR' : role === 'entrenadores' ? 'ENTRENADOR' : 'FAMILIA');
 
   const isFamilias = targetContext === 'FAMILIA';
