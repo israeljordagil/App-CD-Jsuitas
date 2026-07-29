@@ -11,6 +11,7 @@ import {
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
+import { usePlayerGamification } from '../../hooks/usePlayerGamification';
 import { CromoJugador } from '../ui/CromoJugador';
 import { 
   INSIGNIAS, 
@@ -42,8 +43,8 @@ export function MiZona() {
     linkedPlayers, 
     activePlayerId, 
     switchActivePlayer, 
-    childrenLoading, 
-    childrenError 
+    childrenLoading: authLoading, 
+    childrenError: authError 
   } = useAuth();
 
   const [activeRetoTab, setActiveRetoTab] = useState<string>('Ataque');
@@ -51,6 +52,16 @@ export function MiZona() {
   // Identificador del jugador seleccionado (UUID real)
   const selectedPlayerId = activePlayerId || linkedPlayers[0]?.id || null;
   const activeChild = linkedPlayers.find(c => c.id === selectedPlayerId) || linkedPlayers[0] || null;
+
+  // Hook de gamificación persistida en Supabase por jugador_id
+  const { 
+    gamification, 
+    loading: gamiLoading, 
+    error: gamiError 
+  } = usePlayerGamification(selectedPlayerId);
+
+  const isLoading = authLoading || gamiLoading;
+  const errorMessage = authError || gamiError;
 
   // Retos por categoría seleccionada
   const retosCurrentCategory = getRetosByCategory(activeRetoTab);
@@ -70,33 +81,33 @@ export function MiZona() {
         <View style={styles.headerTopRow}>
           <View style={styles.badgeSparkle}>
             <Ionicons name="star" size={16} color={colors.accentGold} />
-            <Text style={styles.badgeSparkleTxt}>ESPACIO PERSONAL DEL JUGADOR</Text>
+            <Text style={styles.badgeSparkleTxt}>GAMIFICACIÓN PERSISTIDA • PROGRESO REAL</Text>
           </View>
         </View>
         <Text style={styles.headerTitle}>🌟 MI ZONA</Text>
         <Text style={styles.headerSubtitle}>
-          Retos, insignias, racha y nivel deportivo del deportista seleccionado
+          Retos, insignias, racha y nivel deportivo de {activeChild?.name || 'deportista'} vinculados a Supabase
         </Text>
       </View>
 
       {/* ESTADO DE CARGA */}
-      {childrenLoading && (
+      {isLoading && (
         <View style={styles.loadingBox}>
           <ActivityIndicator size="large" color={colors.skyPrimary} />
-          <Text style={styles.loadingText}>Cargando datos de Mi Zona...</Text>
+          <Text style={styles.loadingText}>Cargando progreso persistido del jugador...</Text>
         </View>
       )}
 
       {/* ESTADO DE ERROR */}
-      {!childrenLoading && childrenError && (
+      {!isLoading && errorMessage && (
         <View style={styles.errorBox}>
           <Ionicons name="warning-outline" size={24} color={colors.accentRed} />
-          <Text style={styles.errorText}>{childrenError}</Text>
+          <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       )}
 
       {/* ESTADO DE LISTA VACÍA / ACCESO NO AUTORIZADO */}
-      {!childrenLoading && !childrenError && linkedPlayers.length === 0 && (
+      {!isLoading && !errorMessage && linkedPlayers.length === 0 && (
         <View style={styles.emptyBox}>
           <Ionicons name="shield-outline" size={44} color={colors.skyGlow} />
           <Text style={styles.emptyTitle}>No hay un jugador vinculado a esta cuenta</Text>
@@ -107,7 +118,7 @@ export function MiZona() {
       )}
 
       {/* CONTENIDO PRINCIPAL DE MI ZONA */}
-      {!childrenLoading && linkedPlayers.length > 0 && activeChild && (
+      {!isLoading && linkedPlayers.length > 0 && activeChild && gamification && (
         <>
           {/* SELECTOR RÁPIDO DE HIJO EN MI ZONA */}
           {linkedPlayers.length > 1 && (
@@ -137,7 +148,7 @@ export function MiZona() {
             </View>
           )}
 
-          {/* 2. CROMO COMPARTIDO DEL JUGADOR */}
+          {/* 2. CROMO COMPARTIDO DEL JUGADOR CON DATOS PERSISTIDOS REALES */}
           <Text style={styles.sectionTitle}>1. CROMO OFICIAL DEL DEPORTISTA</Text>
           <CromoJugador
             name={activeChild.name}
@@ -145,36 +156,38 @@ export function MiZona() {
             position={activeChild.position}
             team={activeChild.team}
             category={activeChild.category}
-            level={14}
-            currentXp={1250}
-            nextLevelXp={2000}
-            streakWeeks={4}
+            level={gamification.level}
+            currentXp={gamification.xpTotal}
+            nextLevelXp={gamification.nextLevelXp}
+            streakWeeks={gamification.rachaActual}
             photo="👦"
           />
 
-          {/* 3. RESUMEN DE RACHA & EXPERIENCIA GAMIFICADA */}
-          <Text style={styles.sectionTitle}>2. RESUMEN DE GAMIFICACIÓN</Text>
+          {/* 3. RESUMEN DE RACHA & EXPERIENCIA GAMIFICADA (SUPABASE REAL) */}
+          <Text style={styles.sectionTitle}>2. RESUMEN DE GAMIFICACIÓN EN SUPABASE</Text>
           <View style={styles.statsSummaryGrid}>
             <View style={styles.summaryCard}>
               <Text style={styles.summaryIcon}>🔥</Text>
-              <Text style={styles.summaryValue}>4 Semanas</Text>
-              <Text style={styles.summaryLabel}>Racha Imparable</Text>
+              <Text style={styles.summaryValue}>{gamification.rachaActual} Semanas</Text>
+              <Text style={styles.summaryLabel}>Racha Actual</Text>
             </View>
 
             <View style={styles.summaryCard}>
               <Text style={styles.summaryIcon}>🏅</Text>
-              <Text style={styles.summaryValue}>8 Insignias</Text>
-              <Text style={styles.summaryLabel}>Desbloqueadas</Text>
+              <Text style={styles.summaryValue}>
+                {gamification.insigniasConseguidasCount} / {INSIGNIAS.length}
+              </Text>
+              <Text style={styles.summaryLabel}>Insignias Conseguidas</Text>
             </View>
 
             <View style={styles.summaryCard}>
               <Text style={styles.summaryIcon}>⭐</Text>
-              <Text style={styles.summaryValue}>1,250 XP</Text>
-              <Text style={styles.summaryLabel}>Puntos acumulados</Text>
+              <Text style={styles.summaryValue}>{gamification.xpTotal} XP</Text>
+              <Text style={styles.summaryLabel}>Experiencia Total</Text>
             </View>
           </View>
 
-          {/* 4. RETOS FORMATIVOS POR CATEGORÍA */}
+          {/* 4. RETOS FORMATIVOS Y CRUCE DE ESTADOS REALES */}
           <Text style={styles.sectionTitle}>3. RETOS FORMATIVOS Y OBJETIVOS</Text>
 
           {/* CATEGORÍAS DE RETOS */}
@@ -195,11 +208,13 @@ export function MiZona() {
             })}
           </ScrollView>
 
-          {/* LISTA DE RETOS */}
+          {/* LISTA DE RETOS CRUZADA CON JUGADOR_RETOS */}
           <View style={styles.retosContainer}>
             {retosCurrentCategory.map((reto: Reto) => {
-              const isCompleted = reto.curr >= reto.total;
-              const pct = Math.min(100, Math.round((reto.curr / reto.total) * 100));
+              const dbReto = gamification.challengesMap[reto.slug];
+              const currentProgress = dbReto ? dbReto.progreso_actual : 0;
+              const isCompleted = dbReto ? dbReto.estado === 'completado' : currentProgress >= reto.total;
+              const pct = Math.min(100, Math.round((currentProgress / reto.total) * 100));
 
               return (
                 <View key={reto.id} style={[styles.retoCard, isCompleted && styles.retoCardCompleted]}>
@@ -229,7 +244,7 @@ export function MiZona() {
                   </View>
 
                   <View style={styles.retoFooterRow}>
-                    <Text style={styles.retoProgressTxt}>Progreso: {reto.curr} / {reto.total}</Text>
+                    <Text style={styles.retoProgressTxt}>Progreso: {currentProgress} / {reto.total}</Text>
                     {isCompleted ? (
                       <Text style={styles.completedTxt}>✅ ¡COMPLETADO!</Text>
                     ) : (
@@ -241,44 +256,52 @@ export function MiZona() {
             })}
           </View>
 
-          {/* 5. INSIGNIAS Y TROFEOS */}
+          {/* 5. INSIGNIAS Y CRUCE CON JUGADOR_INSIGNIAS */}
           <Text style={styles.sectionTitle}>4. INSIGNIAS DEL CD JESUITAS</Text>
           <View style={styles.insigniasGrid}>
-            {INSIGNIAS.map((ins: Insignia) => (
-              <View 
-                key={ins.id} 
-                style={[styles.insigniaCard, !ins.unlocked && styles.insigniaCardLocked]}
-              >
-                <View style={[
-                  styles.insigniaIconCircle, 
-                  { backgroundColor: ins.unlocked ? `${ins.color}25` : 'rgba(255,255,255,0.05)' },
-                  { borderColor: ins.unlocked ? ins.color : 'rgba(255,255,255,0.1)' }
-                ]}>
-                  <FontAwesome 
-                    name={ins.unlocked ? (ins.icon as any) : 'lock'} 
-                    size={26} 
-                    color={ins.unlocked ? ins.color : colors.textMuted} 
-                  />
-                </View>
+            {INSIGNIAS.map((ins: Insignia) => {
+              const dbBadge = gamification.badgesMap[ins.slug];
+              const isUnlocked = dbBadge ? dbBadge.conseguida : false;
+              const unlockDate = dbBadge?.conseguida_at 
+                ? new Date(dbBadge.conseguida_at).toLocaleDateString('es-ES') 
+                : ins.date;
 
-                <View style={{ flex: 1 }}>
-                  <View style={styles.insTitleRow}>
-                    <Text style={[styles.insTitle, !ins.unlocked && styles.insTitleLocked]}>
-                      {ins.title}
-                    </Text>
-                    {ins.unlocked && (
-                      <View style={styles.unlockedTag}>
-                        <Text style={styles.unlockedTagTxt}>DESBLOQUEADO</Text>
-                      </View>
+              return (
+                <View 
+                  key={ins.id} 
+                  style={[styles.insigniaCard, !isUnlocked && styles.insigniaCardLocked]}
+                >
+                  <View style={[
+                    styles.insigniaIconCircle, 
+                    { backgroundColor: isUnlocked ? `${ins.color}25` : 'rgba(255,255,255,0.05)' },
+                    { borderColor: isUnlocked ? ins.color : 'rgba(255,255,255,0.1)' }
+                  ]}>
+                    <FontAwesome 
+                      name={isUnlocked ? (ins.icon as any) : 'lock'} 
+                      size={26} 
+                      color={isUnlocked ? ins.color : colors.textMuted} 
+                    />
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.insTitleRow}>
+                      <Text style={[styles.insTitle, !isUnlocked && styles.insTitleLocked]}>
+                        {ins.title}
+                      </Text>
+                      {isUnlocked && (
+                        <View style={styles.unlockedTag}>
+                          <Text style={styles.unlockedTagTxt}>DESBLOQUEADO</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.insDesc} numberOfLines={2}>{ins.desc}</Text>
+                    {isUnlocked && unlockDate && (
+                      <Text style={styles.insDate}>Conseguido el {unlockDate}</Text>
                     )}
                   </View>
-                  <Text style={styles.insDesc} numberOfLines={2}>{ins.desc}</Text>
-                  {ins.unlocked && ins.date && (
-                    <Text style={styles.insDate}>Conseguido el {ins.date}</Text>
-                  )}
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         </>
       )}

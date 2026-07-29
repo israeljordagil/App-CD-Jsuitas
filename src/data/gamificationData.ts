@@ -1,5 +1,6 @@
 export interface Insignia {
   id: number;
+  slug: string;
   title: string;
   desc: string;
   icon: string;
@@ -10,6 +11,7 @@ export interface Insignia {
 
 export interface Reto {
   id: number;
+  slug: string;
   title: string;
   ctx: string;
   diff: string;
@@ -21,25 +23,26 @@ export interface Reto {
 export const RETO_TABS = ['Ataque', 'Defensa', 'Entrenamiento', 'Compañerismo', 'Club', 'Temporada'];
 
 export const INSIGNIAS: Insignia[] = [
-  { id: 1, title: 'Goleador', desc: 'Concede al marcar 25 goles con el CD Jesuitas.', icon: 'soccer-ball-o', color: '#4FC3F7', unlocked: true, date: '15 Sep 2026' },
-  { id: 2, title: 'Asistente', desc: 'Concede al alcanzar 20 asistencias.', icon: 'handshake-o', color: '#22C55E', unlocked: true, date: '28 Sep 2026' },
-  { id: 3, title: 'Incansable', desc: 'Completa el 100% de los entrenamientos durante un mes.', icon: 'heartbeat', color: '#E11D48', unlocked: true, date: '1 Nov 2026' },
-  { id: 4, title: 'MVP', desc: 'Ser elegido MVP en 5 partidos.', icon: 'star', color: '#EAB308', unlocked: false },
-  { id: 5, title: 'Leyenda Jesuitas', desc: 'Disputar 100 partidos oficiales con el club.', icon: 'shield', color: '#4FC3F7', unlocked: false },
-  { id: 6, title: 'Compañero del Año', desc: 'Ayuda constantemente a tus compañeros.', icon: 'users', color: '#F97316', unlocked: true, date: '5 Oct 2026' },
-  { id: 7, title: 'Fair Play', desc: 'Destaca por tu juego limpio.', icon: 'hand-peace-o', color: '#A855F7', unlocked: false },
-  { id: 8, title: 'Respeto al Rival', desc: 'Completa 20 partidos demostrando respeto al rival.', icon: 'handshake-o', color: '#4FC3F7', unlocked: false },
-  { id: 9, title: 'Respeto al Árbitro', desc: 'Mantén una actitud ejemplar hacia los árbitros.', icon: 'gavel', color: '#EAB308', unlocked: false },
-  { id: 10, title: 'Confianza del Entrenador', desc: 'Demuestra compromiso y responsabilidad.', icon: 'check-circle', color: '#22C55E', unlocked: true, date: '12 Oct 2026' },
-  { id: 11, title: 'Afición Ejemplar', desc: 'Respeta siempre al público.', icon: 'bullhorn', color: '#4FC3F7', unlocked: false },
-  { id: 12, title: 'Puntualidad', desc: 'Llega siempre puntual a entrenamientos y partidos.', icon: 'clock-o', color: '#3B82F6', unlocked: true, date: '10 Nov 2026' },
-  { id: 13, title: 'Valiente', desc: 'Cumple con los valores del CD Jesuitas demostrando valentía, esfuerzo, compromiso y determinación.', icon: 'bolt', color: '#EAB308', unlocked: false },
-  { id: 14, title: 'ADN Jesuitas', desc: 'Representa los valores del club dentro y fuera del terreno de juego.', icon: 'heart', color: '#E11D48', unlocked: false },
-  { id: 15, title: 'Compañerismo', desc: 'Antepón siempre el equipo al éxito individual.', icon: 'link', color: '#A855F7', unlocked: true, date: '20 Sep 2026' },
+  { id: 1, slug: 'goleador', title: 'Goleador', desc: 'Concede al marcar 25 goles con el CD Jesuitas.', icon: 'soccer-ball-o', color: '#4FC3F7', unlocked: true, date: '15 Sep 2026' },
+  { id: 2, slug: 'asistente', title: 'Asistente', desc: 'Concede al alcanzar 20 asistencias.', icon: 'handshake-o', color: '#22C55E', unlocked: true, date: '28 Sep 2026' },
+  { id: 3, slug: 'incansable', title: 'Incansable', desc: 'Completa el 100% de los entrenamientos durante un mes.', icon: 'heartbeat', color: '#E11D48', unlocked: true, date: '1 Nov 2026' },
+  { id: 4, slug: 'mvp', title: 'MVP', desc: 'Ser elegido MVP en 5 partidos.', icon: 'star', color: '#EAB308', unlocked: false },
+  { id: 5, slug: 'leyenda-jesuitas', title: 'Leyenda Jesuitas', desc: 'Disputar 100 partidos oficiales con el club.', icon: 'shield', color: '#4FC3F7', unlocked: false },
+  { id: 6, slug: 'companero-del-ano', title: 'Compañero del Año', desc: 'Ayuda constantemente a tus compañeros.', icon: 'users', color: '#F97316', unlocked: true, date: '5 Oct 2026' },
+  { id: 7, slug: 'fair-play', title: 'Fair Play', desc: 'Destaca por tu juego limpio.', icon: 'hand-peace-o', color: '#A855F7', unlocked: false },
+  { id: 8, slug: 'respeto-al-rival', title: 'Respeto al Rival', desc: 'Completa 20 partidos demostrando respeto al rival.', icon: 'handshake-o', color: '#4FC3F7', unlocked: false },
+  { id: 9, slug: 'respeto-al-arbitro', title: 'Respeto al Árbitro', desc: 'Mantén una actitud ejemplar hacia los árbitros.', icon: 'gavel', color: '#EAB308', unlocked: false },
+  { id: 10, slug: 'confianza-entrenador', title: 'Confianza del Entrenador', desc: 'Demuestra compromiso y responsabilidad.', icon: 'check-circle', color: '#22C55E', unlocked: true, date: '12 Oct 2026' },
+  { id: 11, slug: 'aficion-ejemplar', title: 'Afición Ejemplar', desc: 'Respeta siempre al público.', icon: 'bullhorn', color: '#4FC3F7', unlocked: false },
+  { id: 12, slug: 'puntualidad', title: 'Puntualidad', desc: 'Llega siempre puntual a entrenamientos y partidos.', icon: 'clock-o', color: '#3B82F6', unlocked: true, date: '10 Nov 2026' },
+  { id: 13, slug: 'valiente', title: 'Valiente', desc: 'Cumple con los valores del CD Jesuitas demostrando valentía, esfuerzo, compromiso y determinación.', icon: 'bolt', color: '#EAB308', unlocked: false },
+  { id: 14, slug: 'adn-jesuitas', title: 'ADN Jesuitas', desc: 'Representa los valores del club dentro y fuera del terreno de juego.', icon: 'heart', color: '#E11D48', unlocked: false },
+  { id: 15, slug: 'companerismo', title: 'Compañerismo', desc: 'Antepón siempre el equipo al éxito individual.', icon: 'link', color: '#A855F7', unlocked: true, date: '20 Sep 2026' },
 ];
 
 const generateReto = (id: number, title: string, ctx: string, diff: string, total: number, curr: number, xp: number): Reto => {
-  return { id, title, ctx, diff, total, curr, xp };
+  const slug = `reto-${id}`;
+  return { id, slug, title, ctx, diff, total, curr, xp };
 };
 
 export const RETOS_ATAQUE: Reto[] = [
