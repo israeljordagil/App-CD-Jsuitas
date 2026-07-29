@@ -176,72 +176,16 @@ export function FamiliaMiHijo() {
         </View>
       )}
 
-      {/* 4. VISTA 2: ESTADÍSTICAS DETALLADAS DE TEMPORADA */}
+      {/* 4. VISTA 2: SECCIÓN RESERVADA A CUERPO TÉCNICO */}
       {activeSubTab === 'stats' && (
         <View style={styles.tabContentBlock}>
-          <Text style={styles.sectionTitle}>PARTICIPACIÓN Y MINUTOS</Text>
-
-          <View style={styles.statsGridRow}>
-            <View style={styles.statBoxCard}>
-              <Text style={styles.statBoxNum}>{player.stats.matches}</Text>
-              <Text style={styles.statBoxLabel}>Partidos Jugados</Text>
-            </View>
-
-            <View style={styles.statBoxCard}>
-              <Text style={styles.statBoxNum}>{player.stats.starter}</Text>
-              <Text style={styles.statBoxLabel}>Titularidades</Text>
-            </View>
-
-            <View style={styles.statBoxCard}>
-              <Text style={styles.statBoxNum}>{player.stats.minutes} min</Text>
-              <Text style={styles.statBoxLabel}>Minutos ({player.stats.minutesPct})</Text>
-            </View>
-
-            <View style={styles.statBoxCard}>
-              <Text style={styles.statBoxNum}>{player.stats.trainingAttendance}</Text>
-              <Text style={styles.statBoxLabel}>Asistencia Entrenos</Text>
-            </View>
+          <View style={{ backgroundColor: '#0B224F', padding: 20, borderRadius: 16, alignItems: 'center', marginVertical: 12 }}>
+            <Ionicons name="shield-checkmark-outline" size={36} color="#4FC3F7" />
+            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800', marginTop: 12, textAlign: 'center' }}>EXPEDIENTE TÉCNICO RESERVADO</Text>
+            <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', marginTop: 6, lineHeight: 18 }}>
+              Las estadísticas deportivas individuales (minutos jugados, valoraciones y datos de rendimiento) se conservan exclusivamente para la dirección deportiva y el cuerpo técnico.
+            </Text>
           </View>
-
-          <Text style={styles.sectionTitle}>APORTACIÓN OFENSIVA & TARJETAS</Text>
-          <View style={styles.statsGridRow}>
-            <View style={styles.statBoxCard}>
-              <Text style={{fontSize: 22, marginBottom: 2}}>⚽</Text>
-              <Text style={styles.statBoxNum}>{player.stats.goals}</Text>
-              <Text style={styles.statBoxLabel}>Goles Marcados</Text>
-            </View>
-
-            <View style={styles.statBoxCard}>
-              <Text style={{fontSize: 22, marginBottom: 2}}>🅰️</Text>
-              <Text style={styles.statBoxNum}>{player.stats.assists}</Text>
-              <Text style={styles.statBoxLabel}>Asistencias de Gol</Text>
-            </View>
-
-            <View style={styles.statBoxCard}>
-              <Text style={{fontSize: 22, marginBottom: 2}}>🟨</Text>
-              <Text style={styles.statBoxNum}>{player.stats.yellowCards}</Text>
-              <Text style={styles.statBoxLabel}>Tarjetas Amarillas</Text>
-            </View>
-
-            <View style={styles.statBoxCard}>
-              <Text style={{fontSize: 22, marginBottom: 2}}>🟥</Text>
-              <Text style={styles.statBoxNum}>{player.stats.redCards}</Text>
-              <Text style={styles.statBoxLabel}>Tarjetas Rojas</Text>
-            </View>
-          </View>
-
-          <Text style={styles.sectionTitle}>HISTORIAL DE PARTIDOS DISPUTADOS</Text>
-          {player.history.map((h, idx) => (
-            <View key={idx} style={styles.historyRowCard}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.historyRoundText}>{h.round} vs {h.opponent}</Text>
-                <Text style={styles.historyDetailsText}>Resultado: {h.score} • {h.minPlayed} jugados</Text>
-              </View>
-              <View style={styles.ratingBadge}>
-                <Text style={styles.ratingText}>★ {h.rating}</Text>
-              </View>
-            </View>
-          ))}
         </View>
       )}
 

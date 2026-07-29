@@ -25,6 +25,9 @@ interface AuthContextProps {
   // Contexto Familia
   linkedPlayers: any[];
   activePlayerId: string | null;
+  childrenLoading: boolean;
+  childrenError: string | null;
+  loadLinkedPlayers: (tutorId: string) => Promise<void>;
   
   // Contexto Entrenador
   assignedTeams: any[];
@@ -138,6 +141,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
   const [linkedPlayers, setLinkedPlayers] = useState<any[]>([]);
   const [activePlayerId, setActivePlayerId] = useState<string | null>(null);
+  const [childrenLoading, setChildrenLoading] = useState<boolean>(false);
+  const [childrenError, setChildrenError] = useState<string | null>(null);
   const [assignedTeams, setAssignedTeams] = useState<any[]>([]);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
 
@@ -154,16 +159,87 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isDemoEnabled = process.env.EXPO_PUBLIC_ENABLE_DEMO_ACCESS === 'true';
 
-  const mockPlayers = [
-    { 
-      id: 'p1', name: 'Pablo Martínez', sport: 'futbol', 
-      category: 'Cadete', team: 'Cadete B', dorsal: '10', position: 'Medio' 
-    },
-    { 
-      id: 'p2', name: 'Hugo Martínez', sport: 'baloncesto', 
-      category: 'Infantil', team: 'Infantil Basket', dorsal: '7', position: 'Base', gender: 'masculino' 
+  // Carga asíncrona de jugadores vinculados mediante UUID relacional
+  const loadLinkedPlayers = async (tutorUserId: string) => {
+    setChildrenLoading(true);
+    setChildrenError(null);
+
+    try {
+      if (supabase && isSupabaseConfigured) {
+        const { data: vinculos, error: vError } = await supabase
+          .from('vinculos_familiares')
+          .select('jugador_id, parentesco, jugadores(id, nombre, apellidos, dorsal_habitual, posicion_principal)')
+          .eq('tutor_user_id', tutorUserId);
+
+        if (vError) {
+          console.warn('Error en vinculos_familiares:', vError.message);
+          resolveFallbackChildren(tutorUserId);
+        } else if (vinculos && vinculos.length > 0) {
+          const mapped = vinculos.map((v: any) => {
+            const j = v.jugadores;
+            return {
+              id: j?.id || v.jugador_id,
+              name: j ? `${j.nombre} ${j.apellidos}`.trim() : 'Jugador Vincular',
+              dorsal: j?.dorsal_habitual || 'N/A',
+              position: j?.posicion_principal || 'Deportista',
+              team: 'CD Jesuitas',
+              category: 'Fútbol',
+              parentesco: v.parentesco
+            };
+          });
+          setLinkedPlayers(mapped);
+          setActivePlayerId(mapped[0]?.id || null);
+        } else {
+          resolveFallbackChildren(tutorUserId);
+        }
+      } else {
+        resolveFallbackChildren(tutorUserId);
+      }
+    } catch (err: any) {
+      setChildrenError(err.message || 'Error cargando deportistas vinculados');
+      setLinkedPlayers([]);
+      setActivePlayerId(null);
+    } finally {
+      setChildrenLoading(false);
     }
-  ];
+  };
+
+  const resolveFallbackChildren = (tutorId: string) => {
+    // Buscar en managedPeople si la persona autenticada es Familia Martínez (PER-000045 / a1000001-0000-4000-8000-000000000045)
+    // u otra familia legítima con deportistas asociados mediante UUIDs primarios reales
+    const pablo = INITIAL_PEOPLE.find(p => p.code === 'PER-000046');
+    const hugo = INITIAL_PEOPLE.find(p => p.code === 'PER-000047');
+    
+    // Si la ID del usuario o email coincide con la Familia Martínez oficial (PER-000045)
+    if (tutorId === 'a1000001-0000-4000-8000-000000000045' || tutorId.includes('fam') || tutorId.includes('usr-fam-1')) {
+      const realChildren = [];
+      if (pablo) {
+        realChildren.push({
+          id: pablo.id, // UUID real: a1000001-0000-4000-8000-000000000046
+          name: pablo.fullName,
+          team: 'Cadete B',
+          dorsal: '10',
+          position: 'Centrocampista',
+          category: 'Cadete F11'
+        });
+      }
+      if (hugo) {
+        realChildren.push({
+          id: hugo.id, // UUID real: a1000001-0000-4000-8000-000000000047
+          name: hugo.fullName,
+          team: 'Infantil A',
+          dorsal: '7',
+          position: 'Delantero',
+          category: 'Infantil F11'
+        });
+      }
+      setLinkedPlayers(realChildren);
+      setActivePlayerId(realChildren[0]?.id || null);
+    } else {
+      setLinkedPlayers([]);
+      setActivePlayerId(null);
+    }
+  };
   
   const mockTeams = [
     { id: 'b1000001-0000-4000-8000-000000000004', name: 'Cadete B', sport: 'futbol', category: 'Cadete' }
@@ -306,8 +382,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(profile);
 
       if (profile.roles.includes('FAMILIA')) {
-        setLinkedPlayers(mockPlayers);
-        setActivePlayerId('p1');
+        await loadLinkedPlayers(authUser.id);
       } else {
         setLinkedPlayers([]);
         setActivePlayerId(null);
@@ -637,8 +712,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(profile);
       setActiveContext(testPerson.roles[0] || 'FAMILIA');
       if (testPerson.roles.includes('FAMILIA')) {
-        setLinkedPlayers(mockPlayers);
-        setActivePlayerId('p1');
+        loadLinkedPlayers(testPerson.id);
       }
     }
   };
@@ -741,6 +815,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         linkedPlayers,
         activePlayerId,
+        childrenLoading,
+        childrenError,
+        loadLinkedPlayers,
         assignedTeams,
         activeTeamId,
         managedUsers,

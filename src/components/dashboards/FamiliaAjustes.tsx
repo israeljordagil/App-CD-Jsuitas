@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from '../../context/AuthContext';
 
 // Colores corporativos de lujo
 const colors = {
@@ -31,6 +32,7 @@ const colors = {
 export function FamiliaAjustes() {
   const { width: screenWidth } = useWindowDimensions();
   const isTablet = screenWidth >= 768;
+  const { linkedPlayers } = useAuth();
 
   // IBAN BANCARIO Y MODAL DE CAMBIO
   const [iban, setIban] = useState('ES48 2100 0412 8842 9912');
@@ -53,47 +55,48 @@ export function FamiliaAjustes() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, isTablet && styles.contentTablet]} showsVerticalScrollIndicator={false}>
       
-      {/* 1. FICHA DE DATOS DE LA FAMILIA */}
-      <View style={styles.profileCard}>
-        <LinearGradient colors={['rgba(11, 34, 79, 0.98)', 'rgba(7, 26, 61, 0.98)']} style={styles.profileGradient}>
-          <View style={styles.profileHeaderRow}>
-            <View style={styles.avatarCircle}>
-              <FontAwesome name="user" size={32} color={colors.navyDark} />
+      {/* 1. FICHA TUTORES LEGALES / DIRECCIÓN GPS Y DATOS BANCARIOS */}
+      <View style={styles.tutorCard}>
+        <LinearGradient colors={['#0B224F', '#071A3D']} style={styles.tutorGradient}>
+          
+          <View style={styles.tutorHeaderRow}>
+            <View style={styles.tutorAvatarBox}>
+              <FontAwesome name="users" size={20} color={colors.skyPrimary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.profileName}>Familia Martínez García</Text>
-              <Text style={styles.profileEmail}>carlos.martinez@email.com</Text>
-              <Text style={styles.profilePhone}>📞 +34 612 345 678</Text>
+              <Text style={styles.tutorTitle}>Ficha Familiar & Tutores Legales</Text>
+              <Text style={styles.tutorSub}>Expediente #FAM-2026-088 • Domiciliación Única</Text>
             </View>
-            <TouchableOpacity style={styles.editBtn}>
-              <Ionicons name="create-outline" size={18} color={colors.skyPrimary} />
-            </TouchableOpacity>
           </View>
 
-          {/* DATOS BANCARIOS REGISTRADOS PARA REMESAS BANCARIAS */}
-          <View style={styles.bankCardInfo}>
-            <Ionicons name="card-outline" size={22} color={colors.accentGold} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.bankLabel}>CUENTA DE DOMICILIACIÓN SEPA HABITUAL:</Text>
-              <Text style={styles.bankIban}>{iban}</Text>
-            </View>
-            <TouchableOpacity 
-              style={styles.changeIbanBtn}
-              onPress={() => {
-                setNewIbanInput(iban);
-                setIsIbanModalOpen(true);
-              }}
-            >
-              <Text style={styles.changeIbanTxt}>Cambiar IBAN</Text>
-            </TouchableOpacity>
+          <View style={styles.dividerLight} />
+
+          {/* DIRECCIÓN VIVIENDA / PUNTO GPS */}
+          <View style={styles.infoRow}>
+            <Ionicons name="home-outline" size={16} color={colors.skyPrimary} />
+            <Text style={styles.infoTextLabel}>Dirección Vivienda (Cálculo GPS):</Text>
+            <Text style={styles.infoTextVal}>Calle Gran Vía Marqués del Turia, 45, Valencia</Text>
           </View>
+
+          {/* IBAN DOMICILIACIÓN BANCARIA */}
+          <View style={styles.infoRow}>
+            <Ionicons name="card-outline" size={16} color={colors.accentGold} />
+            <Text style={styles.infoTextLabel}>IBAN Cobros Domiciliados:</Text>
+            <Text style={styles.infoTextVal}>{iban}</Text>
+          </View>
+
+          <TouchableOpacity style={styles.btnChangeIban} onPress={() => setIsIbanModalOpen(true)}>
+            <Ionicons name="create-outline" size={14} color={colors.navyDark} />
+            <Text style={styles.btnChangeIbanTxt}>Modificar Cuenta Bancaria o Domiciliación SEPA</Text>
+          </TouchableOpacity>
+
         </LinearGradient>
       </View>
 
       {/* 2. CALENDARIO DE REMESAS BANCARIAS / PAGOS TRIMESTRALES ESPECIFICADO POR JUGADOR */}
       <Text style={styles.sectionTitle}>💶 PLAN DE REMESAS BANCARIAS (CUOTAS POR JUGADOR)</Text>
       <View style={styles.remesasCard}>
-        <Text style={styles.remesaNoticeTxt}>*Los cobros son domiciliados individualmente por cada jugador inscrito en el club (Pablo Martínez / Hugo Martínez):</Text>
+        <Text style={styles.remesaNoticeTxt}>*Los cobros son domiciliados individualmente por cada jugador inscrito y vinculado en el club:</Text>
         
         <View style={styles.remesaRow}>
           <View style={styles.remesaIconConfirmed}>
@@ -143,31 +146,26 @@ export function FamiliaAjustes() {
       {/* 3. HIJOS VINCULADOS A LA CUENTA */}
       <Text style={styles.sectionTitle}>👦 HIJOS VINCULADOS EN EL CLUB</Text>
       <View style={styles.childrenContainer}>
-        <View style={styles.childCardRow}>
-          <View style={styles.childAvatarMini}>
-            <Text style={{ fontSize: 18 }}>👦</Text>
+        {linkedPlayers.length > 0 ? (
+          linkedPlayers.map(child => (
+            <View key={child.id} style={styles.childCardRow}>
+              <View style={styles.childAvatarMini}>
+                <Text style={{ fontSize: 18 }}>👦</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.childNameTxt}>{child.name}</Text>
+                <Text style={styles.childSubTxt}>{child.team || 'CD Jesuitas'} • #{child.dorsal || 'N/A'}</Text>
+              </View>
+              <View style={styles.activeTag}>
+                <Text style={styles.activeTagTxt}>ACTIVO</Text>
+              </View>
+            </View>
+          ))
+        ) : (
+          <View style={{ padding: 16, alignItems: 'center' }}>
+            <Text style={{ color: colors.textMuted, fontSize: 13 }}>No hay jugadores vinculados actualmente.</Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.childNameTxt}>Pablo Martínez</Text>
-            <Text style={styles.childSubTxt}>Cadete B • Fútbol 11 (#10)</Text>
-          </View>
-          <View style={styles.activeTag}>
-            <Text style={styles.activeTagTxt}>ACTIVO</Text>
-          </View>
-        </View>
-
-        <View style={styles.childCardRow}>
-          <View style={styles.childAvatarMini}>
-            <Text style={{ fontSize: 18 }}>👦</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.childNameTxt}>Hugo Martínez</Text>
-            <Text style={styles.childSubTxt}>Infantil A • Fútbol Sala (#9)</Text>
-          </View>
-          <View style={styles.activeTag}>
-            <Text style={styles.activeTagTxt}>ACTIVO</Text>
-          </View>
-        </View>
+        )}
       </View>
 
       {/* 4. PREFERENCIAS DE SEGURIDAD Y LOGÍSTICA */}

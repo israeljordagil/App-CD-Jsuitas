@@ -253,30 +253,6 @@ export function FamiliaPartidosView() {
               <Text style={styles.noLiveSub}>El marcador en tiempo real comenzará el {live.nextMatchDate}. El segundo entrenador actualizará cada gol y tarjeta.</Text>
             </View>
           )}
-
-          {/* 6. ESTADÍSTICAS TEMPORADA DEL HIJO */}
-          <Text style={styles.sectionTitle}>📊 RENDIMIENTO DE {matchData.childName.toUpperCase()}</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statBox}>
-              <Text style={styles.statNum}>{matchData.seasonStats.played}</Text>
-              <Text style={styles.statLabel}>Partidos</Text>
-            </View>
-
-            <View style={styles.statBox}>
-              <Text style={[styles.statNum, { color: colors.accentGold }]}>{matchData.seasonStats.goals}</Text>
-              <Text style={styles.statLabel}>Goles</Text>
-            </View>
-
-            <View style={styles.statBox}>
-              <Text style={[styles.statNum, { color: colors.skyGlow }]}>{matchData.seasonStats.assists}</Text>
-              <Text style={styles.statLabel}>Asistencias</Text>
-            </View>
-
-            <View style={styles.statBox}>
-              <Text style={styles.statNum}>{matchData.seasonStats.minutes}</Text>
-              <Text style={styles.statLabel}>Minutos</Text>
-            </View>
-          </View>
         </>
       ) : activeTab === 'calendario' ? (
         /* PESTAÑA PRÓXIMOS PARTIDOS */

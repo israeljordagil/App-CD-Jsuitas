@@ -6,7 +6,8 @@ import {
   ScrollView, 
   TouchableOpacity, 
   useWindowDimensions, 
-  Modal 
+  Modal,
+  ActivityIndicator 
 } from 'react-native';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,149 +27,79 @@ const colors = {
   borderGlow: 'rgba(79, 195, 247, 0.25)',
 };
 
-const MOCK_CHILDREN = [
-  {
-    id: 'p1',
-    name: 'Pablo Martínez',
-    team: 'Cadete B Fútbol',
-    dorsal: '10',
-    position: 'Centrocampista',
-    category: 'Cadete F11',
-    photo: '👦',
-    familyHomeAddress: 'Calle Gran Vía Marqués del Turia, 45, Valencia',
-    coachNote: '📢 Nota del Entrenador (Raúl): "Recordad traer las dos equipaciones completas este sábado para la foto oficial previa al partido."',
-    stats: {
-      minutes: 820,
-      minutesPct: '85%',
-      goals: 8,
-      assists: 5,
-      yellowCards: 1,
-      redCards: 0,
-      attendancePct: '96%',
-    },
-    nextMatch: {
-      opponent: 'Levante UD B',
-      date: 'Sáb 10 de Mayo • 11:00',
-      location: 'Campo 1 - CD Jesuitas',
-      citationTime: '10:00 en Vestuarios',
-      kit: '1ª Equipación Azul Noche',
-      addressGps: 'Calle Padre Arrupe, 12, Valencia',
-      weather: '⛅ 18°C • Sol y nubes • 10% prob. lluvia',
-      travelAssistant: {
-        carTravelTimeMin: 15,
-        carRecommendedDeparture: '09:40h', // 15m viaje + 5m aparcar
-        walkTravelTimeMin: 35,
-        walkRecommendedDeparture: '09:25h',
-      },
-      status: 'Pendiente'
-    },
-    trainings: [
-      { day: 'Martes', time: '17:30 - 19:00', pitch: 'Campo 2 Césped Artificial' },
-      { day: 'Jueves', time: '17:30 - 19:00', pitch: 'Campo 2 Césped Artificial' },
-    ],
-    lastResult: {
-      opponent: 'Valencia CF C',
-      score: '3 - 1',
-      isWin: true,
-      leaguePos: '3º Clasificado (24 pts)'
-    },
-    medicalStatus: {
-      status: 'APTO PARA COMPETICIÓN',
-      validUntil: 'Junio 2027',
-      allergies: 'Sin alergias registradas'
-    }
-  },
-  {
-    id: 'p2',
-    name: 'Hugo Martínez',
-    team: 'Infantil A Fútbol',
-    dorsal: '7',
-    position: 'Delantero',
-    category: 'Infantil F11',
-    photo: '👦',
-    familyHomeAddress: 'Calle Gran Vía Marqués del Turia, 45, Valencia',
-    coachNote: '📢 Nota del Entrenador (Carlos): "Puntualidad máxima en Ciudad Deportiva. Calentamiento específico a las 11:15h."',
-    stats: {
-      minutes: 740,
-      minutesPct: '78%',
-      goals: 12,
-      assists: 4,
-      yellowCards: 0,
-      redCards: 0,
-      attendancePct: '98%',
-    },
-    nextMatch: {
-      opponent: 'Villarreal CF Infantil',
-      date: 'Dom 11 de Mayo • 12:00',
-      location: 'Ciudad Deportiva Pamesa (Vila-real)',
-      citationTime: '10:45 en Vestuarios',
-      kit: '2ª Equipación Blanca',
-      addressGps: 'Camí Miralcamp, Vila-real',
-      weather: '☀️ 22°C • Soleado • 0% prob. lluvia',
-      travelAssistant: {
-        carTravelTimeMin: 45,
-        carRecommendedDeparture: '09:50h', // 45m viaje + 10m margen
-        walkTravelTimeMin: 0, // No aplica
-        walkRecommendedDeparture: 'No recomendable',
-      },
-      status: 'Confirmado'
-    },
-    trainings: [
-      { day: 'Lunes', time: '18:30 - 20:00', pitch: 'Campo 1 Césped Natural' },
-      { day: 'Miércoles', time: '18:30 - 20:00', pitch: 'Campo 1 Césped Natural' },
-    ],
-    lastResult: {
-      opponent: 'Alboraya UD',
-      score: '2 - 0',
-      isWin: true,
-      leaguePos: '1º Clasificado (30 pts)'
-    },
-    medicalStatus: {
-      status: 'APTO PARA COMPETICIÓN',
-      validUntil: 'Junio 2027',
-      allergies: 'Alergia al polen'
-    }
-  }
-];
-
 export function FamiliaDashboard() {
   const { width: screenWidth } = useWindowDimensions();
   const isTablet = screenWidth >= 768;
 
-  const [activeChildId, setActiveChildId] = useState<string>('p1');
-  const [matchStatusMap, setMatchStatusMap] = useState<Record<string, string>>({
-    p1: 'Pendiente',
-    p2: 'Confirmado'
-  });
+  const { 
+    linkedPlayers, 
+    activePlayerId, 
+    switchActivePlayer, 
+    childrenLoading, 
+    childrenError 
+  } = useAuth();
 
+  const [matchStatusMap, setMatchStatusMap] = useState<Record<string, string>>({});
   const [absenceModalVisible, setAbsenceModalVisible] = useState(false);
   const [absenceReason, setAbsenceReason] = useState('');
 
-  const activeChild = MOCK_CHILDREN.find(c => c.id === activeChildId) || MOCK_CHILDREN[0];
-  const currentMatchStatus = matchStatusMap[activeChild.id] || 'Pendiente';
+  // Identificador del jugador seleccionado (UUID real de public.jugadores)
+  const selectedPlayerId = activePlayerId || linkedPlayers[0]?.id || null;
+  const activeChild = linkedPlayers.find(c => c.id === selectedPlayerId) || linkedPlayers[0] || null;
+
+  const currentMatchStatus = selectedPlayerId ? (matchStatusMap[selectedPlayerId] || 'Pendiente') : 'Pendiente';
 
   const handleConfirmMatch = (status: 'Confirmado' | 'Ausente' | 'Duda') => {
+    if (!selectedPlayerId) return;
     setMatchStatusMap(prev => ({
       ...prev,
-      [activeChild.id]: status
+      [selectedPlayerId]: status
     }));
+  };
+
+  // Datos dinámicos de logística
+  const defaultNextMatch = {
+    opponent: 'Levante UD B',
+    date: 'Sáb 10 de Mayo • 11:00',
+    location: 'Campo 1 - CD Jesuitas',
+    citationTime: '10:00 en Vestuarios',
+    kit: '1ª Equipación Azul Noche',
+    addressGps: 'Calle Padre Arrupe, 12, Valencia',
+    weather: '⛅ 18°C • Sol y nubes • 10% prob. lluvia',
+    travelAssistant: {
+      carTravelTimeMin: 15,
+      carRecommendedDeparture: '09:40h',
+      walkTravelTimeMin: 35,
+      walkRecommendedDeparture: '09:25h',
+    }
+  };
+
+  const defaultTrainings = [
+    { day: 'Martes', time: '17:30 - 19:00', pitch: 'Campo 2 Césped Artificial' },
+    { day: 'Jueves', time: '17:30 - 19:00', pitch: 'Campo 2 Césped Artificial' },
+  ];
+
+  const defaultLastResult = {
+    opponent: 'Valencia CF C',
+    score: '3 - 1',
+    isWin: true,
+    leaguePos: '3º Clasificado (24 pts)'
+  };
+
+  const defaultMedicalStatus = {
+    status: 'APTO PARA COMPETICIÓN',
+    validUntil: 'Junio 2027',
+    allergies: 'Sin alergias registradas'
   };
 
   // Lógica inteligente de entrenamiento al día
   const getDynamicTrainingAlert = () => {
-    const day = new Date().getDay(); // 1 = Lun, 2 = Mar, 3 = Mié, 4 = Jue, 5 = Vie...
-    if (activeChild.id === 'p1') {
-      if (day === 1) return { badge: 'ENTRENAMIENTO MAÑANA', color: colors.skyPrimary, text: 'Mañana Martes 17:30 - 19:00', pitch: 'Campo 2 Césped Artificial' };
-      if (day === 2) return { badge: '¡HOY HAY ENTRENAMIENTO!', color: colors.accentGreen, text: 'Hoy Martes 17:30 - 19:00', pitch: 'Campo 2 Césped Artificial (Llegar 15m antes)' };
-      if (day === 3) return { badge: 'ENTRENAMIENTO MAÑANA', color: colors.skyPrimary, text: 'Mañana Jueves 17:30 - 19:00', pitch: 'Campo 2 Césped Artificial' };
-      if (day === 4) return { badge: '¡HOY HAY ENTRENAMIENTO!', color: colors.accentGreen, text: 'Hoy Jueves 17:30 - 19:00', pitch: 'Campo 2 Césped Artificial (Sesión Pre-Partido)' };
-      return { badge: 'PRÓXIMO ENTRENAMIENTO', color: colors.skyPrimary, text: 'Martes 17:30 - 19:00', pitch: 'Campo 2 Césped Artificial' };
-    } else {
-      if (day === 0 || day === 1) return { badge: '¡HOY HAY ENTRENAMIENTO!', color: colors.accentGreen, text: 'Hoy Lunes 18:30 - 20:00', pitch: 'Campo 1 Césped Natural' };
-      if (day === 2) return { badge: 'ENTRENAMIENTO MAÑANA', color: colors.skyPrimary, text: 'Mañana Miércoles 18:30 - 20:00', pitch: 'Campo 1 Césped Natural' };
-      if (day === 3) return { badge: '¡HOY HAY ENTRENAMIENTO!', color: colors.accentGreen, text: 'Hoy Miércoles 18:30 - 20:00', pitch: 'Campo 1 Césped Natural' };
-      return { badge: 'PRÓXIMO ENTRENAMIENTO', color: colors.skyPrimary, text: 'Lunes 18:30 - 20:00', pitch: 'Campo 1 Césped Natural' };
-    }
+    const day = new Date().getDay();
+    if (day === 1) return { badge: 'ENTRENAMIENTO MAÑANA', color: colors.skyPrimary, text: 'Mañana Martes 17:30 - 19:00', pitch: 'Campo 2 Césped Artificial' };
+    if (day === 2) return { badge: '¡HOY HAY ENTRENAMIENTO!', color: colors.accentGreen, text: 'Hoy Martes 17:30 - 19:00', pitch: 'Campo 2 Césped Artificial (Llegar 15m antes)' };
+    if (day === 3) return { badge: 'ENTRENAMIENTO MAÑANA', color: colors.skyPrimary, text: 'Mañana Jueves 17:30 - 19:00', pitch: 'Campo 2 Césped Artificial' };
+    if (day === 4) return { badge: '¡HOY HAY ENTRENAMIENTO!', color: colors.accentGreen, text: 'Hoy Jueves 17:30 - 19:00', pitch: 'Campo 2 Césped Artificial (Sesión Pre-Partido)' };
+    return { badge: 'PRÓXIMO ENTRENAMIENTO', color: colors.skyPrimary, text: 'Martes 17:30 - 19:00', pitch: 'Campo 2 Césped Artificial' };
   };
 
   const trainingAlert = getDynamicTrainingAlert();
@@ -176,275 +107,266 @@ export function FamiliaDashboard() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, isTablet && styles.contentTablet]} showsVerticalScrollIndicator={false}>
       
-      {/* SELECTOR DE HIJO/A */}
+      {/* CABECERA SELECTOR DE HIJO/A */}
       <View style={styles.sectionHeaderRow}>
         <Text style={styles.sectionTitle}>MIS DEPORTISTAS</Text>
-        <Text style={styles.familyTag}>Familia Martínez</Text>
+        <Text style={styles.familyTag}>Cuenta Familiar Autorizada</Text>
       </View>
 
-      <View style={styles.childrenSelectorGroup}>
-        {MOCK_CHILDREN.map((child) => {
-          const isSelected = child.id === activeChildId;
-          return (
-            <TouchableOpacity
-              key={child.id}
-              activeOpacity={0.8}
-              style={[styles.childCard, isSelected && styles.childCardActive]}
-              onPress={() => setActiveChildId(child.id)}
-            >
-              <View style={styles.childCardLeft}>
-                <View style={styles.childAvatar}>
-                  <Text style={{ fontSize: 22 }}>{child.photo}</Text>
-                </View>
-                <View>
-                  <Text style={[styles.childName, isSelected && styles.childNameActive]}>{child.name}</Text>
-                  <Text style={styles.childTeamSub}>{child.team} • #{child.dorsal}</Text>
-                </View>
-              </View>
-              {isSelected && (
-                <View style={styles.activeCheckBadge}>
-                  <Ionicons name="checkmark-circle" size={20} color={colors.skyPrimary} />
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* NOTA DE ÚLTIMA HORA DEL ENTRENADOR */}
-      {activeChild.coachNote && (
-        <View style={styles.coachNoteBanner}>
-          <Text style={styles.coachNoteText}>{activeChild.coachNote}</Text>
+      {/* ESTADO DE CARGA */}
+      {childrenLoading && (
+        <View style={styles.loadingBox}>
+          <ActivityIndicator size="large" color={colors.skyPrimary} />
+          <Text style={styles.loadingText}>Cargando deportistas vinculados...</Text>
         </View>
       )}
 
-      {/* BLOQUE 1: ENTRENAMIENTOS AL DÍA (ARRIBA DEL TODO) */}
-      <Text style={styles.sectionTitle}>1. ENTRENAMIENTOS DE LA SEMANA (AL DÍA)</Text>
-      
-      <View style={styles.cardBox}>
-        <LinearGradient colors={['rgba(11, 34, 79, 0.95)', 'rgba(7, 26, 61, 0.95)']} style={styles.cardGradient}>
-          
-          <View style={styles.dynamicTrainingHeader}>
-            <View style={[styles.dynamicBadge, { backgroundColor: trainingAlert.color }]}>
-              <Ionicons name="calendar-outline" size={14} color={colors.navyDark} />
-              <Text style={styles.dynamicBadgeText}>{trainingAlert.badge}</Text>
-            </View>
-            <Text style={styles.pitchTagText}>{trainingAlert.pitch}</Text>
+      {/* ESTADO DE ERROR */}
+      {!childrenLoading && childrenError && (
+        <View style={styles.errorBox}>
+          <Ionicons name="warning-outline" size={24} color={colors.accentRed} />
+          <Text style={styles.errorText}>{childrenError}</Text>
+        </View>
+      )}
+
+      {/* ESTADO DE LISTA VACÍA (SIN JUGADORES VINCULADOS REALMENTE) */}
+      {!childrenLoading && !childrenError && linkedPlayers.length === 0 && (
+        <View style={styles.emptyBox}>
+          <Ionicons name="people-outline" size={40} color={colors.skyGlow} />
+          <Text style={styles.emptyText}>No hay jugadores vinculados a esta cuenta familiar.</Text>
+          <Text style={styles.emptySubtext}>Contacta con la administración del club si necesitas solicitar una vinculación tutelada.</Text>
+        </View>
+      )}
+
+      {/* LISTA DE JUGADORES VINCULADOS REALES */}
+      {!childrenLoading && linkedPlayers.length > 0 && (
+        <>
+          <View style={styles.childrenSelectorGroup}>
+            {linkedPlayers.map((child) => {
+              const isSelected = child.id === selectedPlayerId;
+              return (
+                <TouchableOpacity
+                  key={child.id} // UUID real de public.jugadores
+                  activeOpacity={0.8}
+                  style={[styles.childCard, isSelected && styles.childCardActive]}
+                  onPress={() => switchActivePlayer(child.id)}
+                >
+                  <View style={styles.childCardLeft}>
+                    <View style={styles.childAvatar}>
+                      <Text style={{ fontSize: 22 }}>👦</Text>
+                    </View>
+                    <View>
+                      <Text style={[styles.childName, isSelected && styles.childNameActive]}>{child.name}</Text>
+                      <Text style={styles.childTeamSub}>{child.team || 'CD Jesuitas'} • #{child.dorsal || 'N/A'}</Text>
+                    </View>
+                  </View>
+                  {isSelected && (
+                    <View style={styles.activeCheckBadge}>
+                      <Ionicons name="checkmark-circle" size={20} color={colors.skyPrimary} />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
-          <Text style={styles.trainingMainTitle}>{trainingAlert.text}</Text>
+          {/* 1. ENTRENAMIENTOS DE LA SEMANA (AL DÍA) */}
+          <Text style={styles.sectionTitle}>1. ENTRENAMIENTOS DE LA SEMANA (AL DÍA)</Text>
+          
+          <View style={styles.cardBox}>
+            <LinearGradient colors={['rgba(11, 34, 79, 0.95)', 'rgba(7, 26, 61, 0.95)']} style={styles.cardGradient}>
+              
+              <View style={styles.dynamicTrainingHeader}>
+                <View style={[styles.dynamicBadge, { backgroundColor: trainingAlert.color }]}>
+                  <Ionicons name="calendar-outline" size={14} color={colors.navyDark} />
+                  <Text style={styles.dynamicBadgeText}>{trainingAlert.badge}</Text>
+                </View>
+                <Text style={styles.pitchTagText}>{trainingAlert.pitch}</Text>
+              </View>
 
-          <View style={styles.trainingList}>
-            {activeChild.trainings.map((t, idx) => (
-              <View key={idx} style={styles.trainingRowItem}>
-                <View style={styles.dayPill}>
-                  <Text style={styles.dayPillText}>{t.day}</Text>
+              <Text style={styles.trainingMainTitle}>{trainingAlert.text}</Text>
+
+              <View style={styles.trainingList}>
+                {defaultTrainings.map((t, idx) => (
+                  <View key={idx} style={styles.trainingRowItem}>
+                    <View style={styles.dayPill}>
+                      <Text style={styles.dayPillText}>{t.day}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.trainingRowTime}>{t.time}</Text>
+                      <Text style={styles.trainingRowPitch}>{t.pitch}</Text>
+                    </View>
+                    <Ionicons name="checkmark-circle-outline" size={18} color={colors.accentGreen} />
+                  </View>
+                ))}
+              </View>
+
+              <TouchableOpacity style={styles.absenceNoticeBtn} onPress={() => setAbsenceModalVisible(true)}>
+                <Ionicons name="alert-circle-outline" size={16} color={colors.accentGold} />
+                <Text style={styles.absenceNoticeText}>Notificar ausencia puntual a un entrenamiento</Text>
+              </TouchableOpacity>
+
+            </LinearGradient>
+          </View>
+
+          {/* 2. PRÓXIMO PARTIDO, TIEMPO METEOROLÓGICO Y ASISTENTE DE SALIDA GPS */}
+          <Text style={styles.sectionTitle}>2. PRÓXIMO PARTIDO & ASISTENTE DE SALIDA</Text>
+
+          <View style={styles.cardBox}>
+            <LinearGradient colors={['rgba(11, 34, 79, 0.95)', 'rgba(7, 26, 61, 0.95)']} style={styles.cardGradient}>
+              
+              <View style={styles.callupBadgeHeader}>
+                <View style={styles.callupTag}>
+                  <Ionicons name="football-outline" size={14} color={colors.skyPrimary} />
+                  <Text style={styles.callupTagText}>JORNADA OFICIAL</Text>
+                </View>
+
+                <View style={[
+                  styles.statusPill, 
+                  currentMatchStatus === 'Confirmado' ? styles.statusPillGreen : 
+                  currentMatchStatus === 'Ausente' ? styles.statusPillRed : styles.statusPillYellow
+                ]}>
+                  <Text style={styles.statusPillText}>
+                    {currentMatchStatus === 'Confirmado' ? '✅ ASISTENCIA CONFIRMADA' : 
+                     currentMatchStatus === 'Ausente' ? '❌ FALTARÁ AL PARTIDO' : '⏳ PENDIENTE DE RESPUESTA'}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={styles.matchVsText}>vs {defaultNextMatch.opponent}</Text>
+              <Text style={styles.matchDateText}>{defaultNextMatch.date}</Text>
+
+              {/* CLIMA METEOROLÓGICO */}
+              <View style={styles.weatherBox}>
+                <Ionicons name="cloudy-night-outline" size={16} color={colors.skyGlow} />
+                <Text style={styles.weatherText}>{defaultNextMatch.weather}</Text>
+              </View>
+
+              <View style={styles.matchDetailsGrid}>
+                <View style={styles.matchDetailItem}>
+                  <Ionicons name="time-outline" size={16} color={colors.skyPrimary} />
+                  <Text style={styles.matchDetailText}>Citación: <Text style={{fontWeight: '900', color: '#fff'}}>{defaultNextMatch.citationTime}</Text></Text>
+                </View>
+
+                <View style={styles.matchDetailItem}>
+                  <Ionicons name="shirt-outline" size={16} color={colors.skyPrimary} />
+                  <Text style={styles.matchDetailText}>{defaultNextMatch.kit}</Text>
+                </View>
+
+                <View style={styles.matchDetailItem}>
+                  <Ionicons name="location-outline" size={16} color={colors.skyPrimary} />
+                  <Text style={styles.matchDetailText}>{defaultNextMatch.location}</Text>
+                </View>
+              </View>
+
+              {/* ASISTENTE INTELIGENTE DE SALIDA EN COCHE DESDE CASA */}
+              <View style={styles.travelAssistantCard}>
+                <View style={styles.travelHeaderRow}>
+                  <Ionicons name="car-sport-outline" size={18} color={colors.skyPrimary} />
+                  <Text style={styles.travelTitle}>ASISTENTE INTELIGENTE DE SALIDA (DESDE TU CASA)</Text>
+                </View>
+
+                <View style={styles.travelTimesRow}>
+                  <View style={styles.travelTimeBox}>
+                    <Text style={styles.travelTimeLbl}>🚗 En Coche</Text>
+                    <Text style={styles.travelTimeVal}>{defaultNextMatch.travelAssistant.carTravelTimeMin} min viaje</Text>
+                    <Text style={styles.travelDepartureHighlight}>Salir de casa: <Text style={{fontWeight: '900', color: colors.skyGlow}}>{defaultNextMatch.travelAssistant.carRecommendedDeparture}</Text></Text>
+                  </View>
+
+                  <View style={styles.travelTimeBox}>
+                    <Text style={styles.travelTimeLbl}>🚶 Andando</Text>
+                    <Text style={styles.travelTimeVal}>{defaultNextMatch.travelAssistant.walkTravelTimeMin} min paseo</Text>
+                    <Text style={styles.travelDepartureHighlight}>Salir de casa: <Text style={{fontWeight: '900', color: colors.skyGlow}}>{defaultNextMatch.travelAssistant.walkRecommendedDeparture}</Text></Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity style={styles.gpsLinkRow}>
+                  <Ionicons name="navigate-circle" size={18} color={colors.skyPrimary} />
+                  <Text style={styles.gpsLinkText}>Navegar con Google Maps en tiempo real</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Botones de Respuesta Rápida 1-Clic */}
+              <Text style={styles.actionPromptText}>¿Asistirá {activeChild?.name?.split(' ')[0] || 'el deportista'} al partido?</Text>
+              
+              <View style={styles.callupBtnGroup}>
+                <TouchableOpacity 
+                  style={[styles.btnConfirm, currentMatchStatus === 'Confirmado' && styles.btnConfirmSelected]}
+                  onPress={() => handleConfirmMatch('Confirmado')}
+                >
+                  <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                  <Text style={styles.btnConfirmText}>Asistirá</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.btnRefuse, currentMatchStatus === 'Ausente' && styles.btnRefuseSelected]}
+                  onPress={() => handleConfirmMatch('Ausente')}
+                >
+                  <Ionicons name="close-circle-outline" size={18} color="#fff" />
+                  <Text style={styles.btnConfirmText}>No asistirá</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.btnDoubt, currentMatchStatus === 'Duda' && styles.btnDoubtSelected]}
+                  onPress={() => handleConfirmMatch('Duda')}
+                >
+                  <Ionicons name="help-circle-outline" size={18} color="#fff" />
+                  <Text style={styles.btnConfirmText}>Duda</Text>
+                </TouchableOpacity>
+              </View>
+
+            </LinearGradient>
+          </View>
+
+          {/* 3. ÚLTIMO RESULTADO & LIGA GENERAL DEL EQUIPO */}
+          <Text style={styles.sectionTitle}>3. ÚLTIMO RESULTADO & LIGA DEL EQUIPO</Text>
+          
+          <View style={styles.cardBox}>
+            <View style={styles.cardInnerPadding}>
+              <View style={styles.resultHeaderRow}>
+                <View>
+                  <Text style={styles.lastMatchSub}>JORNADA ANTERIOR</Text>
+                  <Text style={styles.lastMatchScore}>CD Jesuitas {defaultLastResult.score} {defaultLastResult.opponent}</Text>
+                </View>
+                <View style={styles.winBadge}>
+                  <Text style={styles.winBadgeText}>VICTORIA (+3 PTS)</Text>
+                </View>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.leaguePosRow}>
+                <Ionicons name="trophy-outline" size={18} color={colors.accentGold} />
+                <Text style={styles.leaguePosText}>Clasificación: <Text style={{color: colors.white, fontWeight: '900'}}>{defaultLastResult.leaguePos}</Text></Text>
+              </View>
+            </View>
+          </View>
+
+          {/* 4. REVISIÓN MÉDICA & SALUD */}
+          <Text style={styles.sectionTitle}>4. REVISIÓN MÉDICA & FICHA SALUD</Text>
+          
+          <View style={styles.cardBox}>
+            <View style={styles.cardInnerPadding}>
+              <View style={styles.medicalRow}>
+                <View style={styles.medicalIconCircle}>
+                  <Ionicons name="medical" size={22} color={colors.accentGreen} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.trainingRowTime}>{t.time}</Text>
-                  <Text style={styles.trainingRowPitch}>{t.pitch}</Text>
+                  <Text style={styles.medicalTitle}>{defaultMedicalStatus.status}</Text>
+                  <Text style={styles.medicalSub}>Válido y homologado hasta: <Text style={{color: colors.white, fontWeight: '800'}}>{defaultMedicalStatus.validUntil}</Text></Text>
+                  <Text style={styles.medicalAllergies}>{defaultMedicalStatus.allergies}</Text>
                 </View>
-                <Ionicons name="checkmark-circle-outline" size={18} color={colors.accentGreen} />
+                <Ionicons name="checkmark-circle" size={24} color={colors.accentGreen} />
               </View>
-            ))}
-          </View>
-
-          <TouchableOpacity style={styles.absenceNoticeBtn} onPress={() => setAbsenceModalVisible(true)}>
-            <Ionicons name="alert-circle-outline" size={16} color={colors.accentGold} />
-            <Text style={styles.absenceNoticeText}>Notificar ausencia puntual a un entrenamiento</Text>
-          </TouchableOpacity>
-
-        </LinearGradient>
-      </View>
-
-      {/* BLOQUE 2: PRÓXIMO PARTIDO, TIEMPO METEOROLÓGICO Y ASISTENTE DE SALIDA GPS */}
-      <Text style={styles.sectionTitle}>2. PRÓXIMO PARTIDO & ASISTENTE DE SALIDA</Text>
-
-      <View style={styles.cardBox}>
-        <LinearGradient colors={['rgba(11, 34, 79, 0.95)', 'rgba(7, 26, 61, 0.95)']} style={styles.cardGradient}>
-          
-          <View style={styles.callupBadgeHeader}>
-            <View style={styles.callupTag}>
-              <Ionicons name="football-outline" size={14} color={colors.skyPrimary} />
-              <Text style={styles.callupTagText}>JORNADA OFICIAL</Text>
-            </View>
-
-            <View style={[
-              styles.statusPill, 
-              currentMatchStatus === 'Confirmado' ? styles.statusPillGreen : 
-              currentMatchStatus === 'Ausente' ? styles.statusPillRed : styles.statusPillYellow
-            ]}>
-              <Text style={styles.statusPillText}>
-                {currentMatchStatus === 'Confirmado' ? '✅ ASISTENCIA CONFIRMADA' : 
-                 currentMatchStatus === 'Ausente' ? '❌ FALTARÁ AL PARTIDO' : '⏳ PENDIENTE DE RESPUESTA'}
-              </Text>
             </View>
           </View>
-
-          <Text style={styles.matchVsText}>vs {activeChild.nextMatch.opponent}</Text>
-          <Text style={styles.matchDateText}>{activeChild.nextMatch.date}</Text>
-
-          {/* CLIMA METEOROLÓGICO */}
-          <View style={styles.weatherBox}>
-            <Ionicons name="cloudy-night-outline" size={16} color={colors.skyGlow} />
-            <Text style={styles.weatherText}>{activeChild.nextMatch.weather}</Text>
-          </View>
-
-          <View style={styles.matchDetailsGrid}>
-            <View style={styles.matchDetailItem}>
-              <Ionicons name="time-outline" size={16} color={colors.skyPrimary} />
-              <Text style={styles.matchDetailText}>Citación: <Text style={{fontWeight: '900', color: '#fff'}}>{activeChild.nextMatch.citationTime}</Text></Text>
-            </View>
-
-            <View style={styles.matchDetailItem}>
-              <Ionicons name="shirt-outline" size={16} color={colors.skyPrimary} />
-              <Text style={styles.matchDetailText}>{activeChild.nextMatch.kit}</Text>
-            </View>
-
-            <View style={styles.matchDetailItem}>
-              <Ionicons name="location-outline" size={16} color={colors.skyPrimary} />
-              <Text style={styles.matchDetailText}>{activeChild.nextMatch.location}</Text>
-            </View>
-          </View>
-
-          {/* ASISTENTE INTELIGENTE DE SALIDA EN COCHE DESDE CASA */}
-          <View style={styles.travelAssistantCard}>
-            <View style={styles.travelHeaderRow}>
-              <Ionicons name="car-sport-outline" size={18} color={colors.skyPrimary} />
-              <Text style={styles.travelTitle}>ASISTENTE INTELIGENTE DE SALIDA (DESDE TU CASA)</Text>
-            </View>
-            <Text style={styles.travelAddressSub}>Desde: {activeChild.familyHomeAddress}</Text>
-
-            <View style={styles.travelTimesRow}>
-              <View style={styles.travelTimeBox}>
-                <Text style={styles.travelTimeLbl}>🚗 En Coche</Text>
-                <Text style={styles.travelTimeVal}>{activeChild.nextMatch.travelAssistant.carTravelTimeMin} min viaje</Text>
-                <Text style={styles.travelDepartureHighlight}>Salir de casa: <Text style={{fontWeight: '900', color: colors.skyGlow}}>{activeChild.nextMatch.travelAssistant.carRecommendedDeparture}</Text></Text>
-              </View>
-
-              {activeChild.nextMatch.travelAssistant.walkTravelTimeMin > 0 && (
-                <View style={styles.travelTimeBox}>
-                  <Text style={styles.travelTimeLbl}>🚶 Andando</Text>
-                  <Text style={styles.travelTimeVal}>{activeChild.nextMatch.travelAssistant.walkTravelTimeMin} min paseo</Text>
-                  <Text style={styles.travelDepartureHighlight}>Salir de casa: <Text style={{fontWeight: '900', color: colors.skyGlow}}>{activeChild.nextMatch.travelAssistant.walkRecommendedDeparture}</Text></Text>
-                </View>
-              )}
-            </View>
-
-            <TouchableOpacity style={styles.gpsLinkRow}>
-              <Ionicons name="navigate-circle" size={18} color={colors.skyPrimary} />
-              <Text style={styles.gpsLinkText}>Navegar con Google Maps en tiempo real</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Botones de Respuesta Rápida 1-Clic */}
-          <Text style={styles.actionPromptText}>¿Asistirá {activeChild.name.split(' ')[0]} al partido?</Text>
-          
-          <View style={styles.callupBtnGroup}>
-            <TouchableOpacity 
-              style={[styles.btnConfirm, currentMatchStatus === 'Confirmado' && styles.btnConfirmSelected]}
-              onPress={() => handleConfirmMatch('Confirmado')}
-            >
-              <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
-              <Text style={styles.btnConfirmText}>Asistirá</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.btnRefuse, currentMatchStatus === 'Ausente' && styles.btnRefuseSelected]}
-              onPress={() => handleConfirmMatch('Ausente')}
-            >
-              <Ionicons name="close-circle-outline" size={18} color="#fff" />
-              <Text style={styles.btnConfirmText}>No asistirá</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.btnDoubt, currentMatchStatus === 'Duda' && styles.btnDoubtSelected]}
-              onPress={() => handleConfirmMatch('Duda')}
-            >
-              <Ionicons name="help-circle-outline" size={18} color="#fff" />
-              <Text style={styles.btnConfirmText}>Duda</Text>
-            </TouchableOpacity>
-          </View>
-
-        </LinearGradient>
-      </View>
-
-      {/* BLOQUE 3: ESTADÍSTICAS DE LA TEMPORADA (ABAJO) */}
-      <Text style={styles.sectionTitle}>3. ESTADÍSTICAS DE TEMPORADA</Text>
-      
-      <View style={styles.statsGrid}>
-        <View style={styles.statCard}>
-          <Text style={styles.statIcon}>⏱️</Text>
-          <Text style={styles.statValue}>{activeChild.stats.minutes} min</Text>
-          <Text style={styles.statLabel}>Minutos ({activeChild.stats.minutesPct})</Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <Text style={styles.statIcon}>⚽</Text>
-          <Text style={styles.statValue}>{activeChild.stats.goals}</Text>
-          <Text style={styles.statLabel}>Goles Marcados</Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <Text style={styles.statIcon}>🅰️</Text>
-          <Text style={styles.statValue}>{activeChild.stats.assists}</Text>
-          <Text style={styles.statLabel}>Asistencias</Text>
-        </View>
-
-        <View style={styles.statCard}>
-          <Text style={styles.statIcon}>📈</Text>
-          <Text style={styles.statValue}>{activeChild.stats.attendancePct}</Text>
-          <Text style={styles.statLabel}>Asistencia Entrenos</Text>
-        </View>
-      </View>
-
-      {/* BLOQUE 4: ÚLTIMO RESULTADO & CLASIFICACIÓN */}
-      <Text style={styles.sectionTitle}>4. ÚLTIMO RESULTADO & LIGA</Text>
-      
-      <View style={styles.cardBox}>
-        <View style={styles.cardInnerPadding}>
-          <View style={styles.resultHeaderRow}>
-            <View>
-              <Text style={styles.lastMatchSub}>JORNADA ANTERIOR</Text>
-              <Text style={styles.lastMatchScore}>CD Jesuitas {activeChild.lastResult.score} {activeChild.lastResult.opponent}</Text>
-            </View>
-            <View style={styles.winBadge}>
-              <Text style={styles.winBadgeText}>VICTORIA (+3 PTS)</Text>
-            </View>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.leaguePosRow}>
-            <Ionicons name="trophy-outline" size={18} color={colors.accentGold} />
-            <Text style={styles.leaguePosText}>Clasificación: <Text style={{color: colors.white, fontWeight: '900'}}>{activeChild.lastResult.leaguePos}</Text></Text>
-          </View>
-        </View>
-      </View>
-
-      {/* BLOQUE 5: REVISIÓN MÉDICA & SALUD */}
-      <Text style={styles.sectionTitle}>5. REVISIÓN MÉDICA & FICHA SALUD</Text>
-      
-      <View style={styles.cardBox}>
-        <View style={styles.cardInnerPadding}>
-          <View style={styles.medicalRow}>
-            <View style={styles.medicalIconCircle}>
-              <Ionicons name="medical" size={22} color={colors.accentGreen} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.medicalTitle}>{activeChild.medicalStatus.status}</Text>
-              <Text style={styles.medicalSub}>Válido y homologado hasta: <Text style={{color: colors.white, fontWeight: '800'}}>{activeChild.medicalStatus.validUntil}</Text></Text>
-              <Text style={styles.medicalAllergies}>{activeChild.medicalStatus.allergies}</Text>
-            </View>
-            <Ionicons name="checkmark-circle" size={24} color={colors.accentGreen} />
-          </View>
-        </View>
-      </View>
+        </>
+      )}
 
       {/* MODAL NOTIFICAR AUSENCIA PUNTUAL */}
       <Modal visible={absenceModalVisible} transparent animationType="fade">
         <View style={styles.modalBg}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Notificar Ausencia a Entrenamiento</Text>
-            <Text style={styles.modalSub}>Informa al cuerpo técnico sobre la falta de {activeChild.name}</Text>
+            <Text style={styles.modalSub}>Informa al cuerpo técnico sobre la falta de {activeChild?.name || 'tu hijo/a'}</Text>
             
             <View style={styles.reasonOptionGroup}>
               {['Motivo Médico / Enfermedad', 'Examen / Estudios', 'Viaje Familiar'].map((r, i) => (
@@ -478,6 +400,16 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.navyDark },
   content: { padding: 16, paddingBottom: 60 },
   contentTablet: { maxWidth: 900, alignSelf: 'center', width: '100%' },
+
+  loadingBox: { padding: 30, alignItems: 'center', justifyContent: 'center' },
+  loadingText: { color: colors.skyGlow, marginTop: 12, fontSize: 13, fontWeight: '700' },
+
+  errorBox: { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: colors.accentRed, padding: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 12 },
+  errorText: { color: colors.accentRed, fontSize: 13, fontWeight: '700', flex: 1 },
+
+  emptyBox: { backgroundColor: colors.navyCard, borderWidth: 1, borderColor: colors.borderGlow, borderRadius: 20, padding: 24, alignItems: 'center', marginVertical: 16 },
+  emptyText: { color: colors.white, fontSize: 15, fontWeight: '900', textAlign: 'center', marginTop: 12 },
+  emptySubtext: { color: colors.textMuted, fontSize: 12, fontWeight: '600', textAlign: 'center', marginTop: 6, lineHeight: 18 },
 
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { fontSize: 11, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 1.5, marginTop: 22, marginBottom: 10 },
