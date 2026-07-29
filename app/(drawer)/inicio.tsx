@@ -10,6 +10,7 @@ import { EntrenadorDashboard } from '../../src/components/dashboards/EntrenadorD
 import { CoordinadorDashboard } from '../../src/components/dashboards/CoordinadorDashboard';
 import { DireccionDeportivaDashboard } from '../../src/components/dashboards/DireccionDeportivaDashboard';
 import { AdminGeneralDashboard } from '../../src/components/dashboards/AdminGeneralDashboard';
+import { LargeProfileSelectorScreen } from '../../src/components/ui/LargeProfileSelectorScreen';
 
 const ALL_PROFILES: { id: ActiveContextType; label: string; icon: string }[] = [
   { id: 'FAMILIA', label: 'Familia', icon: '👨‍👩‍👧' },
@@ -23,6 +24,7 @@ export default function DashboardRouterScreen() {
   const { user, activeContext, switchContext, isLoading } = useAuth();
   const { sport, setSport } = useSport();
   const router = useRouter();
+  const [isSelectingProfile, setIsSelectingProfile] = React.useState(false);
 
   // Filtrar perfiles únicamente por los roles autorizados del usuario real de Supabase
   const userRoles = user?.roles || [];
@@ -51,6 +53,19 @@ export default function DashboardRouterScreen() {
     setSport(null);
     router.replace('/');
   };
+
+  if (isSelectingProfile) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <LargeProfileSelectorScreen 
+          onSelectProfile={(profileId) => {
+            switchContext(profileId);
+            setIsSelectingProfile(false);
+          }} 
+        />
+      </SafeAreaView>
+    );
+  }
 
   const renderDashboard = () => {
     if (isLoading) {
@@ -85,12 +100,33 @@ export default function DashboardRouterScreen() {
         <View style={styles.stickyHeader}>
           <PremiumHeader 
             title={getHeaderTitle()}
-            subtitle="CD JESUITAS"
+            subtitle={`PERFIL: ${activeContext || 'FAMILIA'}`}
             showSearchAndActions={false}
             showAvatar={false}
-            showBackButton={activeContext !== 'ADMIN_GENERAL' && activeContext !== 'DIR_DEPORTIVA'}
+            showBackButton={true}
             onBackPress={handleBackToSports}
           />
+
+          {/* BARRA DE ACCIONES DE CAMBIO (CAMBIAR PERFIL / CAMBIAR DEPORTE) */}
+          <View style={styles.demoChangeActionsRow}>
+            <TouchableOpacity 
+              style={styles.changeProfileBtn} 
+              onPress={() => setIsSelectingProfile(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 13 }}>👥</Text>
+              <Text style={styles.changeProfileBtnText}>Cambiar perfil</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.changeSportBtn} 
+              onPress={handleBackToSports}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 13 }}>⚽</Text>
+              <Text style={styles.changeSportBtnText}>Cambiar deporte</Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Pestañas de Perfil (Solo se muestran si el usuario posee MÁS DE UN ROL autorizado) */}
           {availableProfiles.length > 1 && (
@@ -190,5 +226,48 @@ const styles = StyleSheet.create({
     flex: 1, 
     width: '100%',
     backgroundColor: 'transparent',
-  }
+  },
+  demoChangeActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(11, 31, 77, 0.6)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    gap: 12,
+  },
+  changeProfileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(79, 195, 247, 0.15)',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 195, 247, 0.4)',
+    gap: 6,
+  },
+  changeProfileBtnText: {
+    color: '#4FC3F7',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  changeSportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+    gap: 6,
+  },
+  changeSportBtnText: {
+    color: '#F59E0B',
+    fontSize: 12,
+    fontWeight: '800',
+  },
 });

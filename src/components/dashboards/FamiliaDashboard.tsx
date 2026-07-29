@@ -28,8 +28,12 @@ const colors = {
   borderGlow: 'rgba(79, 195, 247, 0.25)',
 };
 
+import { DEMO_FAMILY } from '../../data/demoFamilyData';
+import { useSport } from '../../context/SportContext';
+
 export function FamiliaDashboard() {
   const router = useRouter();
+  const { setSport } = useSport();
   const { width: screenWidth } = useWindowDimensions();
   const isTablet = screenWidth >= 768;
 
@@ -45,9 +49,26 @@ export function FamiliaDashboard() {
   const [absenceModalVisible, setAbsenceModalVisible] = useState(false);
   const [absenceReason, setAbsenceReason] = useState('');
 
-  // Identificador del jugador seleccionado (UUID real de public.jugadores)
-  const selectedPlayerId = activePlayerId || linkedPlayers[0]?.id || null;
-  const activeChild = linkedPlayers.find(c => c.id === selectedPlayerId) || linkedPlayers[0] || null;
+  // Hijos a mostrar (Linked players reales de Supabase o lista Demo multidisciplinar)
+  const displayChildren = linkedPlayers.length > 0 ? linkedPlayers : DEMO_FAMILY.children.map(c => ({
+    id: c.id,
+    name: c.fullName,
+    team: c.team,
+    dorsal: c.dorsal,
+    sport: c.sport,
+    avatar: c.avatarIcon,
+  }));
+
+  // Identificador del jugador seleccionado
+  const selectedPlayerId = activePlayerId || displayChildren[0]?.id || null;
+  const activeChild = displayChildren.find(c => c.id === selectedPlayerId) || displayChildren[0] || null;
+
+  const handleSelectChild = (child: any) => {
+    switchActivePlayer(child.id);
+    if (child.sport) {
+      setSport(child.sport);
+    }
+  };
 
   const currentMatchStatus = selectedPlayerId ? (matchStatusMap[selectedPlayerId] || 'Pendiente') : 'Pendiente';
 
@@ -131,47 +152,37 @@ export function FamiliaDashboard() {
         </View>
       )}
 
-      {/* ESTADO DE LISTA VACÍA (SIN JUGADORES VINCULADOS REALMENTE) */}
-      {!childrenLoading && !childrenError && linkedPlayers.length === 0 && (
-        <View style={styles.emptyBox}>
-          <Ionicons name="people-outline" size={40} color={colors.skyGlow} />
-          <Text style={styles.emptyText}>No hay jugadores vinculados a esta cuenta familiar.</Text>
-          <Text style={styles.emptySubtext}>Contacta con la administración del club si necesitas solicitar una vinculación tutelada.</Text>
+      {/* LISTA DE JUGADORES (DEMO MULTIDISCIPLINAR O SUPABASE REAL) */}
+      {!childrenLoading && displayChildren.length > 0 && (
+        <View style={styles.childrenSelectorGroup}>
+          {displayChildren.map((child) => {
+            const isSelected = child.id === selectedPlayerId;
+            return (
+              <TouchableOpacity
+                key={child.id}
+                activeOpacity={0.8}
+                style={[styles.childCard, isSelected && styles.childCardActive]}
+                onPress={() => handleSelectChild(child)}
+              >
+                <View style={styles.childCardLeft}>
+                  <View style={styles.childAvatar}>
+                    <Text style={{ fontSize: 22 }}>{child.avatar || '👦'}</Text>
+                  </View>
+                  <View>
+                    <Text style={[styles.childName, isSelected && styles.childNameActive]}>{child.name}</Text>
+                    <Text style={styles.childTeamSub}>{child.team || 'CD Jesuitas'} • #{child.dorsal || 'N/A'}</Text>
+                  </View>
+                </View>
+                {isSelected && (
+                  <View style={styles.activeCheckBadge}>
+                    <Ionicons name="checkmark-circle" size={20} color={colors.skyPrimary} />
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
-
-      {/* LISTA DE JUGADORES VINCULADOS REALES */}
-      {!childrenLoading && linkedPlayers.length > 0 && (
-        <>
-          <View style={styles.childrenSelectorGroup}>
-            {linkedPlayers.map((child) => {
-              const isSelected = child.id === selectedPlayerId;
-              return (
-                <TouchableOpacity
-                  key={child.id} // UUID real de public.jugadores
-                  activeOpacity={0.8}
-                  style={[styles.childCard, isSelected && styles.childCardActive]}
-                  onPress={() => switchActivePlayer(child.id)}
-                >
-                  <View style={styles.childCardLeft}>
-                    <View style={styles.childAvatar}>
-                      <Text style={{ fontSize: 22 }}>👦</Text>
-                    </View>
-                    <View>
-                      <Text style={[styles.childName, isSelected && styles.childNameActive]}>{child.name}</Text>
-                      <Text style={styles.childTeamSub}>{child.team || 'CD Jesuitas'} • #{child.dorsal || 'N/A'}</Text>
-                    </View>
-                  </View>
-                  {isSelected && (
-                    <View style={styles.activeCheckBadge}>
-                      <Ionicons name="checkmark-circle" size={20} color={colors.skyPrimary} />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </>
       )}
 
       {/* ACCESO DIRECTO DESTACADO A MI ZONA (SIEMPRE VISIBLE EN CUENTA FAMILIA) */}
