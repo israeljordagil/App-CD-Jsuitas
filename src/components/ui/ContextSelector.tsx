@@ -34,7 +34,7 @@ export function ContextSelector() {
         contentContainerStyle={styles.scrollContent}
       >
         {TABS.map((tab) => {
-          const isActive = activeContext === tab.id || (role === 'familias' && tab.id === 'FAMILIA');
+          const isActive = activeContext === tab.id;
           return (
             <TouchableOpacity 
               key={tab.id}

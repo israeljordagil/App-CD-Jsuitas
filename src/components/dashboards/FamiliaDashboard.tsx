@@ -171,33 +171,35 @@ export function FamiliaDashboard() {
               );
             })}
           </View>
+        </>
+      )}
 
-          {/* ACCESO DIRECTO DESTACADO A MI ZONA */}
-          <TouchableOpacity 
-            style={styles.miZonaCardBanner} 
-            activeOpacity={0.9}
-            onPress={() => router.push('/(drawer)/mi-zona')}
-          >
-            <LinearGradient
-              colors={['#0E2E6B', '#071A3D']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.miZonaCardGradient}
-            >
-              <View style={styles.miZonaCardLeft}>
-                <View style={styles.miZonaIconCircle}>
-                  <Text style={{ fontSize: 22 }}>🌟</Text>
-                </View>
-                <View>
-                  <Text style={styles.miZonaTitle}>MI ZONA • ESPACIO GAMIFICADO</Text>
-                  <Text style={styles.miZonaSub}>Cromo, retos, racha e insignias de {activeChild?.name?.split(' ')[0] || 'tu hijo/a'}</Text>
-                </View>
-              </View>
-              <View style={styles.miZonaArrowBtn}>
-                <Ionicons name="arrow-forward" size={18} color={colors.navyDark} />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
+      {/* ACCESO DIRECTO DESTACADO A MI ZONA (SIEMPRE VISIBLE EN CUENTA FAMILIA) */}
+      <TouchableOpacity 
+        style={styles.miZonaCardBanner} 
+        activeOpacity={0.9}
+        onPress={() => router.push('/(drawer)/mi-zona')}
+      >
+        <LinearGradient
+          colors={['#0E2E6B', '#071A3D']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.miZonaCardGradient}
+        >
+          <View style={styles.miZonaCardLeft}>
+            <View style={styles.miZonaIconCircle}>
+              <Text style={{ fontSize: 22 }}>🌟</Text>
+            </View>
+            <View>
+              <Text style={styles.miZonaTitle}>MI ZONA • ESPACIO GAMIFICADO</Text>
+              <Text style={styles.miZonaSub}>Cromo, retos, racha e insignias de {activeChild?.name?.split(' ')[0] || 'tu hijo/a'}</Text>
+            </View>
+          </View>
+          <View style={styles.miZonaArrowBtn}>
+            <Ionicons name="arrow-forward" size={18} color={colors.navyDark} />
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
 
           {/* 1. ENTRENAMIENTOS DE LA SEMANA (AL DÍA) */}
           <Text style={styles.sectionTitle}>1. ENTRENAMIENTOS DE LA SEMANA (AL DÍA)</Text>
@@ -387,8 +389,7 @@ export function FamiliaDashboard() {
               </View>
             </View>
           </View>
-        </>
-      )}
+        )}
 
       {/* MODAL NOTIFICAR AUSENCIA PUNTUAL */}
       <Modal visible={absenceModalVisible} transparent animationType="fade">

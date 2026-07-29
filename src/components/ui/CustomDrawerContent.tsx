@@ -30,20 +30,6 @@ const FAMILIAS_MENU_ITEMS = [
   { label: 'Ajustes', route: 'configuracion', icon: '⚙️' },
 ];
 
-const PLAYER_MENU_ITEMS = [
-  { label: 'Inicio', route: 'index', icon: '🏠' },
-  { label: 'Mi perfil', route: 'mi-perfil', icon: '👤' },
-  { label: 'Calendario', route: 'calendario', icon: '📅' },
-  { label: 'Convocatorias', route: 'convocatorias', icon: '📋' },
-  { label: 'Entrenamientos', route: 'entrenamientos', icon: '🏃' },
-  { label: 'Temporada', route: 'temporada', icon: '🏟️' },
-  { label: 'Mi rendimiento', route: 'rendimiento', icon: '📊' },
-  { label: 'Retos e insignias', route: 'retos', icon: '🏅' },
-  { label: 'Mensajes', route: 'mensajes', icon: '💬' },
-  { label: 'Club', route: 'instalaciones', icon: '🏛️' },
-  { label: 'Ajustes', route: 'configuracion', icon: '⚙️' },
-];
-
 const COACH_MENU_ITEMS = [
   { label: 'Inicio', route: 'index', icon: '🏠' },
   { label: 'Plantilla', route: 'plantillas', icon: '👥' },
@@ -81,12 +67,12 @@ export function CustomDrawerContent(props: any) {
   const { activeContext, user, activePlayerId, linkedPlayers, assignedTeams, clearProfile } = useAuth();
   const { role } = useRole();
   const { sport, setSport } = useSport();
-  
-  const currentRole = role || activeContext || user?.role || 'FAMILIA';
 
-  const isEntrenador = currentRole === 'entrenadores' || currentRole === 'entrenador' || currentRole === 'ENTRENADOR';
-  const isCoordinador = currentRole === 'coordinadores' || currentRole === 'coordinador' || currentRole === 'COORDINADOR';
-  const isFamilias = !isEntrenador && !isCoordinador;
+  const targetContext = activeContext || (role === 'coordinadores' ? 'COORDINADOR' : role === 'entrenadores' ? 'ENTRENADOR' : 'FAMILIA');
+
+  const isFamilias = targetContext === 'FAMILIA';
+  const isEntrenador = targetContext === 'ENTRENADOR';
+  const isCoordinador = targetContext === 'COORDINADOR' || targetContext === 'DIR_DEPORTIVA' || targetContext === 'ADMIN_GENERAL';
 
   if (isEntrenador) {
     return (

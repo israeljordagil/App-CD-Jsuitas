@@ -86,6 +86,16 @@ const VALID_ROLES = new Set<AppRole>([
   'ADMIN_GENERAL'
 ]);
 
+export function resolveDefaultContext(roles: AppRole[]): ActiveContextType | null {
+  if (!roles || roles.length === 0) return null;
+  if (roles.includes('FAMILIA')) return 'FAMILIA';
+  if (roles.includes('ENTRENADOR')) return 'ENTRENADOR';
+  if (roles.includes('COORDINADOR')) return 'COORDINADOR';
+  if (roles.includes('DIR_DEPORTIVA')) return 'DIR_DEPORTIVA';
+  if (roles.includes('ADMIN_GENERAL')) return 'ADMIN_GENERAL';
+  return roles[0] || null;
+}
+
 const INITIAL_TEST_USERS: ManagedUser[] = [
   {
     id: 'usr-dir-1',
@@ -388,8 +398,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (profile.roles.length > 0) {
+        const defaultContext = resolveDefaultContext(profile.roles);
         if (!activeContext || !profile.roles.includes(activeContext)) {
-          setActiveContext(profile.roles[0]);
+          setActiveContext(defaultContext);
         }
       } else {
         setActiveContext(null);
