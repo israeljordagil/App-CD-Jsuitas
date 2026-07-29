@@ -10,7 +10,6 @@ import { EntrenadorDashboard } from '../../src/components/dashboards/EntrenadorD
 import { CoordinadorDashboard } from '../../src/components/dashboards/CoordinadorDashboard';
 import { DireccionDeportivaDashboard } from '../../src/components/dashboards/DireccionDeportivaDashboard';
 import { AdminGeneralDashboard } from '../../src/components/dashboards/AdminGeneralDashboard';
-import { LargeProfileSelectorScreen } from '../../src/components/ui/LargeProfileSelectorScreen';
 
 import { useDemoNavigation } from '../../src/context/DemoNavigationContext';
 
@@ -65,7 +64,6 @@ export default function DashboardRouterScreen() {
       );
     }
 
-    // MODO DEMO:selectedDemoProfile / effectiveProfile determina el Dashboard de forma limpia y directa
     switch (effectiveProfile) {
       case 'FAMILIA': 
         return <FamiliaDashboard />;
@@ -93,18 +91,17 @@ export default function DashboardRouterScreen() {
             subtitle={`Perfil activo: ${effectiveProfile === 'ENTRENADOR' ? 'Entrenador' : effectiveProfile === 'COORDINADOR' ? 'Coordinación' : 'Familia'}`}
             showSearchAndActions={false}
             showAvatar={false}
-            showBackButton={true}
-            onBackPress={handleBackToSports}
+            showBackButton={false}
           />
 
-          {/* BARRA DE ACCIONES DE CAMBIO (CAMBIAR DEPORTE / CAMBIAR PERFIL) */}
+          {/* BARRA COMPACTA DE ACCIONES DE CAMBIO EN DEMO */}
           <View style={styles.demoChangeActionsRow}>
             <TouchableOpacity 
               style={styles.changeSportBtn} 
               onPress={handleBackToSports}
               activeOpacity={0.8}
             >
-              <Text style={{ fontSize: 13 }}>⚽</Text>
+              <Text style={{ fontSize: 12 }}>⚽</Text>
               <Text style={styles.changeSportBtnText}>Cambiar deporte</Text>
             </TouchableOpacity>
 
@@ -113,12 +110,12 @@ export default function DashboardRouterScreen() {
               onPress={handleChangeProfile}
               activeOpacity={0.8}
             >
-              <Text style={{ fontSize: 13 }}>👥</Text>
+              <Text style={{ fontSize: 12 }}>👥</Text>
               <Text style={styles.changeProfileBtnText}>Cambiar perfil</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Pestañas de Perfil (Solo se muestran si el usuario posee MÁS DE UN ROL autorizado) */}
+          {/* Pestañas de Perfil (Solo si el usuario posee MÁS DE UN ROL) */}
           {availableProfiles.length > 1 && (
             <View style={styles.tabsContainer}>
               <ScrollView 
@@ -147,11 +144,11 @@ export default function DashboardRouterScreen() {
           )}
         </View>
 
-        {/* Dashboard del perfil seleccionado con máxima amplitud */}
+        {/* Dashboard del perfil seleccionado */}
         <View style={styles.dashboardWrapper}>
           {renderDashboard()}
         </View>
-        
+
       </View>
     </SafeAreaView>
   );
@@ -160,11 +157,11 @@ export default function DashboardRouterScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#071A3D', 
+    backgroundColor: '#071A3D',
   },
   mainContainer: {
     flex: 1,
-    backgroundColor: '#071A3D', 
+    backgroundColor: '#071A3D',
   },
   stickyHeader: {
     zIndex: 10,
@@ -173,8 +170,8 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(79, 195, 247, 0.2)',
   },
   tabsContainer: {
-    paddingVertical: 6,
-    paddingBottom: 8,
+    paddingVertical: 4,
+    paddingBottom: 6,
   },
   tabsScrollContent: {
     paddingHorizontal: 14,
@@ -183,9 +180,9 @@ const styles = StyleSheet.create({
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 38,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    height: 34,
+    paddingHorizontal: 10,
+    borderRadius: 10,
     borderWidth: 1,
   },
   tabActive: {
@@ -197,11 +194,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(79, 195, 247, 0.3)',
   },
   tabIcon: {
-    fontSize: 14,
-    marginRight: 6,
+    fontSize: 13,
+    marginRight: 4,
   },
   tabLabel: {
-    fontSize: 12,
+    fontSize: 11,
     letterSpacing: 0.3,
   },
   tabLabelActive: {
@@ -213,7 +210,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   dashboardWrapper: {
-    flex: 1, 
+    flex: 1,
     width: '100%',
     backgroundColor: 'transparent',
   },
@@ -222,42 +219,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 5,
     backgroundColor: 'rgba(11, 31, 77, 0.6)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.08)',
-    gap: 12,
+    gap: 8,
   },
   changeProfileBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(79, 195, 247, 0.15)',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(79, 195, 247, 0.4)',
-    gap: 6,
+    gap: 4,
   },
   changeProfileBtnText: {
     color: '#4FC3F7',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
   },
   changeSportBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(245, 158, 11, 0.4)',
-    gap: 6,
+    gap: 4,
   },
   changeSportBtnText: {
     color: '#F59E0B',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
   },
 });
