@@ -139,7 +139,7 @@ export function LargeProfileSelectorScreen({ onSelectProfile }: LargeProfileSele
         <View style={styles.footer}>
           <Text style={styles.footerClub}>Club Deportivo Colegio Jesuitas</Text>
           <Text style={styles.footerCopy}>Sistema Integrado de Gestión Deportiva • 2026</Text>
-          <Text style={styles.buildBadge}>COMPILACIÓN: PERFIL-PRIMERO-02</Text>
+          <Text style={styles.buildBadge}>COMPILACIÓN: FAMILIA-MIZONA-01</Text>
         </View>
       </ScrollView>
     </LinearGradient>

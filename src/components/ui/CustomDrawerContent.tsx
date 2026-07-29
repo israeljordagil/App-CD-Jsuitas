@@ -62,8 +62,11 @@ const COORDINATOR_MENU_ITEMS = [
   { label: 'Ajustes', route: 'configuracion', icon: '⚙️' },
 ];
 
+import { useDemoNavigation } from '../../context/DemoNavigationContext';
+
 export function CustomDrawerContent(props: any) {
   const router = useRouter();
+  const { selectedDemoProfile, resetDemoFlow } = useDemoNavigation();
   const { activeContext, user, activePlayerId, linkedPlayers, assignedTeams, clearProfile } = useAuth();
   const { role } = useRole();
   const { sport, setSport } = useSport();
@@ -71,7 +74,7 @@ export function CustomDrawerContent(props: any) {
   const activePlayer = linkedPlayers.find(p => p.id === activePlayerId) || linkedPlayers[0] || null;
   const activeTeam = (assignedTeams && assignedTeams[0] && assignedTeams[0].name) ? assignedTeams[0].name : 'Infantil A';
 
-  const targetContext = activeContext || (role === 'coordinadores' ? 'COORDINADOR' : role === 'entrenadores' ? 'ENTRENADOR' : 'FAMILIA');
+  const targetContext = selectedDemoProfile || activeContext || 'FAMILIA';
 
   const isFamilias = targetContext === 'FAMILIA';
   const isEntrenador = targetContext === 'ENTRENADOR';
@@ -94,13 +97,14 @@ export function CustomDrawerContent(props: any) {
       <TouchableOpacity 
         style={styles.bottomActionBtn} 
         onPress={() => {
+          resetDemoFlow();
           clearProfile();
           router.replace('/');
         }}
         activeOpacity={0.7}
       >
-        <Text style={styles.bottomActionIcon}>🚪</Text>
-        <Text style={styles.bottomActionText}>Cerrar Sesión</Text>
+        <Text style={styles.bottomActionIcon}>👥</Text>
+        <Text style={styles.bottomActionText}>Cambiar Perfil</Text>
       </TouchableOpacity>
     </View>
   );
