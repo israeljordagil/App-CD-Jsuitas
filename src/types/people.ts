@@ -48,12 +48,12 @@ export interface PersonLicense {
   isValid: boolean;
 }
 
-export interface PersonHistoryItem {
+export interface PersonEventHistoryItem {
   id: string;
-  season: string;
-  summaryRole: string;
-  details?: string;
-  createdAt: string;
+  date: string;     // ISO String o Fecha legible
+  user: string;     // Usuario que realizó la acción
+  action: string;   // Acción realizada (ej. 'Creación de expediente', 'Rol añadido')
+  detail: string;   // Detalle técnico del cambio
 }
 
 export interface PersonAccountInfo {
@@ -64,7 +64,8 @@ export interface PersonAccountInfo {
 }
 
 export interface ManagedPerson {
-  id: string;
+  id: string;             // UUID interno
+  code: string;           // Código visible e inmutable: PER-000001, PER-000002...
   firstName: string;
   lastName: string;
   fullName: string;
@@ -76,14 +77,21 @@ export interface ManagedPerson {
   photoUrl?: string;
   status: PersonStatus;
   
-  // Relaciones
+  // Relaciones Núcleo
   roles: AppRole[];
   responsibilities: ResponsibilityType[];
   teamAssignments: PersonTeamAssignment[];
   licenses: PersonLicense[];
   account: PersonAccountInfo;
-  history: PersonHistoryItem[];
   
+  // Historial Auditado de Eventos
+  eventHistory: PersonEventHistoryItem[];
+  
+  // Auditoría
   createdAt: string;
   updatedAt: string;
+  createdBy?: string;
+  updatedBy?: string;
+  lastAccess?: string;
+  lastModified?: string;
 }

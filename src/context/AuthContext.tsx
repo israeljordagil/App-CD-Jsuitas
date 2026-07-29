@@ -320,8 +320,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false, error: 'Ya existe una persona registrada con este correo electrónico.' };
     }
 
+    const nextIndex = managedPeople.length + 1;
+    const perCode = `PER-${String(nextIndex).padStart(6, '0')}`;
+
     const newPerson: ManagedPerson = {
       id: `per-${Date.now()}`,
+      code: perCode,
       firstName: personData.firstName.trim(),
       lastName: personData.lastName.trim(),
       fullName,
@@ -333,16 +337,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       teamAssignments: personData.teamAssignments || [],
       licenses: personData.licenses || [{ id: `lic-${Date.now()}`, licenseType: 'Sin licencia', isValid: true }],
       account: personData.account || { hasAccess: false },
-      history: [
+      eventHistory: [
         {
-          id: `h-${Date.now()}`,
-          season: '2025/2026',
-          summaryRole: `Alta de ${fullName} en la plataforma`,
-          createdAt: new Date().toISOString()
+          id: `ev-${Date.now()}`,
+          date: new Date().toISOString(),
+          user: user?.full_name || 'Israel Jordá',
+          action: 'Persona creada',
+          detail: `Alta de expediente en el núcleo PERSONAS (${perCode}).`
         }
       ],
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      createdBy: user?.full_name || 'Israel Jordá',
+      updatedBy: user?.full_name || 'Israel Jordá',
+      lastModified: new Date().toISOString()
     };
 
     setManagedPeople(prev => [newPerson, ...prev]);

@@ -18,7 +18,8 @@ import {
   ResponsibilityType, 
   TechnicalLicenseType, 
   PersonTeamAssignment,
-  StaffPositionTitle
+  StaffPositionTitle,
+  PersonEventHistoryItem
 } from '../../src/types/people';
 
 const ALL_ROLES: AppRole[] = [
@@ -63,15 +64,15 @@ export default function PersonasScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
-  const { activeContext, managedPeople, updatePerson, createPerson } = useAuth();
+  const { activeContext, user, managedPeople, updatePerson, createPerson } = useAuth();
 
   // Búsqueda y Filtros
   const [searchQuery, setSearchQuery] = useState('');
   const [filterChip, setFilterChip] = useState<string>('TODOS');
 
-  // Ficha de Persona seleccionada (Modal de 7 Pestañas)
+  // Ficha de Persona seleccionada (Modal de 8 Pestañas)
   const [selectedPerson, setSelectedPerson] = useState<ManagedPerson | null>(null);
-  const [activeTab, setActiveTab] = useState<number>(1); // 1: Datos, 2: Roles, 3: Resp, 4: Equipos, 5: Licencias, 6: Cuenta, 7: Historial
+  const [activeTab, setActiveTab] = useState<number>(1); // 1: Resumen, 2: Datos, 3: Roles, 4: Resp, 5: Equipos, 6: Licencias, 7: Cuenta, 8: Historial
 
   // Campos temporales en edición
   const [editedFirstName, setEditedFirstName] = useState('');
@@ -119,6 +120,7 @@ export default function PersonasScreen() {
     const query = searchQuery.toLowerCase();
     const matchesSearch = 
       p.fullName.toLowerCase().includes(query) ||
+      p.code.toLowerCase().includes(query) ||
       (p.email && p.email.toLowerCase().includes(query)) ||
       p.teamAssignments.some(t => t.teamName.toLowerCase().includes(query)) ||
       p.roles.some(r => r.toLowerCase().includes(query));
@@ -140,7 +142,7 @@ export default function PersonasScreen() {
     return true;
   });
 
-  // Métricas de tarjetas superiores
+  // Métricas
   const totalCount = managedPeople.length;
   const coachCount = managedPeople.filter(p => p.roles.includes('ENTRENADOR')).length;
   const playerCount = managedPeople.filter(p => p.roles.includes('JUGADOR')).length;
@@ -150,7 +152,7 @@ export default function PersonasScreen() {
 
   const handleOpenFicha = (person: ManagedPerson) => {
     setSelectedPerson(person);
-    setActiveTab(1);
+    setActiveTab(1); // Tab 1: Resumen por defecto
     setEditedFirstName(person.firstName);
     setEditedLastName(person.lastName);
     setEditedDocId(person.docId || '');
@@ -194,17 +196,49 @@ export default function PersonasScreen() {
       isActive: true
     };
 
+    const newEvent: PersonEventHistoryItem = {
+      id: `ev-${Date.now()}`,
+      date: new Date().toISOString().split('T')[0],
+      user: user?.full_name || 'Israel Jordá',
+      action: 'Equipo asignado',
+      detail: `Asignación al equipo ${newTeamName} como ${newPosition}.`
+    };
+
     const updatedAssignments = [...selectedPerson.teamAssignments, newAss];
-    const updated = { ...selectedPerson, teamAssignments: updatedAssignments };
+    const updatedHistory = [newEvent, ...selectedPerson.eventHistory];
+    const updated = { 
+      ...selectedPerson, 
+      teamAssignments: updatedAssignments, 
+      eventHistory: updatedHistory,
+      updatedAt: new Date().toISOString(),
+      updatedBy: user?.full_name || 'Israel Jordá'
+    };
     setSelectedPerson(updated);
     updatePerson(updated);
-    setFeedbackMsg({ type: 'success', text: `Asignación ${newTeamName} (${newPosition}) añadida.` });
+    setFeedbackMsg({ type: 'success', text: `Asignación ${newTeamName} (${newPosition}) registrada en el historial.` });
   };
 
   const handleRemoveTeamAssignment = (assId: string) => {
     if (!selectedPerson) return;
+    const targetAss = selectedPerson.teamAssignments.find(a => a.id === assId);
     const updatedAssignments = selectedPerson.teamAssignments.filter(a => a.id !== assId);
-    const updated = { ...selectedPerson, teamAssignments: updatedAssignments };
+
+    const newEvent: PersonEventHistoryItem = {
+      id: `ev-${Date.now()}`,
+      date: new Date().toISOString().split('T')[0],
+      user: user?.full_name || 'Israel Jordá',
+      action: 'Equipo eliminado',
+      detail: `Desvinculación del equipo ${targetAss?.teamName || ''}.`
+    };
+
+    const updatedHistory = [newEvent, ...selectedPerson.eventHistory];
+    const updated = { 
+      ...selectedPerson, 
+      teamAssignments: updatedAssignments,
+      eventHistory: updatedHistory,
+      updatedAt: new Date().toISOString(),
+      updatedBy: user?.full_name || 'Israel Jordá'
+    };
     setSelectedPerson(updated);
     updatePerson(updated);
   };
@@ -215,6 +249,15 @@ export default function PersonasScreen() {
       setFeedbackMsg({ type: 'error', text: 'Nombre y apellidos son obligatorios.' });
       return;
     }
+
+    const nowIso = new Date().toISOString();
+    const newEvent: PersonEventHistoryItem = {
+      id: `ev-${Date.now()}`,
+      date: nowIso.split('T')[0],
+      user: user?.full_name || 'Israel Jordá',
+      action: 'Expediente actualizado',
+      detail: `Modificación de datos personales, roles (${editedRoles.join(', ')}) o estado.`
+    };
 
     const updatedPerson: ManagedPerson = {
       ...selectedPerson,
@@ -240,7 +283,10 @@ export default function PersonasScreen() {
         hasAccess: editedHasAccess,
         email: editedEmail.trim().toLowerCase() || selectedPerson.account.email
       },
-      updatedAt: new Date().toISOString()
+      eventHistory: [newEvent, ...selectedPerson.eventHistory],
+      updatedAt: nowIso,
+      updatedBy: user?.full_name || 'Israel Jordá',
+      lastModified: nowIso
     };
 
     const res = updatePerson(updatedPerson);
@@ -248,7 +294,7 @@ export default function PersonasScreen() {
       setFeedbackMsg({ type: 'error', text: res.error || 'Error al guardar persona.' });
     } else {
       setSelectedPerson(updatedPerson);
-      setFeedbackMsg({ type: 'success', text: 'Expediente de persona guardado correctamente.' });
+      setFeedbackMsg({ type: 'success', text: 'Expediente de persona guardado y evento auditado en el historial.' });
       setTimeout(() => setFeedbackMsg(null), 1500);
     }
   };
@@ -275,7 +321,7 @@ export default function PersonasScreen() {
       setNewLastName('');
       setNewEmailInput('');
       setNewPhoneInput('');
-      Alert.alert('Éxito', 'Persona registrada en el sistema.');
+      Alert.alert('Éxito', 'Persona registrada en el núcleo PERSONAS con código PER automático.');
     }
   };
 
@@ -335,7 +381,7 @@ export default function PersonasScreen() {
           <Ionicons name="search-outline" size={18} color="#94A3B8" />
           <TextInput
             style={styles.searchInput}
-            placeholder="Buscar persona por nombre, apellidos, equipo o rol..."
+            placeholder="Buscar por código PER, nombre, apellidos, equipo o rol..."
             placeholderTextColor="rgba(148, 163, 184, 0.6)"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -372,7 +418,7 @@ export default function PersonasScreen() {
         </ScrollView>
       </View>
 
-      {/* LISTADO DE PERSONAS */}
+      {/* LISTADO DE PERSONAS REALES */}
       <View style={styles.listSection}>
         {filteredPeople.map(person => (
           <View key={person.id} style={styles.personCard}>
@@ -382,7 +428,13 @@ export default function PersonasScreen() {
 
             <View style={{ flex: 1 }}>
               <View style={styles.personHeaderRow}>
-                <Text style={styles.personName}>{person.fullName}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={styles.personName}>{person.fullName}</Text>
+                  <View style={styles.codeBadge}>
+                    <Text style={styles.codeBadgeTxt}>{person.code}</Text>
+                  </View>
+                </View>
+
                 <View style={[styles.accessBadge, person.account.hasAccess ? styles.accessGreen : styles.accessGrey]}>
                   <Text style={styles.accessBadgeTxt}>{person.account.hasAccess ? 'CON ACCESO' : 'SIN ACCESO'}</Text>
                 </View>
@@ -390,7 +442,7 @@ export default function PersonasScreen() {
 
               {person.email && <Text style={styles.personSub}>{person.email} • {person.phone || 'Sin tel.'}</Text>}
 
-              {/* Roles */}
+              {/* Roles & Responsabilidades */}
               <View style={styles.tagsRow}>
                 {person.roles.map(r => (
                   <View key={r} style={styles.roleBadge}>
@@ -424,31 +476,37 @@ export default function PersonasScreen() {
         ))}
       </View>
 
-      {/* MODAL FICHA INTEGRAL DE PERSONA (7 PESTAÑAS) */}
+      {/* MODAL FICHA INTEGRAL DE PERSONA (8 PESTAÑAS) */}
       <Modal visible={!!selectedPerson} transparent animationType="fade" onRequestClose={() => setSelectedPerson(null)}>
         <View style={styles.modalBg}>
           <View style={styles.modalCardLarge}>
             
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalTitle}>EXPEDIENTE DE PERSONA</Text>
-                <Text style={styles.modalSub}>{selectedPerson?.fullName} ({selectedPerson?.id})</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={styles.modalTitle}>EXPEDIENTE DE PERSONA</Text>
+                  <View style={styles.codeBadge}>
+                    <Text style={styles.codeBadgeTxt}>{selectedPerson?.code}</Text>
+                  </View>
+                </View>
+                <Text style={styles.modalSub}>{selectedPerson?.fullName} • {selectedPerson?.id}</Text>
               </View>
               <TouchableOpacity onPress={() => setSelectedPerson(null)}>
                 <Ionicons name="close" size={24} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
 
-            {/* PESTAÑAS (1 a 7) */}
+            {/* PESTAÑAS (1 a 8) */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsRow}>
               {[
-                { id: 1, label: '1. Datos' },
-                { id: 2, label: '2. Roles' },
-                { id: 3, label: '3. Responsabilidades' },
-                { id: 4, label: '4. Equipos' },
-                { id: 5, label: '5. Licencias' },
-                { id: 6, label: '6. Cuenta App' },
-                { id: 7, label: '7. Historial' },
+                { id: 1, label: '1. Resumen' },
+                { id: 2, label: '2. Datos' },
+                { id: 3, label: '3. Roles' },
+                { id: 4, label: '4. Responsabilidades' },
+                { id: 5, label: '5. Equipos' },
+                { id: 6, label: '6. Licencias' },
+                { id: 7, label: '7. Cuenta App' },
+                { id: 8, label: '8. Historial' },
               ].map(tb => (
                 <TouchableOpacity
                   key={tb.id}
@@ -475,8 +533,56 @@ export default function PersonasScreen() {
 
             <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
               
-              {/* TAB 1: DATOS PERSONALES */}
+              {/* TAB 1: RESUMEN GENERAL */}
               {activeTab === 1 && (
+                <View style={styles.tabContentBox}>
+                  <View style={styles.resumenProfileHeader}>
+                    <View style={styles.avatarLarge}>
+                      <Text style={styles.avatarLargeTxt}>{selectedPerson?.firstName.charAt(0)}{selectedPerson?.lastName.charAt(0)}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.resumenName}>{selectedPerson?.fullName}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                        <Text style={styles.resumenCode}>Código: {selectedPerson?.code}</Text>
+                        <View style={[styles.accessBadge, selectedPerson?.status === 'ACTIVE' ? styles.accessGreen : styles.accessGrey]}>
+                          <Text style={styles.accessBadgeTxt}>{selectedPerson?.status === 'ACTIVE' ? 'ACTIVO' : 'INACTIVO'}</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.resumenSub}>{selectedPerson?.email || 'Sin correo electrónico'} • {selectedPerson?.phone || 'Sin teléfono'}</Text>
+                    </View>
+                  </View>
+
+                  {/* Indicadores Compactos */}
+                  <View style={styles.summaryStatsRow}>
+                    <View style={styles.summaryStatBox}>
+                      <Text style={styles.summaryStatNum}>{selectedPerson?.roles.length || 0}</Text>
+                      <Text style={styles.summaryStatLabel}>Roles</Text>
+                    </View>
+                    <View style={styles.summaryStatBox}>
+                      <Text style={styles.summaryStatNum}>{selectedPerson?.responsibilities.length || 0}</Text>
+                      <Text style={styles.summaryStatLabel}>Responsab.</Text>
+                    </View>
+                    <View style={styles.summaryStatBox}>
+                      <Text style={styles.summaryStatNum}>{selectedPerson?.teamAssignments.length || 0}</Text>
+                      <Text style={styles.summaryStatLabel}>Equipos</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.sectionTitle}>Licencia Principal</Text>
+                  <Text style={styles.summaryTextValue}>
+                    {selectedPerson?.licenses[0]?.licenseType || 'Sin licencia'} 
+                    {selectedPerson?.licenses[0]?.licenseNumber ? ` (${selectedPerson.licenses[0].licenseNumber})` : ''}
+                  </Text>
+
+                  <Text style={[styles.sectionTitle, { marginTop: 10 }]}>Último Acceso Registrado</Text>
+                  <Text style={styles.summaryTextValue}>
+                    {selectedPerson?.account.lastLogin ? new Date(selectedPerson.account.lastLogin).toLocaleString() : 'Sin accesos recientes registrados'}
+                  </Text>
+                </View>
+              )}
+
+              {/* TAB 2: DATOS PERSONALES */}
+              {activeTab === 2 && (
                 <View style={styles.tabContentBox}>
                   <Text style={styles.fieldLabel}>Nombre</Text>
                   <TextInput style={styles.inputModal} value={editedFirstName} onChangeText={setEditedFirstName} />
@@ -505,11 +611,15 @@ export default function PersonasScreen() {
                       </TouchableOpacity>
                     ))}
                   </View>
+
+                  <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Datos de Auditoría</Text>
+                  <Text style={styles.auditInfoTxt}>Creado por: {selectedPerson?.createdBy || 'Sistema'} • {selectedPerson?.createdAt ? new Date(selectedPerson.createdAt).toLocaleDateString() : ''}</Text>
+                  <Text style={styles.auditInfoTxt}>Modificado por: {selectedPerson?.updatedBy || 'Israel Jordá'} • {selectedPerson?.updatedAt ? new Date(selectedPerson.updatedAt).toLocaleDateString() : ''}</Text>
                 </View>
               )}
 
-              {/* TAB 2: ROLES */}
-              {activeTab === 2 && (
+              {/* TAB 3: ROLES */}
+              {activeTab === 3 && (
                 <View style={styles.tabContentBox}>
                   <Text style={styles.tabHeading}>Roles Asignados a la Persona</Text>
                   <View style={styles.grid2}>
@@ -530,8 +640,8 @@ export default function PersonasScreen() {
                 </View>
               )}
 
-              {/* TAB 3: RESPONSABILIDADES */}
-              {activeTab === 3 && (
+              {/* TAB 4: RESPONSABILIDADES */}
+              {activeTab === 4 && (
                 <View style={styles.tabContentBox}>
                   <Text style={styles.tabHeading}>Responsabilidades Institucionales (Separadas de Roles)</Text>
                   <View style={styles.grid2}>
@@ -552,8 +662,8 @@ export default function PersonasScreen() {
                 </View>
               )}
 
-              {/* TAB 4: EQUIPOS Y ASIGNACIONES */}
-              {activeTab === 4 && (
+              {/* TAB 5: EQUIPOS Y ASIGNACIONES */}
+              {activeTab === 5 && (
                 <View style={styles.tabContentBox}>
                   <Text style={styles.tabHeading}>Equipos Asignados (Múltiples equipos permitidos)</Text>
                   
@@ -598,8 +708,8 @@ export default function PersonasScreen() {
                 </View>
               )}
 
-              {/* TAB 5: LICENCIAS */}
-              {activeTab === 5 && (
+              {/* TAB 6: LICENCIAS */}
+              {activeTab === 6 && (
                 <View style={styles.tabContentBox}>
                   <Text style={styles.tabHeading}>Licencia Técnica de Federación</Text>
 
@@ -616,13 +726,13 @@ export default function PersonasScreen() {
                     ))}
                   </View>
 
-                  <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Número de Licencia / NIF Colegiado</Text>
+                  <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Número de Licencia / Colegiado</Text>
                   <TextInput style={styles.inputModal} value={editedLicenseNum} onChangeText={setEditedLicenseNum} placeholder="Ej. FFCV-998201" placeholderTextColor="#94A3B8" />
                 </View>
               )}
 
-              {/* TAB 6: CUENTA APP */}
-              {activeTab === 6 && (
+              {/* TAB 7: CUENTA APP */}
+              {activeTab === 7 && (
                 <View style={styles.tabContentBox}>
                   <Text style={styles.tabHeading}>Acceso a la App (Supabase Auth)</Text>
                   <Text style={styles.infoTxt}>
@@ -641,17 +751,21 @@ export default function PersonasScreen() {
                 </View>
               )}
 
-              {/* TAB 7: HISTORIAL */}
-              {activeTab === 7 && (
+              {/* TAB 8: HISTORIAL DE EVENTOS AUDITADOS */}
+              {activeTab === 8 && (
                 <View style={styles.tabContentBox}>
-                  <Text style={styles.tabHeading}>Historial Inmutable de Cargos y Temporadas</Text>
+                  <Text style={styles.tabHeading}>Historial Inmutable de Eventos Auditados</Text>
 
-                  {selectedPerson?.history.map(item => (
-                    <View key={item.id} style={styles.historyCard}>
-                      <View style={styles.historyBadge}>
-                        <Text style={styles.historyBadgeTxt}>{item.season}</Text>
+                  {selectedPerson?.eventHistory.map(event => (
+                    <View key={event.id} style={styles.historyCard}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View style={styles.historyBadge}>
+                          <Text style={styles.historyBadgeTxt}>{event.action}</Text>
+                        </View>
+                        <Text style={styles.historyDate}>{event.date}</Text>
                       </View>
-                      <Text style={styles.historySummary}>{item.summaryRole}</Text>
+                      <Text style={styles.historySummary}>{event.detail}</Text>
+                      <Text style={styles.historyUserTxt}>Realizado por: {event.user}</Text>
                     </View>
                   ))}
                 </View>
@@ -659,7 +773,7 @@ export default function PersonasScreen() {
 
             </ScrollView>
 
-            {/* BOTÓN DE GUARDAR GLOBAL DE LA FICHA */}
+            {/* BOTÓN GUARDAR GLOBAL */}
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.saveBtn} onPress={handleSavePerson}>
                 <Text style={styles.saveBtnTxt}>Guardar Expediente de Persona</Text>
@@ -683,10 +797,10 @@ export default function PersonasScreen() {
 
             <View style={{ gap: 10, marginVertical: 10 }}>
               <Text style={styles.fieldLabel}>Nombre</Text>
-              <TextInput style={styles.inputModal} placeholder="Ej. Raúl" placeholderTextColor="#94A3B8" value={newFirstName} onChangeText={setNewFirstName} />
+              <TextInput style={styles.inputModal} placeholder="Ej. Carlos" placeholderTextColor="#94A3B8" value={newFirstName} onChangeText={setNewFirstName} />
 
               <Text style={styles.fieldLabel}>Apellidos</Text>
-              <TextInput style={styles.inputModal} placeholder="Ej. Fuentes" placeholderTextColor="#94A3B8" value={newLastName} onChangeText={setNewLastName} />
+              <TextInput style={styles.inputModal} placeholder="Ej. Díaz" placeholderTextColor="#94A3B8" value={newLastName} onChangeText={setNewLastName} />
 
               <Text style={styles.fieldLabel}>Correo Electrónico (Opcional)</Text>
               <TextInput style={styles.inputModal} placeholder="correo@ejemplo.com" placeholderTextColor="#94A3B8" value={newEmailInput} onChangeText={setNewEmailInput} autoCapitalize="none" />
@@ -706,7 +820,7 @@ export default function PersonasScreen() {
             </View>
 
             <TouchableOpacity style={styles.saveBtn} onPress={handleCreatePerson}>
-              <Text style={styles.saveBtnTxt}>Crear Registro en PERSONAS</Text>
+              <Text style={styles.saveBtnTxt}>Crear Registro con PER Automático</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -753,6 +867,9 @@ const styles = StyleSheet.create({
   avatarTxt: { color: '#071A3D', fontSize: 16, fontWeight: '900' },
   personHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   personName: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+  codeBadge: { backgroundColor: 'rgba(79, 195, 247, 0.15)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(79, 195, 247, 0.3)' },
+  codeBadgeTxt: { color: '#4FC3F7', fontSize: 10, fontWeight: '900' },
+
   personSub: { color: '#94A3B8', fontSize: 12, marginTop: 2 },
   accessBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   accessGreen: { backgroundColor: 'rgba(16, 185, 129, 0.2)', borderWidth: 1, borderColor: '#10B981' },
@@ -779,7 +896,7 @@ const styles = StyleSheet.create({
   modalSub: { color: '#94A3B8', fontSize: 12, marginTop: 2 },
 
   tabsRow: { flexDirection: 'row', gap: 6, marginBottom: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)', paddingBottom: 8 },
-  tabBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.05)' },
+  tabBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.05)' },
   tabBtnActive: { backgroundColor: '#4FC3F7' },
   tabBtnTxt: { color: '#94A3B8', fontSize: 11, fontWeight: '700' },
   tabBtnTxtActive: { color: '#071A3D', fontWeight: '900' },
@@ -789,6 +906,23 @@ const styles = StyleSheet.create({
   fieldLabel: { color: '#81D4FA', fontSize: 11, fontWeight: '800' },
   inputModal: { backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: '#4FC3F7', borderRadius: 10, padding: 10, color: '#FFFFFF', fontSize: 13 },
   optionsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+
+  resumenProfileHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: 'rgba(0,0,0,0.25)', padding: 14, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  avatarLarge: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#4FC3F7', justifyContent: 'center', alignItems: 'center' },
+  avatarLargeTxt: { color: '#071A3D', fontSize: 20, fontWeight: '900' },
+  resumenName: { color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
+  resumenCode: { color: '#4FC3F7', fontSize: 12, fontWeight: '800' },
+  resumenSub: { color: '#94A3B8', fontSize: 12, marginTop: 4 },
+
+  summaryStatsRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  summaryStatBox: { flex: 1, backgroundColor: 'rgba(79, 195, 247, 0.1)', padding: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(79, 195, 247, 0.25)' },
+  summaryStatNum: { color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
+  summaryStatLabel: { color: '#81D4FA', fontSize: 10, fontWeight: '700', marginTop: 2 },
+
+  sectionTitle: { color: '#4FC3F7', fontSize: 11, fontWeight: '800', marginTop: 6 },
+  summaryTextValue: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+
+  auditInfoTxt: { color: '#94A3B8', fontSize: 11, fontWeight: '600', marginTop: 2 },
 
   grid2: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   checkCard: { flex: 1, minWidth: 140, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.04)', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
@@ -810,7 +944,9 @@ const styles = StyleSheet.create({
   historyCard: { backgroundColor: 'rgba(0,0,0,0.25)', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   historyBadge: { backgroundColor: 'rgba(245, 158, 11, 0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, alignSelf: 'flex-start' },
   historyBadgeTxt: { color: '#F59E0B', fontSize: 10, fontWeight: '900' },
+  historyDate: { color: '#94A3B8', fontSize: 10, fontWeight: '600' },
   historySummary: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', marginTop: 6 },
+  historyUserTxt: { color: '#94A3B8', fontSize: 10, marginTop: 4, fontWeight: '600' },
 
   feedbackBox: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 10, marginBottom: 12 },
   feedbackSuccess: { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderWidth: 1, borderColor: '#10B981' },
