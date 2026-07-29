@@ -91,21 +91,22 @@ const ROLES_INFO: { id: ActiveContextType; label: string; icon: string }[] = [
   { id: 'COORDINADOR', label: 'Coordinación', icon: '🧭' },
 ];
 
-export function SportSelectionScreen() {
+interface SportSelectionScreenProps {
+  onChangeProfile?: () => void;
+}
+
+export function SportSelectionScreen({ onChangeProfile }: SportSelectionScreenProps) {
   const { setSport } = useSport();
   const { user, activeContext, switchContext, loginAsCoachInfantilA } = useAuth();
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
 
-  // Breakpoint para activar la cuadrícula explícita 2x2 en Escritorio / Tablet (ancho >= 640px)
   const isDesktop = screenWidth >= 640;
 
-  // Animaciones
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const floatAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Animación de pulso del escudo
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.05, duration: 1500, useNativeDriver: true }),
@@ -113,7 +114,6 @@ export function SportSelectionScreen() {
       ])
     ).start();
 
-    // Flotación suave de balones
     Animated.loop(
       Animated.sequence([
         Animated.timing(floatAnim, { toValue: -2, duration: 2000, useNativeDriver: true }),
@@ -130,7 +130,6 @@ export function SportSelectionScreen() {
     router.replace('/(drawer)/inicio' as any);
   };
 
-  // Función reutilizable para renderizar cada tarjeta deportiva individual
   const renderSportCard = (sport: typeof SPORTS[0]) => {
     return (
       <TouchableOpacity
@@ -143,7 +142,6 @@ export function SportSelectionScreen() {
           <ImageBackground source={sport.bgImage} style={styles.cardBgImage} resizeMode="cover">
             <LinearGradient colors={sport.gradientColors} style={StyleSheet.absoluteFillObject} />
             
-            {/* Header compacto (Categoría y Avisos) */}
             <View style={styles.cardHeader}>
               <View style={styles.badgeCategory}>
                 <Text style={styles.badgeCategoryText}>{sport.category}</Text>
@@ -155,7 +153,6 @@ export function SportSelectionScreen() {
               )}
             </View>
 
-            {/* Fila Central: Nombre del Deporte + Descripción + Balón Decorativo */}
             <View style={styles.cardMainRow}>
               <View style={styles.cardTextCol}>
                 <Text style={styles.sportTitle}>{sport.label}</Text>
@@ -169,13 +166,11 @@ export function SportSelectionScreen() {
               </Animated.View>
             </View>
 
-            {/* Próximo Evento (Franja Compacta) */}
             <View style={styles.nextEventBox}>
               <Ionicons name="calendar-outline" size={10} color={colors.skyPrimary} />
               <Text style={styles.nextEventText} numberOfLines={1}>{sport.nextEvent}</Text>
             </View>
 
-            {/* Botón Acceder Elegante */}
             <View style={[styles.enterBtn, { backgroundColor: sport.colorAccent }]}>
               <Text style={styles.enterBtnText}>ACCEDER</Text>
               <FontAwesome name="arrow-right" size={9.5} color="#fff" />
@@ -194,33 +189,32 @@ export function SportSelectionScreen() {
         showsVerticalScrollIndicator={false}
       >
         
-        {/* BARRA SUPERIOR DE CONTEXTO / USUARIO */}
+        {/* BARRA SUPERIOR DE PERFIL ACTIVO Y BOTÓN CAMBIAR PERFIL */}
         <View style={styles.topContextBar}>
           <View style={styles.userInfoRow}>
             <View style={styles.userAvatarBadge}>
-              <Text style={{ fontSize: 13 }}>{activeContext === 'ENTRENADOR' ? '👨‍🏫' : activeContext === 'COORDINADOR' ? '🧭' : '👨‍👩‍👧‍👦'}</Text>
+              <Text style={{ fontSize: 14 }}>
+                {activeContext === 'ENTRENADOR' ? '👨‍🏫' : activeContext === 'COORDINADOR' ? '🧭' : '👨‍👩‍👧‍👦'}
+              </Text>
             </View>
             <View>
-              <Text style={styles.userGreeting}>Buenos días,</Text>
-              <Text style={styles.userName}>{user?.full_name || 'Familia Martínez'}</Text>
+              <Text style={styles.userGreeting}>Perfil activo:</Text>
+              <Text style={styles.userName}>
+                {activeContext === 'ENTRENADOR' ? 'Entrenador' : activeContext === 'COORDINADOR' ? 'Coordinación' : 'Familia'}
+              </Text>
             </View>
           </View>
 
-          <View style={styles.roleBadgesGroup}>
-            {ROLES_INFO.map(r => {
-              const isActive = activeContext === r.id;
-              return (
-                <TouchableOpacity 
-                  key={r.id} 
-                  style={[styles.rolePill, isActive && styles.rolePillActive]}
-                  onPress={() => switchContext(r.id)}
-                >
-                  <Text style={{ fontSize: 9.5 }}>{r.icon}</Text>
-                  <Text style={[styles.rolePillText, isActive && styles.rolePillTextActive]}>{r.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          {onChangeProfile && (
+            <TouchableOpacity 
+              style={styles.changeProfileTopBtn}
+              onPress={onChangeProfile}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="swap-horizontal" size={14} color={colors.skyPrimary} />
+              <Text style={styles.changeProfileTopText}>Cambiar perfil</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* HERO HEADER PRINCIPAL CON ESCUDO GLOW */}
@@ -329,30 +323,39 @@ const styles = StyleSheet.create({
   topContextBar: {
     backgroundColor: colors.navyCard,
     borderRadius: 12,
-    padding: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     marginBottom: 8,
     borderWidth: 1,
     borderColor: colors.borderGlow,
-    flexDirection: 'column',
-    gap: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   userInfoRow: { flexDirection: 'row', alignItems: 'center' },
   userAvatarBadge: {
-    width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center', alignItems: 'center', marginRight: 6
+    width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center', alignItems: 'center', marginRight: 8
   },
   userGreeting: { fontSize: 9, color: colors.textMuted, fontWeight: '600' },
-  userName: { fontSize: 12, color: colors.white, fontWeight: '900' },
+  userName: { fontSize: 13, color: colors.white, fontWeight: '900' },
 
-  roleBadgesGroup: { flexDirection: 'row', gap: 4, flexWrap: 'wrap' },
-  rolePill: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)'
+  changeProfileTopBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(79, 195, 247, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(79, 195, 247, 0.4)',
+    gap: 4,
   },
-  rolePillActive: { backgroundColor: colors.navyDeep, borderColor: colors.skyPrimary },
-  rolePillText: { fontSize: 9, fontWeight: '700', color: colors.textMuted },
-  rolePillTextActive: { color: colors.skyPrimary, fontWeight: '900' },
+  changeProfileTopText: {
+    color: colors.skyPrimary,
+    fontSize: 11,
+    fontWeight: '800',
+  },
 
   // HERO HEADER
   heroHeader: { alignItems: 'center', marginBottom: 8 },

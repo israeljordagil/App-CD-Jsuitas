@@ -24,7 +24,6 @@ export default function DashboardRouterScreen() {
   const { user, activeContext, switchContext, isLoading } = useAuth();
   const { sport, setSport } = useSport();
   const router = useRouter();
-  const [isSelectingProfile, setIsSelectingProfile] = React.useState(false);
 
   // Filtrar perfiles únicamente por los roles autorizados del usuario real de Supabase
   const userRoles = user?.roles || [];
@@ -54,18 +53,13 @@ export default function DashboardRouterScreen() {
     router.replace('/');
   };
 
-  if (isSelectingProfile) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <LargeProfileSelectorScreen 
-          onSelectProfile={(profileId) => {
-            switchContext(profileId);
-            setIsSelectingProfile(false);
-          }} 
-        />
-      </SafeAreaView>
-    );
-  }
+  const handleChangeProfile = () => {
+    setSport(null);
+    switchContext(null as any);
+    router.replace('/');
+  };
+
+
 
   const renderDashboard = () => {
     if (isLoading) {
@@ -100,24 +94,15 @@ export default function DashboardRouterScreen() {
         <View style={styles.stickyHeader}>
           <PremiumHeader 
             title={getHeaderTitle()}
-            subtitle={`PERFIL: ${activeContext || 'FAMILIA'}`}
+            subtitle={`Perfil activo: ${activeContext === 'ENTRENADOR' ? 'Entrenador' : activeContext === 'COORDINADOR' ? 'Coordinación' : 'Familia'}`}
             showSearchAndActions={false}
             showAvatar={false}
             showBackButton={true}
             onBackPress={handleBackToSports}
           />
 
-          {/* BARRA DE ACCIONES DE CAMBIO (CAMBIAR PERFIL / CAMBIAR DEPORTE) */}
+          {/* BARRA DE ACCIONES DE CAMBIO (CAMBIAR DEPORTE / CAMBIAR PERFIL) */}
           <View style={styles.demoChangeActionsRow}>
-            <TouchableOpacity 
-              style={styles.changeProfileBtn} 
-              onPress={() => setIsSelectingProfile(true)}
-              activeOpacity={0.8}
-            >
-              <Text style={{ fontSize: 13 }}>👥</Text>
-              <Text style={styles.changeProfileBtnText}>Cambiar perfil</Text>
-            </TouchableOpacity>
-
             <TouchableOpacity 
               style={styles.changeSportBtn} 
               onPress={handleBackToSports}
@@ -125,6 +110,15 @@ export default function DashboardRouterScreen() {
             >
               <Text style={{ fontSize: 13 }}>⚽</Text>
               <Text style={styles.changeSportBtnText}>Cambiar deporte</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.changeProfileBtn} 
+              onPress={handleChangeProfile}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 13 }}>👥</Text>
+              <Text style={styles.changeProfileBtnText}>Cambiar perfil</Text>
             </TouchableOpacity>
           </View>
 

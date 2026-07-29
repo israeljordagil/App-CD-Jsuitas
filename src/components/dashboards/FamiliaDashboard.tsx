@@ -183,7 +183,6 @@ export function FamiliaDashboard() {
           })}
         </View>
       )}
-      )}
 
       {/* ACCESO DIRECTO DESTACADO A MI ZONA (SIEMPRE VISIBLE EN CUENTA FAMILIA) */}
       <TouchableOpacity 
@@ -400,7 +399,6 @@ export function FamiliaDashboard() {
               </View>
             </View>
           </View>
-        )}
 
       {/* MODAL NOTIFICAR AUSENCIA PUNTUAL */}
       <Modal visible={absenceModalVisible} transparent animationType="fade">

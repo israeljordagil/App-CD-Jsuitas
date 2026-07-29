@@ -5,13 +5,12 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   ScrollView, 
-  useWindowDimensions 
+  useWindowDimensions,
+  Platform 
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { useAuth, ActiveContextType } from '../../context/AuthContext';
-import { useSport } from '../../context/SportContext';
-import { useRouter } from 'expo-router';
 
 const colors = {
   navyDark: '#020814',
@@ -30,9 +29,8 @@ const PROFILE_CARDS = [
     id: 'FAMILIA' as ActiveContextType,
     title: 'FAMILIA',
     subtitle: 'ÁREA DE PADRES Y TUTORES',
-    description: 'Consulta a tus hijos, equipos, convocatorias, horarios y accede a Mi Zona gamificada.',
+    description: 'Consulta a tus hijos, equipos, convocatorias, calendario y Mi Zona.',
     icon: '👨‍👩‍👧‍👦',
-    faIcon: 'users',
     accentColor: '#4FC3F7',
     gradientColors: ['rgba(79, 195, 247, 0.2)', 'rgba(11, 34, 79, 0.95)'],
     borderColor: 'rgba(79, 195, 247, 0.5)',
@@ -41,9 +39,8 @@ const PROFILE_CARDS = [
     id: 'ENTRENADOR' as ActiveContextType,
     title: 'ENTRENADOR',
     subtitle: 'CUERPO TÉCNICO Y MÍSTERS',
-    description: 'Gestiona la plantilla de tu equipo, convoca jugadores, prepara tácticas y registra partidos.',
+    description: 'Gestiona plantilla, entrenamientos, convocatorias, tácticas y partidos.',
     icon: '👨‍🏫',
-    faIcon: 'graduation-cap',
     accentColor: '#10B981',
     gradientColors: ['rgba(16, 185, 129, 0.2)', 'rgba(11, 34, 79, 0.95)'],
     borderColor: 'rgba(16, 185, 129, 0.5)',
@@ -52,9 +49,8 @@ const PROFILE_CARDS = [
     id: 'COORDINADOR' as ActiveContextType,
     title: 'COORDINACIÓN',
     subtitle: 'DIRECCIÓN Y SUPERVISIÓN',
-    description: 'Supervisa todos los equipos, entrenadores, instalaciones y planificación global del club.',
+    description: 'Supervisa equipos, entrenadores, planificación e instalaciones.',
     icon: '🧭',
-    faIcon: 'shield',
     accentColor: '#F59E0B',
     gradientColors: ['rgba(245, 158, 11, 0.2)', 'rgba(11, 34, 79, 0.95)'],
     borderColor: 'rgba(245, 158, 11, 0.5)',
@@ -62,46 +58,18 @@ const PROFILE_CARDS = [
 ];
 
 interface LargeProfileSelectorScreenProps {
-  onSelectProfile?: (profileId: ActiveContextType) => void;
+  onSelectProfile: (profileId: ActiveContextType) => void;
 }
 
 export function LargeProfileSelectorScreen({ onSelectProfile }: LargeProfileSelectorScreenProps) {
   const { switchContext } = useAuth();
-  const { sport, setSport } = useSport();
-  const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
-  const isDesktop = screenWidth >= 768;
-
-  const getSportLabel = () => {
-    switch (sport) {
-      case 'futbol': return 'FÚTBOL';
-      case 'futbol_sala': return 'FÚTBOL SALA';
-      case 'baloncesto': return 'BALONCESTO';
-      case 'voleibol': return 'VOLEIBOL';
-      default: return 'DEPORTE';
-    }
-  };
-
-  const getSportEmoji = () => {
-    switch (sport) {
-      case 'futbol': return '⚽';
-      case 'futbol_sala': return '⚽🥅';
-      case 'baloncesto': return '🏀';
-      case 'voleibol': return '🏐';
-      default: return '🏆';
-    }
-  };
+  const isDesktop = screenWidth >= 900;
+  const isTablet = screenWidth >= 600 && screenWidth < 900;
 
   const handleSelect = (profileId: ActiveContextType) => {
     switchContext(profileId);
-    if (onSelectProfile) {
-      onSelectProfile(profileId);
-    }
-  };
-
-  const handleBackToSports = () => {
-    setSport(null);
-    router.replace('/');
+    onSelectProfile(profileId);
   };
 
   return (
@@ -110,22 +78,23 @@ export function LargeProfileSelectorScreen({ onSelectProfile }: LargeProfileSele
         contentContainerStyle={[styles.scrollContent, isDesktop && styles.scrollContentDesktop]}
         showsVerticalScrollIndicator={false}
       >
-        {/* HEADER DE SELECCIÓN DE PERFIL */}
+        {/* HEADER PRINCIPAL PERFIL PRIMERO */}
         <View style={styles.headerBox}>
-          <TouchableOpacity style={styles.backSportBadge} onPress={handleBackToSports} activeOpacity={0.8}>
-            <Ionicons name="arrow-back" size={16} color={colors.skyPrimary} />
-            <Text style={styles.backSportText}>{getSportEmoji()} {getSportLabel()}</Text>
-            <Text style={styles.changeSportSub}>(Cambiar deporte)</Text>
-          </TouchableOpacity>
+          <View style={styles.clubBadgeRow}>
+            <Text style={{ fontSize: 18, marginRight: 6 }}>🛡️</Text>
+            <Text style={styles.clubBadgeText}>CD JESUITAS</Text>
+          </View>
 
-          <Text style={styles.title}>SELECCIONA TU PERFIL</Text>
-          <Text style={styles.subtitle}>
-            Elige el tipo de acceso para gestionar la experiencia en <Text style={{ color: colors.skyPrimary, fontWeight: '800' }}>{getSportLabel()}</Text>
-          </Text>
+          <Text style={styles.title}>Selecciona un perfil para continuar</Text>
+          <Text style={styles.subtitle}>Modo demostración</Text>
         </View>
 
         {/* CONTENEDOR DE TARJETAS GRANDES */}
-        <View style={[styles.cardsGrid, isDesktop && styles.cardsGridDesktop]}>
+        <View style={[
+          styles.cardsGrid, 
+          isDesktop && styles.cardsGridDesktop,
+          isTablet && styles.cardsGridTablet
+        ]}>
           {PROFILE_CARDS.map((card) => (
             <TouchableOpacity
               key={card.id}
@@ -133,19 +102,20 @@ export function LargeProfileSelectorScreen({ onSelectProfile }: LargeProfileSele
               style={[
                 styles.largeCard, 
                 { borderColor: card.borderColor },
-                isDesktop && styles.largeCardDesktop
+                isDesktop && styles.largeCardDesktop,
+                isTablet && styles.largeCardTablet
               ]}
               onPress={() => handleSelect(card.id)}
             >
               <LinearGradient
-                colors={card.gradientColors}
+                colors={card.gradientColors as [string, string]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.cardGradient}
               >
                 <View style={styles.cardHeaderRow}>
                   <View style={[styles.iconCircle, { backgroundColor: 'rgba(255, 255, 255, 0.1)' }]}>
-                    <Text style={{ fontSize: 32 }}>{card.icon}</Text>
+                    <Text style={{ fontSize: 36 }}>{card.icon}</Text>
                   </View>
                   <View style={styles.actionArrow}>
                     <Ionicons name="chevron-forward" size={22} color={card.accentColor} />
@@ -157,7 +127,7 @@ export function LargeProfileSelectorScreen({ onSelectProfile }: LargeProfileSele
                 <Text style={styles.cardDesc}>{card.description}</Text>
 
                 <View style={styles.enterButtonRow}>
-                  <Text style={[styles.enterText, { color: card.accentColor }]}>ENTRAR AL PANEL</Text>
+                  <Text style={[styles.enterText, { color: card.accentColor }]}>SELECCIONAR PERFIL</Text>
                   <FontAwesome name="arrow-right" size={12} color={card.accentColor} />
                 </View>
               </LinearGradient>
@@ -165,11 +135,12 @@ export function LargeProfileSelectorScreen({ onSelectProfile }: LargeProfileSele
           ))}
         </View>
 
-        {/* BOTÓN VOLVER DEPORTE */}
-        <TouchableOpacity style={styles.bottomChangeSportBtn} onPress={handleBackToSports} activeOpacity={0.7}>
-          <Ionicons name="grid-outline" size={18} color={colors.textMuted} />
-          <Text style={styles.bottomChangeSportText}>Volver al selector de deportes</Text>
-        </TouchableOpacity>
+        {/* PIE DE PÁGINA INSTITUCIONAL CON IDENTIFICADOR VISUAL */}
+        <View style={styles.footer}>
+          <Text style={styles.footerClub}>Club Deportivo Colegio Jesuitas</Text>
+          <Text style={styles.footerCopy}>Sistema Integrado de Gestión Deportiva • 2026</Text>
+          <Text style={styles.buildBadge}>COMPILACIÓN: PERFIL-PRIMERO-01</Text>
+        </View>
       </ScrollView>
     </LinearGradient>
   );
@@ -178,58 +149,56 @@ export function LargeProfileSelectorScreen({ onSelectProfile }: LargeProfileSele
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    minHeight: Platform.OS === 'web' ? ('100vh' as any) : '100%',
   },
   scrollContent: {
     padding: 20,
-    paddingTop: 40,
+    paddingTop: 50,
     alignItems: 'center',
+    width: '100%',
   },
   scrollContentDesktop: {
-    paddingTop: 60,
-    maxWidth: 1100,
+    paddingTop: 70,
+    maxWidth: 1150,
     alignSelf: 'center',
-    width: '100%',
   },
   headerBox: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 36,
     width: '100%',
   },
-  backSportBadge: {
+  clubBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(79, 195, 247, 0.12)',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(79, 195, 247, 0.3)',
     marginBottom: 16,
-    gap: 8,
   },
-  backSportText: {
+  clubBadgeText: {
     color: colors.white,
-    fontWeight: '800',
-    fontSize: 14,
-    letterSpacing: 0.8,
-  },
-  changeSportSub: {
-    color: colors.textMuted,
-    fontSize: 12,
+    fontWeight: '900',
+    fontSize: 13,
+    letterSpacing: 1,
   },
   title: {
     color: colors.white,
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '900',
-    letterSpacing: 1.5,
+    letterSpacing: 0.5,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   subtitle: {
-    color: colors.textMuted,
+    color: colors.skyPrimary,
     fontSize: 14,
+    fontWeight: '800',
     textAlign: 'center',
-    maxWidth: 480,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
   cardsGrid: {
     width: '100%',
@@ -240,44 +209,54 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 24,
   },
+  cardsGridTablet: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 20,
+  },
   largeCard: {
     width: '100%',
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1.5,
     overflow: 'hidden',
   },
   largeCardDesktop: {
     flex: 1,
-    maxWidth: 340,
+    maxWidth: 350,
+  },
+  largeCardTablet: {
+    width: '47%',
+    minWidth: 280,
   },
   cardGradient: {
-    padding: 24,
-    minHeight: 230,
+    padding: 26,
+    minHeight: 240,
     justifyContent: 'space-between',
   },
   cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: 18,
   },
   iconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 18,
+    width: 64,
+    height: 64,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
   actionArrow: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   cardTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '900',
     letterSpacing: 1.2,
     marginBottom: 4,
@@ -291,8 +270,8 @@ const styles = StyleSheet.create({
   },
   cardDesc: {
     color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 13.5,
+    lineHeight: 20,
     marginBottom: 20,
   },
   enterButtonRow: {
@@ -305,17 +284,26 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 1,
   },
-  bottomChangeSportBtn: {
-    flexDirection: 'row',
+  footer: {
+    marginTop: 40,
     alignItems: 'center',
-    gap: 8,
-    marginTop: 32,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
-  bottomChangeSportText: {
+  footerClub: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  footerCopy: {
     color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 9,
+    marginTop: 2,
+  },
+  buildBadge: {
+    color: colors.skyPrimary,
+    fontSize: 10,
+    fontWeight: '900',
+    marginTop: 6,
+    letterSpacing: 1,
   },
 });
