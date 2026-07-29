@@ -4,6 +4,8 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { AppRole, UserStatus, UserRoleAssignment, ManagedUser } from '../types/roles';
 import { ManagedPerson } from '../types/people';
 import { INITIAL_PEOPLE } from '../data/peopleData';
+import { ManagedTeam, TeamStaffMember } from '../types/teams';
+import { INITIAL_TEAMS } from '../data/teamsData';
 
 export type ActiveContextType = AppRole;
 
@@ -44,10 +46,15 @@ interface AuthContextProps {
   ) => { success: boolean; user?: ManagedUser; error?: string };
   loginAsTestUserByEmail: (email: string) => void;
 
-  // Gestión del Módulo Núcleo PERSONAS
+  // Gestión del Módulo NÚCLEO PERSONAS
   managedPeople: ManagedPerson[];
   updatePerson: (person: ManagedPerson) => { success: boolean; error?: string };
   createPerson: (personData: Partial<ManagedPerson>) => { success: boolean; person?: ManagedPerson; error?: string };
+
+  // Gestión del Módulo NÚCLEO EQUIPOS
+  managedTeams: ManagedTeam[];
+  updateTeam: (team: ManagedTeam) => { success: boolean; error?: string };
+  createTeam: (teamData: Partial<ManagedTeam>) => { success: boolean; team?: ManagedTeam; error?: string };
 
   // Acciones de Autenticación Supabase
   loginWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
@@ -134,8 +141,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Módulo Usuarios
   const [managedUsers, setManagedUsers] = useState<ManagedUser[]>(INITIAL_TEST_USERS);
   
-  // Módulo NÚCLEO PERSONAS (Sin duplicidades por persona física)
+  // Módulo NÚCLEO PERSONAS
   const [managedPeople, setManagedPeople] = useState<ManagedPerson[]>(INITIAL_PEOPLE);
+
+  // Módulo NÚCLEO EQUIPOS
+  const [teamsState, setTeamsState] = useState<ManagedTeam[]>(INITIAL_TEAMS);
 
   const isDemoEnabled = process.env.EXPO_PUBLIC_ENABLE_DEMO_ACCESS === 'true';
 
@@ -153,6 +163,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const mockTeams = [
     { id: 't1', name: 'Cadete B', sport: 'futbol', category: 'Cadete' }
   ];
+
+  // Cálculo Dinámico: Conectar managedPeople -> managedTeams mediante person_team_assignments (teamId)
+  const managedTeams: ManagedTeam[] = teamsState.map(team => {
+    const staffMembers: TeamStaffMember[] = [];
+
+    managedPeople.forEach(person => {
+      person.teamAssignments.forEach(assignment => {
+        if (assignment.teamId === team.id || assignment.teamName.toLowerCase() === team.name.toLowerCase()) {
+          staffMembers.push({
+            personId: person.id,
+            personCode: person.code,
+            fullName: person.fullName,
+            positionTitle: assignment.positionTitle
+          });
+        }
+      });
+    });
+
+    return {
+      ...team,
+      staff: staffMembers
+    };
+  });
 
   // Consulta el perfil real del usuario y sus roles asignados en Supabase
   const loadUserProfileAndRoles = async (authUser: User) => {
@@ -307,7 +340,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
-  // Crear una nueva persona en el núcleo PERSONAS (Garantizando no duplicados)
+  // Crear una nueva persona en el núcleo PERSONAS
   const createPerson = (personData: Partial<ManagedPerson>): { success: boolean; person?: ManagedPerson; error?: string } => {
     if (!personData.firstName || !personData.lastName) {
       return { success: false, error: 'Se requiere nombre y apellidos.' };
@@ -340,7 +373,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       eventHistory: [
         {
           id: `ev-${Date.now()}`,
-          date: new Date().toISOString(),
+          date: new Date().toISOString().split('T')[0],
           user: user?.full_name || 'Israel Jordá',
           action: 'Persona creada',
           detail: `Alta de expediente en el núcleo PERSONAS (${perCode}).`
@@ -357,7 +390,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true, person: newPerson };
   };
 
-  // Actualizar roles y estados de Usuarios (Módulo Usuarios)
+  // Actualizar expedientes del Módulo NÚCLEO EQUIPOS
+  const updateTeam = (updatedTeam: ManagedTeam): { success: boolean; error?: string } => {
+    setTeamsState(prev => prev.map(t => t.id === updatedTeam.id ? updatedTeam : t));
+    return { success: true };
+  };
+
+  // Crear un nuevo equipo en el módulo EQUIPOS (Strict rule: name completo sin letter)
+  const createTeam = (teamData: Partial<ManagedTeam>): { success: boolean; team?: ManagedTeam; error?: string } => {
+    if (!teamData.name || !teamData.category) {
+      return { success: false, error: 'El nombre completo y la categoría son obligatorios.' };
+    }
+
+    const nextIndex = teamsState.length + 1;
+    const equCode = `EQU-${String(nextIndex).padStart(6, '0')}`;
+
+    const newTeam: ManagedTeam = {
+      id: `equ-${Date.now()}`,
+      internalCode: equCode,
+      name: teamData.name.trim(), // Nombre completo ej. "Alevín A" (Sin campo letter)
+      category: teamData.category,
+      sport: teamData.sport || 'Fútbol',
+      gender: teamData.gender || 'MIXTO',
+      season: teamData.season || '2026/2027',
+      status: teamData.status || 'ACTIVE',
+      observations: teamData.observations,
+      staff: [],
+      history: [
+        {
+          id: `ev-${Date.now()}`,
+          date: new Date().toISOString().split('T')[0],
+          user: user?.full_name || 'Israel Jordá',
+          action: 'Equipo creado',
+          detail: `Alta de equipo ${teamData.name.trim()} (${equCode}).`
+        }
+      ],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      createdBy: user?.full_name || 'Israel Jordá',
+      updatedBy: user?.full_name || 'Israel Jordá'
+    };
+
+    setTeamsState(prev => [newTeam, ...prev]);
+    return { success: true, team: newTeam };
+  };
+
+  // Actualizar roles y estados de Usuarios
   const updateUserRolesAndStatus = (
     targetUserId: string, 
     newRoles: AppRole[], 
@@ -556,6 +634,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         managedPeople,
         updatePerson,
         createPerson,
+        managedTeams,
+        updateTeam,
+        createTeam,
         loginWithEmail,
         resetPassword,
         logout,

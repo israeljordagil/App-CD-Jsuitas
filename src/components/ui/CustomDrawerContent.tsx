@@ -61,7 +61,7 @@ const COACH_MENU_ITEMS = [
 const COORDINATOR_MENU_ITEMS = [
   { label: 'Inicio', route: 'index', icon: '🏠' },
   { label: 'Personas', route: 'personas', icon: '👥' },
-  { label: 'Equipos', route: 'equipos', icon: '👥' },
+  { label: 'Equipos', route: 'equipos', icon: '⚽' },
   { label: 'Jugadores', route: 'jugadores', icon: '👤' },
   { label: 'Entrenadores', route: 'entrenadores', icon: '👨‍🏫' },
   { label: 'Calendario', route: 'calendario', icon: '📅' },

@@ -52,10 +52,11 @@ const ADMIN_MODULES: AdminModuleCard[] = [
   {
     id: 'teams',
     title: 'Equipos',
-    subtitle: 'Configuración de plantilla por categoría',
+    subtitle: 'Gestión de la estructura de 31 equipos reales del CD Jesuitas',
     icon: 'shirt-outline',
-    badge: 'Próximamente',
+    badge: 'ACTIVO',
     color: '#10B981',
+    route: '/(drawer)/equipos',
   },
   {
     id: 'players',
