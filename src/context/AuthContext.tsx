@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { AppRole, UserStatus, UserRoleAssignment, ManagedUser } from '../types/roles';
+import { ManagedPerson } from '../types/people';
+import { INITIAL_PEOPLE } from '../data/peopleData';
 
 export type ActiveContextType = AppRole;
 
@@ -26,7 +28,7 @@ interface AuthContextProps {
   assignedTeams: any[];
   activeTeamId: string | null;
 
-  // Gestión de Usuarios y Roles (ADMIN_GENERAL)
+  // Gestión de Usuarios y Roles
   managedUsers: ManagedUser[];
   updateUserRolesAndStatus: (
     userId: string, 
@@ -41,6 +43,11 @@ interface AuthContextProps {
     assignments?: UserRoleAssignment[]
   ) => { success: boolean; user?: ManagedUser; error?: string };
   loginAsTestUserByEmail: (email: string) => void;
+
+  // Gestión del Módulo Núcleo PERSONAS
+  managedPeople: ManagedPerson[];
+  updatePerson: (person: ManagedPerson) => { success: boolean; error?: string };
+  createPerson: (personData: Partial<ManagedPerson>) => { success: boolean; person?: ManagedPerson; error?: string };
 
   // Acciones de Autenticación Supabase
   loginWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
@@ -124,8 +131,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [assignedTeams, setAssignedTeams] = useState<any[]>([]);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
 
-  // Lista de usuarios gestionados por el módulo
+  // Módulo Usuarios
   const [managedUsers, setManagedUsers] = useState<ManagedUser[]>(INITIAL_TEST_USERS);
+  
+  // Módulo NÚCLEO PERSONAS (Sin duplicidades por persona física)
+  const [managedPeople, setManagedPeople] = useState<ManagedPerson[]>(INITIAL_PEOPLE);
 
   const isDemoEnabled = process.env.EXPO_PUBLIC_ENABLE_DEMO_ACCESS === 'true';
 
@@ -185,30 +195,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
 
       setUser(profile);
-
-      // Sincronizar el usuario actual en managedUsers sin duplicados
-      setManagedUsers(prev => {
-        const exists = prev.some(u => u.id === profile.id || u.email.toLowerCase() === profile.email?.toLowerCase());
-        if (exists) {
-          return prev.map(u => 
-            (u.id === profile.id || u.email.toLowerCase() === profile.email?.toLowerCase())
-              ? { ...u, id: profile.id, fullName: profile.full_name || u.fullName, email: profile.email || u.email, roles: profile.roles }
-              : u
-          );
-        } else {
-          return [
-            {
-              id: profile.id,
-              fullName: profile.full_name || 'Usuario Principal',
-              email: profile.email || '',
-              status: 'ACTIVE',
-              roles: profile.roles,
-              createdAt: new Date().toISOString()
-            },
-            ...prev
-          ];
-        }
-      });
 
       // Configurar vinculaciones según perfil
       if (profile.roles.includes('FAMILIA')) {
@@ -292,14 +278,84 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // SEGURIDAD: Actualizar roles y estados sin permitir eliminar al ÚNICO Administrador General
+  // Actualizar expedientes del Módulo NÚCLEO PERSONAS
+  const updatePerson = (updatedPerson: ManagedPerson): { success: boolean; error?: string } => {
+    // Protección del Administrador Único
+    const currentAdmins = managedPeople.filter(p => p.status === 'ACTIVE' && p.roles.includes('ADMIN_GENERAL'));
+    const targetIsAdmin = updatedPerson.roles.includes('ADMIN_GENERAL');
+    const targetIsActive = updatedPerson.status === 'ACTIVE';
+
+    const originalPerson = managedPeople.find(p => p.id === updatedPerson.id);
+    const originalWasAdmin = originalPerson?.roles.includes('ADMIN_GENERAL');
+
+    if (originalWasAdmin && (!targetIsAdmin || !targetIsActive)) {
+      if (currentAdmins.length <= 1) {
+        return {
+          success: false,
+          error: 'Acción denegada: Debe existir al menos un Administrador General activo en el club.'
+        };
+      }
+    }
+
+    setManagedPeople(prev => prev.map(p => p.id === updatedPerson.id ? updatedPerson : p));
+
+    // Si la persona actualizada coincide con el usuario activo, actualizar perfil
+    if (user && (user.email?.toLowerCase() === updatedPerson.email?.toLowerCase())) {
+      setUser(prev => prev ? { ...prev, roles: updatedPerson.roles } : null);
+    }
+
+    return { success: true };
+  };
+
+  // Crear una nueva persona en el núcleo PERSONAS (Garantizando no duplicados)
+  const createPerson = (personData: Partial<ManagedPerson>): { success: boolean; person?: ManagedPerson; error?: string } => {
+    if (!personData.firstName || !personData.lastName) {
+      return { success: false, error: 'Se requiere nombre y apellidos.' };
+    }
+
+    const fullName = `${personData.firstName.trim()} ${personData.lastName.trim()}`;
+    const cleanEmail = personData.email?.trim().toLowerCase();
+
+    if (cleanEmail && managedPeople.some(p => p.email?.toLowerCase() === cleanEmail)) {
+      return { success: false, error: 'Ya existe una persona registrada con este correo electrónico.' };
+    }
+
+    const newPerson: ManagedPerson = {
+      id: `per-${Date.now()}`,
+      firstName: personData.firstName.trim(),
+      lastName: personData.lastName.trim(),
+      fullName,
+      email: cleanEmail,
+      phone: personData.phone?.trim(),
+      status: 'ACTIVE',
+      roles: personData.roles && personData.roles.length > 0 ? personData.roles : ['FAMILIA'],
+      responsibilities: personData.responsibilities || [],
+      teamAssignments: personData.teamAssignments || [],
+      licenses: personData.licenses || [{ id: `lic-${Date.now()}`, licenseType: 'Sin licencia', isValid: true }],
+      account: personData.account || { hasAccess: false },
+      history: [
+        {
+          id: `h-${Date.now()}`,
+          season: '2025/2026',
+          summaryRole: `Alta de ${fullName} en la plataforma`,
+          createdAt: new Date().toISOString()
+        }
+      ],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    setManagedPeople(prev => [newPerson, ...prev]);
+    return { success: true, person: newPerson };
+  };
+
+  // Actualizar roles y estados de Usuarios (Módulo Usuarios)
   const updateUserRolesAndStatus = (
     targetUserId: string, 
     newRoles: AppRole[], 
     newStatus: UserStatus,
     assignments?: UserRoleAssignment[]
   ): { success: boolean; error?: string } => {
-    // 1. Contar cuántos Administradores Generales ACTIVOS existen en total
     const currentAdmins = managedUsers.filter(u => u.status === 'ACTIVE' && u.roles.includes('ADMIN_GENERAL'));
     const targetUser = managedUsers.find(u => u.id === targetUserId);
 
@@ -307,7 +363,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const newIsAdmin = newRoles.includes('ADMIN_GENERAL');
     const newIsActive = newStatus === 'ACTIVE';
 
-    // Regla de Protección: No permitir que un ADMIN_GENERAL pierda su rol si es el único
     if (targetIsAdmin && (!newIsAdmin || !newIsActive)) {
       if (currentAdmins.length <= 1) {
         return { 
@@ -317,7 +372,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // 2. Actualizar estado local de managedUsers
     setManagedUsers(prev => prev.map(u => {
       if (u.id === targetUserId) {
         return {
@@ -330,7 +384,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return u;
     }));
 
-    // 3. Si el usuario modificado es el usuario actualmente autenticado, actualizar su perfil
     if (user && user.id === targetUserId) {
       setUser(prev => prev ? { ...prev, roles: newRoles } : null);
       if (activeContext && !newRoles.includes(activeContext)) {
@@ -338,7 +391,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // 4. Sincronizar en Supabase si está conectado y existe cliente
     if (supabase && isSupabaseConfigured) {
       supabase.from('profiles').update({ status: newStatus }).eq('id', targetUserId).then(() => {}).catch(() => {});
     }
@@ -346,7 +398,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
-  // Crear nuevo usuario gestionado (Fase 1)
   const createManagedUser = (
     fullName: string, 
     email: string, 
@@ -372,19 +423,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true, user: newUser };
   };
 
-  // Probar perfil con un usuario de prueba (ej. Familia Prueba)
   const loginAsTestUserByEmail = (targetEmail: string) => {
-    const testUser = managedUsers.find(u => u.email.toLowerCase() === targetEmail.toLowerCase());
-    if (testUser) {
+    const testPerson = managedPeople.find(p => p.email?.toLowerCase() === targetEmail.toLowerCase());
+    if (testPerson) {
       const profile: UserProfile = {
-        id: testUser.id,
-        full_name: testUser.fullName,
-        email: testUser.email,
-        roles: testUser.roles,
+        id: testPerson.id,
+        full_name: testPerson.fullName,
+        email: testPerson.email || '',
+        roles: testPerson.roles,
       };
       setUser(profile);
-      setActiveContext(testUser.roles[0] || 'FAMILIA');
-      if (testUser.roles.includes('FAMILIA')) {
+      setActiveContext(testPerson.roles[0] || 'FAMILIA');
+      if (testPerson.roles.includes('FAMILIA')) {
         setLinkedPlayers(mockPlayers);
         setActivePlayerId('p1');
       }
@@ -448,7 +498,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const switchContext = (context: ActiveContextType) => {
-    // Protección de SwitchContext: No permitir cambiar a un rol que el usuario no tenga asignado
     if (user && user.roles.length > 0 && !user.roles.includes(context)) {
       console.warn(`Intento no autorizado de cambiar al contexto ${context}`);
       return;
@@ -496,6 +545,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateUserRolesAndStatus,
         createManagedUser,
         loginAsTestUserByEmail,
+        managedPeople,
+        updatePerson,
+        createPerson,
         loginWithEmail,
         resetPassword,
         logout,

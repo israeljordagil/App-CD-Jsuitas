@@ -24,6 +24,15 @@ interface AdminModuleCard {
 
 const ADMIN_MODULES: AdminModuleCard[] = [
   {
+    id: 'people',
+    title: 'Centro de Personas',
+    subtitle: 'Gestión única de personas, roles, equipos e historial',
+    icon: 'people-outline',
+    badge: 'NÚCLEO',
+    color: '#4FC3F7',
+    route: '/(drawer)/personas',
+  },
+  {
     id: 'users',
     title: 'Usuarios y Roles',
     subtitle: 'Gestión de permisos, perfiles y accesos',
