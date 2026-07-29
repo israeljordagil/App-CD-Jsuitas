@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, Component, ErrorInfo, ReactNode } from 'react';
 import { 
   View, 
   Text, 
@@ -6,6 +6,7 @@ import {
   ScrollView, 
   TouchableOpacity, 
   Modal, 
+  TextInput,
   useWindowDimensions,
   Linking,
   ActivityIndicator
@@ -13,9 +14,9 @@ import {
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
-// TODO: sustituir por convocatoria real vinculada a family_player_links y convocatorias.
+// TODO: guardar respuesta y motivo en Supabase cuando se conecte convocatorias reales.
 
-// Colores corporativos institucionales de CD Jesuitas
+// Colores corporativos institucionales de CD Jesuitas (Estilo Apple Premium)
 const colors = {
   navyDark: '#071A3D',
   navyCard: '#0B224F',
@@ -31,6 +32,9 @@ const colors = {
 };
 
 const DEFAULT_SCHOOL_ADDRESS = 'Puerta del Colegio (Avda. Cortes Valencianas nº 1)';
+
+// Tipo estricto de asistencia aprobado (CONFIRMACIÓN EXPLICITA: "Duda" ha sido eliminada por completo)
+export type AttendanceStatus = 'PENDIENTE' | 'ASISTIRA' | 'NO_ASISTIRA';
 
 interface ChecklistItem {
   id: string;
@@ -126,48 +130,154 @@ const INITIAL_CALLUPS: Record<string, CallupData> = {
   }
 };
 
-export function FamiliaConvocatorias() {
+const ABSENCE_QUICK_REASONS = [
+  'Enfermedad',
+  'Lesión',
+  'Viaje o compromiso familiar',
+  'Motivo académico',
+  'Otro motivo'
+];
+
+// Error Boundary local anti-pantalla-blanca
+export class FamiliaConvocatoriasErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("CRITICAL ERROR en FamiliaConvocatorias:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={styles.errorBoundaryBox}>
+          <Ionicons name="alert-circle-outline" size={54} color={colors.accentRed} style={{ marginBottom: 12 }} />
+          <Text style={styles.errorBoundaryTitle}>No se han podido cargar las convocatorias</Text>
+          <Text style={styles.errorBoundarySub}>
+            {this.state.error?.message || "Ha ocurrido un error inesperado al renderizar la pantalla."}
+          </Text>
+          <TouchableOpacity 
+            style={styles.retryBtn} 
+            onPress={() => this.setState({ hasError: false, error: null })}
+          >
+            <Text style={styles.retryBtnTxt}>Reintentar</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export function FamiliaConvocatoriasContent() {
   const { width: screenWidth } = useWindowDimensions();
   const isTablet = screenWidth >= 768;
 
-  // Estados de control de datos y pantalla
+  // Estados de control de datos y carga
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
+  
+  // Selección del hijo activo (Pablo 'p1' o Hugo 'p2')
   const [selectedChildKey, setSelectedChildKey] = useState<'p1' | 'p2'>('p1');
   const [activeTab, setActiveTab] = useState<'proxima' | 'historial'>('proxima');
-  const [myStatus, setMyStatus] = useState<'confirmado' | 'duda' | 'no_disponible'>('confirmado');
-  
+
+  // Estados independientes de asistencia por hijo
+  const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendanceStatus>>({
+    p1: 'ASISTIRA',
+    p2: 'PENDIENTE'
+  });
+  const [absenceReasonMap, setAbsenceReasonMap] = useState<Record<string, string>>({
+    p1: '',
+    p2: ''
+  });
+
+  // Checklist independiente por hijo
+  const [checklistsMap, setChecklistsMap] = useState<Record<string, ChecklistItem[]>>({
+    p1: INITIAL_CALLUPS.p1.checklist,
+    p2: INITIAL_CALLUPS.p2.checklist
+  });
+
   // Modales
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false);
+  const [selectedReasonOption, setSelectedReasonOption] = useState<string>('');
+  const [customReasonText, setCustomReasonText] = useState<string>('');
+  const [absenceError, setAbsenceError] = useState<string | null>(null);
+
+  // Modal Coche Compartido
   const [isOfferCarModalOpen, setIsOfferCarModalOpen] = useState(false);
   const [offeredSeats, setOfferedSeats] = useState(2);
   const [selectedContactFamily, setSelectedContactFamily] = useState<any>(null);
 
-  // Coche compartido
+  // Lista Coche Compartido
   const [carpoolList, setCarpoolList] = useState([
     { id: 'cp1', family: 'Familia de Dani García', type: 'offer', seats: 2, pickup: DEFAULT_SCHOOL_ADDRESS, phone: '677888999' },
     { id: 'cp2', family: 'Familia de Lucas Pérez', type: 'need', seats: 1, pickup: DEFAULT_SCHOOL_ADDRESS, phone: '611222333' }
   ]);
 
-  // Selección segura de datos de la convocatoria
+  // Selección segura de la convocatoria del hijo activo
   const callup: CallupData = INITIAL_CALLUPS[selectedChildKey] || INITIAL_CALLUPS.p1;
-  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>(callup?.checklist || []);
+  const currentStatus: AttendanceStatus = attendanceMap[selectedChildKey] || 'PENDIENTE';
+  const currentReason: string = absenceReasonMap[selectedChildKey] || '';
+  const currentChecklist: ChecklistItem[] = checklistsMap[selectedChildKey] || callup.checklist || [];
 
-  // Actualizar la checklist de forma segura cuando cambia de hijo/a
-  useEffect(() => {
-    if (callup && callup.checklist) {
-      setChecklistItems(callup.checklist);
-    }
-  }, [selectedChildKey]);
+  const childFirstName = callup?.childName ? callup.childName.split(' ')[0] : 'Pablo';
 
-  const toggleChecklistItem = (id: string) => {
-    setChecklistItems(prev => prev.map(item => item.id === id ? { ...item, checked: !item.checked } : item));
+  // Cambiar checklist individual
+  const toggleChecklistItem = (itemId: string) => {
+    setChecklistsMap(prev => ({
+      ...prev,
+      [selectedChildKey]: (prev[selectedChildKey] || []).map(item => 
+        item.id === itemId ? { ...item, checked: !item.checked } : item
+      )
+    }));
   };
 
+  // Confirmar Asistencia Directa ("Asistirá")
+  const handleConfirmAttendance = () => {
+    setAttendanceMap(prev => ({ ...prev, [selectedChildKey]: 'ASISTIRA' }));
+  };
+
+  // Abrir Modal de Ausencia ("No asistirá")
+  const handleOpenAbsenceModal = () => {
+    setSelectedReasonOption(currentReason.startsWith('Otro motivo:') ? 'Otro motivo' : currentReason || '');
+    setCustomReasonText(currentReason.startsWith('Otro motivo:') ? currentReason.replace('Otro motivo: ', '') : '');
+    setAbsenceError(null);
+    setIsAbsenceModalOpen(true);
+  };
+
+  // Confirmar la Ausencia en el Modal
+  const handleConfirmAbsence = () => {
+    if (!selectedReasonOption) {
+      setAbsenceError('Por favor, selecciona un motivo para la ausencia.');
+      return;
+    }
+
+    let finalReason = selectedReasonOption;
+    if (selectedReasonOption === 'Otro motivo') {
+      if (!customReasonText.trim()) {
+        setAbsenceError('Por favor, escribe el motivo de la ausencia.');
+        return;
+      }
+      finalReason = `Otro motivo: ${customReasonText.trim()}`;
+    }
+
+    setAttendanceMap(prev => ({ ...prev, [selectedChildKey]: 'NO_ASISTIRA' }));
+    setAbsenceReasonMap(prev => ({ ...prev, [selectedChildKey]: finalReason }));
+    setIsAbsenceModalOpen(false);
+    setAbsenceError(null);
+  };
+
+  // Publicar Coche Compartido
   const handlePublishMyCar = () => {
     const newOffer = {
       id: Date.now().toString(),
-      family: `Familia de ${callup?.childName || 'Jugador'}`,
+      family: `Familia de ${callup.childName}`,
       type: 'offer',
       seats: offeredSeats,
       pickup: DEFAULT_SCHOOL_ADDRESS,
@@ -184,7 +294,7 @@ export function FamiliaConvocatorias() {
 
   const handleWhatsAppParentDirect = (phone: string, familyName: string) => {
     if (!phone) return;
-    const text = `Hola, soy la familia de ${callup?.childName || 'nuestro hijo'}. Te contacto por la plaza libre en coche para el partido vs ${callup?.rival || 'el rival'}.`;
+    const text = `Hola, soy la familia de ${callup.childName}. Te contacto por la plaza libre en coche para el partido vs ${callup.rival}.`;
     Linking.openURL(`https://wa.me/34${phone}?text=${encodeURIComponent(text)}`).catch(() => {});
   };
 
@@ -200,12 +310,10 @@ export function FamiliaConvocatorias() {
   };
 
   const handleWhatsAppCoach = () => {
-    const text = `Hola Míster, soy la familia de ${callup?.childName || 'nuestro hijo'}. Te confirmo la asistencia para el partido vs ${callup?.rival || 'el rival'}.`;
+    const text = `Hola Míster, soy la familia de ${callup.childName}. Te confirmo la asistencia para el partido vs ${callup.rival}.`;
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     Linking.openURL(url).catch(() => {});
   };
-
-  const childFirstName = callup?.childName ? callup.childName.split(' ')[0] : 'Pablo';
 
   // 1. ESTADO DE CARGA INSTITUCIONAL
   if (isLoading) {
@@ -291,20 +399,20 @@ export function FamiliaConvocatorias() {
             
             <View style={[
               styles.statusBadge,
-              myStatus === 'confirmado' ? styles.statusConfirmed :
-              myStatus === 'duda' ? styles.statusLate : styles.statusAbsent
+              currentStatus === 'ASISTIRA' ? styles.statusConfirmed :
+              currentStatus === 'NO_ASISTIRA' ? styles.statusAbsent : styles.statusPending
             ]}>
               <Ionicons 
                 name={
-                  myStatus === 'confirmado' ? 'checkmark-circle' :
-                  myStatus === 'duda' ? 'help-circle' : 'close-circle'
+                  currentStatus === 'ASISTIRA' ? 'checkmark-circle' :
+                  currentStatus === 'NO_ASISTIRA' ? 'close-circle' : 'time-outline'
                 } 
                 size={16} 
                 color={colors.white} 
               />
               <Text style={styles.statusBadgeText}>
-                {myStatus === 'confirmado' ? 'ASISTIRÁ' :
-                 myStatus === 'duda' ? 'DUDA' : 'NO ASISTIRÁ'}
+                {currentStatus === 'ASISTIRA' ? 'ASISTIRÁ' :
+                 currentStatus === 'NO_ASISTIRA' ? 'NO ASISTIRÁ' : 'PENDIENTE'}
               </Text>
             </View>
           </View>
@@ -393,10 +501,68 @@ export function FamiliaConvocatorias() {
             </LinearGradient>
           </View>
 
-          {/* 6. CHECKLIST DE LA MOCHILA DE CONVOCATORIA (PARA LOS PADRES) */}
+          {/* 6. CONFIRMACIÓN DE ASISTENCIA: SÓLO DOS OPCIONES (ASISTIRÁ / NO ASISTIRÁ) */}
+          <Text style={styles.sectionTitle}>CONFIRMACIÓN DE ASISTENCIA</Text>
+          <View style={styles.attendanceCard}>
+            <Text style={styles.attendanceQuestion}>¿Asistirá {childFirstName} al partido?</Text>
+            
+            <View style={styles.attendanceButtonsRow}>
+              {/* BOTÓN 1: ASISTIRÁ */}
+              <TouchableOpacity 
+                style={[styles.btnAttendance, styles.btnGreen, currentStatus === 'ASISTIRA' && styles.btnActiveGlow]}
+                onPress={handleConfirmAttendance}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="checkmark-circle" size={20} color={colors.white} style={{ marginRight: 6 }} />
+                <Text style={styles.btnAttendanceTxt}>Asistirá</Text>
+              </TouchableOpacity>
+
+              {/* BOTÓN 2: NO ASISTIRÁ */}
+              <TouchableOpacity 
+                style={[styles.btnAttendance, styles.btnRed, currentStatus === 'NO_ASISTIRA' && styles.btnActiveGlow]}
+                onPress={handleOpenAbsenceModal}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="close-circle" size={20} color={colors.white} style={{ marginRight: 6 }} />
+                <Text style={styles.btnAttendanceTxt}>No asistirá</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* ESTADO VISUAL TRAS RESPONDER */}
+            {currentStatus === 'ASISTIRA' && (
+              <View style={styles.statusConfirmedBox}>
+                <Ionicons name="checkmark-circle" size={18} color={colors.accentGreen} />
+                <Text style={styles.statusConfirmedTxt}>Asistencia confirmada</Text>
+              </View>
+            )}
+
+            {currentStatus === 'NO_ASISTIRA' && (
+              <View style={styles.statusAbsentBox}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="close-circle" size={18} color={colors.accentRed} />
+                  <Text style={styles.statusAbsentTxt}>No asistirá</Text>
+                </View>
+                {Boolean(currentReason) && (
+                  <Text style={styles.statusReasonSub}>
+                    Motivo comunicado al cuerpo técnico: <Text style={{ color: colors.white }}>{currentReason}</Text>
+                  </Text>
+                )}
+              </View>
+            )}
+
+            {currentStatus === 'PENDIENTE' && (
+              <View style={styles.statusPendingBox}>
+                <Ionicons name="time-outline" size={16} color={colors.accentGold} />
+                <Text style={styles.statusPendingTxt}>Respuesta pendiente de confirmación</Text>
+              </View>
+            )}
+
+          </View>
+
+          {/* 7. CHECKLIST DE LA MOCHILA DE CONVOCATORIA (PARA LOS PADRES) */}
           <Text style={styles.sectionTitle}>🎒 CHECKLIST DE LA MOCHILA DEL PARTIDO</Text>
           <View style={styles.checklistCard}>
-            {checklistItems.map(item => (
+            {currentChecklist.map(item => (
               <TouchableOpacity 
                 key={item.id}
                 style={styles.checkItemRow}
@@ -410,7 +576,7 @@ export function FamiliaConvocatorias() {
             ))}
           </View>
 
-          {/* 7. RED DE COCHE COMPARTIDO ENTRE FAMILIAS */}
+          {/* 8. RED DE COCHE COMPARTIDO ENTRE FAMILIAS */}
           <View style={styles.carpoolHeaderRow}>
             <Text style={styles.sectionTitleNoMargin}>🚗 COCHE COMPARTIDO & PLAZAS LIBRES</Text>
             <TouchableOpacity style={styles.carpoolActionBtn} onPress={() => setIsOfferCarModalOpen(true)}>
@@ -444,40 +610,6 @@ export function FamiliaConvocatorias() {
                 </TouchableOpacity>
               </View>
             ))}
-          </View>
-
-          {/* 8. TARJETA DE ASISTENCIA CON NOMENCLATURA APROBADA */}
-          <Text style={styles.sectionTitle}>CONFIRMACIÓN DE ASISTENCIA</Text>
-          <View style={styles.attendanceCard}>
-            <Text style={styles.attendanceQuestion}>¿Asistirá {childFirstName} al partido?</Text>
-            <View style={styles.attendanceButtonsRow}>
-              {/* Botón Verde: Asistirá */}
-              <TouchableOpacity 
-                style={[styles.btnAttendance, styles.btnGreen, myStatus === 'confirmado' && styles.btnActiveGlow]}
-                onPress={() => setMyStatus('confirmado')}
-              >
-                <Ionicons name="checkmark-circle" size={18} color={colors.white} style={{ marginRight: 4 }} />
-                <Text style={styles.btnAttendanceTxt}>Asistirá</Text>
-              </TouchableOpacity>
-
-              {/* Botón Rojo: No asistirá */}
-              <TouchableOpacity 
-                style={[styles.btnAttendance, styles.btnRed, myStatus === 'no_disponible' && styles.btnActiveGlow]}
-                onPress={() => setIsAbsenceModalOpen(true)}
-              >
-                <Ionicons name="close-circle" size={18} color={colors.white} style={{ marginRight: 4 }} />
-                <Text style={styles.btnAttendanceTxt}>No asistirá</Text>
-              </TouchableOpacity>
-
-              {/* Botón Naranja: Duda */}
-              <TouchableOpacity 
-                style={[styles.btnAttendance, styles.btnOrange, myStatus === 'duda' && styles.btnActiveGlow]}
-                onPress={() => setMyStatus('duda')}
-              >
-                <Ionicons name="help-circle" size={18} color={colors.white} style={{ marginRight: 4 }} />
-                <Text style={styles.btnAttendanceTxt}>Duda</Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
           {/* 9. ACCIONES RÁPIDAS & DELEGADO DE EQUIPO */}
@@ -517,6 +649,83 @@ export function FamiliaConvocatorias() {
         </View>
       )}
 
+      {/* MODAL DE MOTIVO DE AUSENCIA (EXIGIDO PARA "NO ASISTIRÁ") */}
+      <Modal 
+        visible={isAbsenceModalOpen} 
+        transparent 
+        animationType="slide" 
+        onRequestClose={() => setIsAbsenceModalOpen(false)}
+      >
+        <View style={styles.modalBg}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Motivo de la ausencia</Text>
+            <Text style={styles.modalSub}>Indica por qué {childFirstName} no asistirá al partido.</Text>
+
+            {absenceError && (
+              <View style={styles.modalErrorBox}>
+                <Ionicons name="alert-circle" size={16} color={colors.accentRed} />
+                <Text style={styles.modalErrorText}>{absenceError}</Text>
+              </View>
+            )}
+
+            {ABSENCE_QUICK_REASONS.map((reason, idx) => {
+              const isSelected = selectedReasonOption === reason;
+              return (
+                <TouchableOpacity 
+                  key={idx}
+                  style={[styles.reasonBtn, isSelected && styles.reasonBtnSelected]}
+                  onPress={() => {
+                    setSelectedReasonOption(reason);
+                    setAbsenceError(null);
+                  }}
+                >
+                  <Text style={[styles.reasonTxt, isSelected && styles.reasonTxtSelected]}>{reason}</Text>
+                  {isSelected && <Ionicons name="checkmark-circle" size={18} color={colors.skyPrimary} />}
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* CAMPO DE TEXTO SI SELECCIONA "OTRO MOTIVO" */}
+            {selectedReasonOption === 'Otro motivo' && (
+              <View style={styles.customReasonContainer}>
+                <TextInput
+                  style={styles.customReasonInput}
+                  placeholder="Escribe brevemente el motivo"
+                  placeholderTextColor="rgba(148, 163, 184, 0.6)"
+                  maxLength={300}
+                  multiline
+                  numberOfLines={3}
+                  value={customReasonText}
+                  onChangeText={(txt) => {
+                    setCustomReasonText(txt);
+                    setAbsenceError(null);
+                  }}
+                />
+                <Text style={styles.charCountText}>{customReasonText.length}/300 caracteres</Text>
+              </View>
+            )}
+
+            {/* BOTONES DE ACCIÓN EN EL MODAL */}
+            <View style={styles.modalActionsRow}>
+              <TouchableOpacity 
+                style={styles.modalCancelActionBtn} 
+                onPress={() => setIsAbsenceModalOpen(false)}
+              >
+                <Text style={styles.modalCancelActionTxt}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.modalConfirmActionBtn} 
+                onPress={handleConfirmAbsence}
+              >
+                <Text style={styles.modalConfirmActionTxt}>Confirmar ausencia</Text>
+              </TouchableOpacity>
+            </View>
+
+          </View>
+        </View>
+      </Modal>
+
       {/* MODAL DE SELECCIÓN DE CONTACTO DIRECTO */}
       <Modal visible={!!selectedContactFamily} transparent animationType="fade" onRequestClose={() => setSelectedContactFamily(null)}>
         <View style={styles.modalBgCenter}>
@@ -549,34 +758,6 @@ export function FamiliaConvocatorias() {
 
             <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setSelectedContactFamily(null)}>
               <Text style={styles.modalCancelTxt}>CANCELAR</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* MODAL DE MOTIVO DE AUSENCIA */}
-      <Modal visible={isAbsenceModalOpen} transparent animationType="slide" onRequestClose={() => setIsAbsenceModalOpen(false)}>
-        <View style={styles.modalBg}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>MOTIVO DE LA AUSENCIA</Text>
-            <Text style={styles.modalSub}>Indica el motivo para notificar automáticamente al cuerpo técnico.</Text>
-
-            {['Enfermedad / Fiebre', 'Lesión Muscular', 'Exámenes Escolares', 'Viaje Familiar', 'Problemas de Transporte', 'Otro'].map((reason, idx) => (
-              <TouchableOpacity 
-                key={idx}
-                style={styles.reasonBtn}
-                onPress={() => {
-                  setMyStatus('no_disponible');
-                  setIsAbsenceModalOpen(false);
-                }}
-              >
-                <Text style={styles.reasonTxt}>{reason}</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.skyPrimary} />
-              </TouchableOpacity>
-            ))}
-
-            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsAbsenceModalOpen(false)}>
-              <Text style={styles.modalCloseTxt}>CANCELAR</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -624,10 +805,24 @@ export function FamiliaConvocatorias() {
   );
 }
 
+// Componente exportado con ErrorBoundary envolvente
+export function FamiliaConvocatorias() {
+  return (
+    <FamiliaConvocatoriasErrorBoundary>
+      <FamiliaConvocatoriasContent />
+    </FamiliaConvocatoriasErrorBoundary>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.navyDark },
   content: { padding: 16, paddingBottom: 60 },
   contentTablet: { maxWidth: 900, alignSelf: 'center', width: '100%' },
+
+  // ERROR BOUNDARY
+  errorBoundaryBox: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.navyDark, padding: 24, minHeight: 400 },
+  errorBoundaryTitle: { color: colors.white, fontSize: 18, fontWeight: '900', textAlign: 'center', marginBottom: 8 },
+  errorBoundarySub: { color: colors.textMuted, fontSize: 12, textAlign: 'center', marginBottom: 20, lineHeight: 18 },
 
   // ESTADOS DE CARGA, ERROR Y VACÍO
   stateContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.navyDark, padding: 24, minHeight: 400 },
@@ -658,7 +853,7 @@ const styles = StyleSheet.create({
   statusHeroSub: { color: colors.skyGlow, fontSize: 11, fontWeight: '900', marginTop: 2 },
   statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
   statusConfirmed: { backgroundColor: colors.accentGreen },
-  statusLate: { backgroundColor: colors.accentGold },
+  statusPending: { backgroundColor: colors.accentGold },
   statusAbsent: { backgroundColor: colors.accentRed },
   statusBadgeText: { color: colors.white, fontSize: 10, fontWeight: '900' },
 
@@ -690,6 +885,29 @@ const styles = StyleSheet.create({
   carTitle: { color: colors.accentGold, fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
   carDepartureTxt: { color: colors.white, fontSize: 11, marginTop: 2 },
 
+  // CONFIRMACIÓN DE ASISTENCIA (EXACTAMENTE DOS OPCIONES: ASISTIRÁ / NO ASISTIRÁ)
+  sectionTitle: { fontSize: 11, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 1.5, marginBottom: 10 },
+  sectionTitleNoMargin: { fontSize: 11, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 1.5 },
+  
+  attendanceCard: { backgroundColor: colors.navyCard, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.borderGlow, marginBottom: 20 },
+  attendanceQuestion: { color: colors.white, fontSize: 15, fontWeight: '900', textAlign: 'center', marginBottom: 14 },
+  attendanceButtonsRow: { flexDirection: 'row', gap: 12 },
+  btnAttendance: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 14 },
+  btnGreen: { backgroundColor: colors.accentGreen },
+  btnRed: { backgroundColor: colors.accentRed },
+  btnActiveGlow: { borderWidth: 2, borderColor: colors.white },
+  btnAttendanceTxt: { color: colors.white, fontSize: 13, fontWeight: '900', letterSpacing: 0.5 },
+
+  statusConfirmedBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(16, 185, 129, 0.15)', borderWidth: 1, borderColor: colors.accentGreen, padding: 12, borderRadius: 12, marginTop: 14 },
+  statusConfirmedTxt: { color: colors.accentGreen, fontSize: 13, fontWeight: '900' },
+
+  statusAbsentBox: { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: colors.accentRed, padding: 12, borderRadius: 12, marginTop: 14 },
+  statusAbsentTxt: { color: colors.accentRed, fontSize: 13, fontWeight: '900' },
+  statusReasonSub: { color: colors.textMuted, fontSize: 11, marginTop: 4, fontWeight: '600' },
+
+  statusPendingBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(245, 158, 11, 0.15)', borderWidth: 1, borderColor: colors.accentGold, padding: 12, borderRadius: 12, marginTop: 14 },
+  statusPendingTxt: { color: colors.accentGold, fontSize: 12, fontWeight: '700' },
+
   // CHECKLIST MOCHILA
   checklistCard: { backgroundColor: colors.navyCard, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: colors.borderGlow, gap: 10, marginBottom: 20 },
   checkItemRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -714,20 +932,6 @@ const styles = StyleSheet.create({
   contactBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.skyPrimary, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   contactBtnTxt: { color: colors.navyDark, fontSize: 11, fontWeight: '900' },
 
-  // TARJETA DE CONFIRMACIÓN DE ASISTENCIA
-  sectionTitle: { fontSize: 11, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 1.5, marginBottom: 10 },
-  sectionTitleNoMargin: { fontSize: 11, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 1.5 },
-  
-  attendanceCard: { backgroundColor: colors.navyCard, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.borderGlow, marginBottom: 20 },
-  attendanceQuestion: { color: colors.white, fontSize: 14, fontWeight: '900', textAlign: 'center', marginBottom: 14 },
-  attendanceButtonsRow: { flexDirection: 'row', gap: 8 },
-  btnAttendance: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12 },
-  btnGreen: { backgroundColor: colors.accentGreen },
-  btnRed: { backgroundColor: colors.accentRed },
-  btnOrange: { backgroundColor: colors.accentGold },
-  btnActiveGlow: { borderWidth: 2, borderColor: colors.white },
-  btnAttendanceTxt: { color: colors.white, fontSize: 12, fontWeight: '900' },
-
   // QUICK TOOLS
   quickToolsRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
   toolBtnCard: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.navyCard, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
@@ -742,16 +946,31 @@ const styles = StyleSheet.create({
   hTitle: { color: colors.white, fontSize: 15, fontWeight: '900' },
   hResult: { color: colors.skyGlow, fontSize: 12, fontWeight: '700', marginTop: 2 },
 
-  // MODALES
+  // MODAL DE AUSENCIA
   modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
   modalCard: { backgroundColor: colors.navyCard, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, borderWidth: 1, borderColor: colors.skyPrimary },
   modalTitle: { color: colors.white, fontSize: 18, fontWeight: '900', textAlign: 'center', marginBottom: 4 },
   modalSub: { color: colors.textMuted, fontSize: 12, textAlign: 'center', marginBottom: 16 },
-  reasonBtn: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
-  reasonTxt: { color: colors.white, fontSize: 13, fontWeight: '700' },
-  modalCloseBtn: { marginTop: 16, paddingVertical: 12, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12 },
-  modalCloseTxt: { color: colors.textMuted, fontSize: 12, fontWeight: '900' },
+  
+  modalErrorBox: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(239, 68, 68, 0.2)', padding: 10, borderRadius: 8, marginBottom: 12, borderWidth: 1, borderColor: colors.accentRed },
+  modalErrorText: { color: colors.accentRed, fontSize: 12, fontWeight: '700' },
 
+  reasonBtn: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.03)', marginBottom: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  reasonBtnSelected: { backgroundColor: 'rgba(79, 195, 247, 0.15)', borderColor: colors.skyPrimary },
+  reasonTxt: { color: colors.white, fontSize: 13, fontWeight: '700' },
+  reasonTxtSelected: { color: colors.skyPrimary, fontWeight: '900' },
+
+  customReasonContainer: { marginTop: 4, marginBottom: 12 },
+  customReasonInput: { backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: colors.skyPrimary, borderRadius: 10, padding: 12, color: colors.white, fontSize: 13, minHeight: 70, textAlignVertical: 'top' },
+  charCountText: { color: colors.textMuted, fontSize: 10, textAlign: 'right', marginTop: 4 },
+
+  modalActionsRow: { flexDirection: 'row', gap: 12, marginTop: 12 },
+  modalCancelActionBtn: { flex: 1, paddingVertical: 14, alignItems: 'center', borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.08)' },
+  modalCancelActionTxt: { color: colors.textMuted, fontSize: 13, fontWeight: '800' },
+  modalConfirmActionBtn: { flex: 1, paddingVertical: 14, alignItems: 'center', borderRadius: 12, backgroundColor: colors.accentRed },
+  modalConfirmActionTxt: { color: colors.white, fontSize: 13, fontWeight: '900' },
+
+  // MODALES SECUNDARIOS
   modalBgCenter: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalCardCenter: { width: '100%', maxWidth: 360, backgroundColor: colors.navyCard, borderRadius: 24, padding: 20, alignItems: 'center', borderWidth: 1, borderColor: colors.skyPrimary },
   modalTitleCenter: { color: colors.white, fontSize: 15, fontWeight: '900', marginTop: 10, marginBottom: 4, letterSpacing: 0.5 },
