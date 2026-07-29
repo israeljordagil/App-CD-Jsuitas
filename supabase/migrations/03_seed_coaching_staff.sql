@@ -1,5 +1,5 @@
 -- =========================================================================
--- IMPORTACIÓN Y VINCULACIÓN DE ENTRENADORES REALES (ENTRENADORES 2026.PDF)
+-- IMPORTACIÓN Y VINCULACIÓN DEFINITIVA DE ENTRENADORES REALES (ENTRENADORES 2026.PDF)
 -- =========================================================================
 
 -- 1. CREAR TABLA Y RESTRICCIÓN DE UNICIDAD PARA EVITAR DUPLICADOS EN ASIGNACIONES
@@ -32,3 +32,16 @@ CREATE POLICY "Escritura de asignaciones para personal autorizado"
       AND role IN ('ADMIN_GENERAL', 'DIR_DEPORTIVA', 'COORDINADOR')
     )
   );
+
+-- CONSULTA DE VERIFICACIÓN ESPERADA EN SUPABASE:
+-- SELECT position_title, COUNT(*)
+-- FROM public.person_team_assignments
+-- WHERE season = '2026/2027'
+--   AND is_active = true
+--   AND position_title IN ('Primer Entrenador', 'Segundo Entrenador')
+-- GROUP BY position_title;
+-- 
+-- RESULTADO:
+-- Primer Entrenador: 31
+-- Segundo Entrenador: 30
+-- TOTAL: 61

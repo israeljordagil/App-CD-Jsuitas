@@ -121,7 +121,7 @@ export const INITIAL_PEOPLE: ManagedPerson[] = [
     updatedAt: '2026-07-28T09:15:00Z'
   },
 
-  // 4. ENTRENADORES DEL DOCUMENTO ENTRENADORES 2026 (PERSONAS ÚNICAS REUTILIZADAS EN MULTI-EQUIPO)
+  // 4. ENTRENADORES DEL DOCUMENTO ENTRENADORES 2026 (INCLUYENDO MAX SOLER)
   {
     id: 'a1000001-0000-4000-8000-000000000006',
     code: 'PER-000006',
@@ -842,6 +842,24 @@ export const INITIAL_PEOPLE: ManagedPerson[] = [
     eventHistory: [{ id: 'ev-vic-1', date: '2025-09-01', user: 'Josep Ferrer', action: 'Persona creada', detail: 'Alta de Vicente.' }],
     createdAt: '2025-09-01T08:00:00Z',
     updatedAt: '2026-07-29T00:00:00Z'
+  },
+  {
+    id: 'a1000001-0000-4000-8000-000000000048',
+    code: 'PER-000048',
+    firstName: 'Max',
+    lastName: 'Soler',
+    fullName: 'Max Soler',
+    status: 'ACTIVE',
+    roles: ['ENTRENADOR'],
+    responsibilities: [],
+    teamAssignments: [
+      { id: 'as-msoler-1', teamId: 'b1000001-0000-4000-8000-000000000008', teamName: 'Cadete Femenino', category: 'Cadete', sport: 'Fútbol', positionTitle: 'Segundo Entrenador', season: '2026/2027', isActive: true }
+    ],
+    licenses: [{ id: 'lic-msoler-1', licenseType: 'Sin licencia', isValid: true }],
+    account: { hasAccess: false },
+    eventHistory: [{ id: 'ev-msoler-1', date: '2025-09-01', user: 'Josep Ferrer', action: 'Persona creada', detail: 'Alta de Max Soler (2º Entrenador Cadete Femenino).' }],
+    createdAt: '2025-09-01T08:00:00Z',
+    updatedAt: '2026-07-29T16:15:00Z'
   },
 
   // FAMILIA Y JUGADORES REALES
