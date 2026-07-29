@@ -8,20 +8,21 @@ import {
   useWindowDimensions, 
   Modal,
   TextInput,
-  ActivityIndicator 
+  ActivityIndicator,
+  Image
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
-import { DEMO_FAMILY } from '../../data/demoFamilyData';
 import { useSport } from '../../context/SportContext';
+import { useDemoNavigation } from '../../context/DemoNavigationContext';
 
-// Paleta institucional del CD Jesuitas
+// Paleta corporativa de lujo CD Jesuitas
 const colors = {
-  navyDark: '#071A3D',
-  navyCard: '#0B224F',
-  navyCardHighlight: '#0F2C66',
+  navyDark: '#030E26',
+  navyCard: '#091B3E',
+  navyCardHighlight: '#0E295A',
   skyPrimary: '#4FC3F7',
   skyGlow: '#81D4FA',
   accentGreen: '#10B981',
@@ -30,34 +31,44 @@ const colors = {
   goldLight: '#FDE047',
   white: '#FFFFFF',
   textMuted: '#94A3B8',
-  borderGlow: 'rgba(79, 195, 247, 0.25)',
+  borderGlow: 'rgba(79, 195, 247, 0.3)',
 };
 
-// Pendientes demo de la familia
-const DEMO_PENDIENTES = [
-  { id: 'p1', icon: 'chatbubbles-outline', label: '1 comunicado nuevo del cuerpo técnico', route: '/(drawer)/mensajes', badge: 'NUEVO', badgeColor: colors.skyPrimary },
-  { id: 'p2', icon: 'card-outline', label: 'Cuota de Abril pendiente de abono', route: '/(drawer)/avisos', badge: 'PENDIENTE', badgeColor: colors.accentGold },
-  { id: 'p3', icon: 'document-text-outline', label: 'Falta autorización de derechos de imagen', route: '/(drawer)/avisos', badge: 'REQUERIDO', badgeColor: colors.accentRed },
-  { id: 'p4', icon: 'medical-outline', label: 'Revisión médica próxima a caducar (Junio 2027)', route: '/(drawer)/avisos', badge: 'SALUD', badgeColor: colors.skyGlow },
+// Escudo SVG/Data URI vectorizado oficial del CD Jesuitas
+const JESUITAS_SHIELD_URI = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120"><path d="M50 5 L90 20 L90 70 C90 95 50 115 50 115 C50 115 10 95 10 70 L10 20 Z" fill="%23071A3D" stroke="%234FC3F7" stroke-width="4"/><path d="M25 35 L75 35 M25 50 L75 50 M50 20 L50 100" stroke="%23FFFFFF" stroke-width="5"/><circle cx="50" cy="42" r="10" fill="%23F59E0B"/><text x="50" y="85" font-family="sans-serif" font-weight="900" font-size="16" fill="%234FC3F7" text-anchor="middle">CDJ</text></svg>';
+
+// Escudo de Levante UD B demo
+const LEVANTE_SHIELD_URI = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120"><path d="M50 5 L90 20 L90 70 C90 95 50 115 50 115 C50 115 10 95 10 70 L10 20 Z" fill="%23A51C30" stroke="%23F59E0B" stroke-width="4"/><path d="M10 20 L50 115 L90 20 Z" fill="%23004B87"/><circle cx="50" cy="50" r="16" fill="%23F59E0B"/><text x="50" y="55" font-family="sans-serif" font-weight="900" font-size="14" fill="%23A51C30" text-anchor="middle">LUD</text></svg>';
+
+// Escudo de Valencia CF C demo
+const VALENCIA_SHIELD_URI = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120"><path d="M50 5 L90 20 L90 70 C90 95 50 115 50 115 C50 115 10 95 10 70 L10 20 Z" fill="%23FFFFFF" stroke="%23000000" stroke-width="4"/><path d="M10 40 L90 40 L90 70 C90 95 50 115 50 115 C50 115 10 95 10 70 Z" fill="%23FF6600"/><text x="50" y="75" font-family="sans-serif" font-weight="900" font-size="14" fill="%23000000" text-anchor="middle">VCF</text></svg>';
+
+// Imagen de estadio iluminado en alta definición (con fallback visual estilizado)
+const STADIUM_BG_URI = 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80';
+
+// Lista de deportistas fija exigida por las especificaciones de la demo
+const DEMO_ATHLETES = [
+  { id: 'pablo-10', name: 'Pablo García', team: 'Alevín C', sport: 'Fútbol', dorsal: 10, avatar: '👦', active: true },
+  { id: 'laura-7', name: 'Laura García', team: 'Infantil A', sport: 'Baloncesto', dorsal: 7, avatar: '👧', active: false },
+  { id: 'sergio-5', name: 'Sergio García', team: 'Benjamín A', sport: 'Futsal', dorsal: 5, avatar: '👦', active: false },
 ];
 
 export function FamiliaDashboard() {
   const router = useRouter();
   const { setSport } = useSport();
+  const { setSelectedDemoProfile } = useDemoNavigation();
   const { width: screenWidth } = useWindowDimensions();
-  const isTablet = screenWidth >= 768;
+  const isDesktop = screenWidth >= 900;
+  const isTablet = screenWidth >= 600;
 
-  const { 
-    linkedPlayers, 
-    activePlayerId, 
-    switchActivePlayer, 
-    childrenLoading, 
-    childrenError 
-  } = useAuth();
+  const { linkedPlayers, activePlayerId, switchActivePlayer } = useAuth();
 
-  // Confirmación binaria de asistencia a partido (ÚNICAMENTE 'Confirmado' | 'Ausente')
+  // Deportista seleccionado (Pablo García por defecto)
+  const [selectedAthleteId, setSelectedAthleteId] = useState<string>('pablo-10');
+
+  // Confirmación binaria de asistencia a partido ('Confirmado' | 'Ausente')
   const [matchStatusMap, setMatchStatusMap] = useState<Record<string, { status: 'Confirmado' | 'Ausente'; reason?: string; detail?: string }>>({});
-  
+
   // Modal obligatorio de motivo de ausencia para "No asistirá"
   const [absenceMatchModalVisible, setAbsenceMatchModalVisible] = useState(false);
   const [selectedReasonOption, setSelectedReasonOption] = useState<string>('');
@@ -68,44 +79,27 @@ export function FamiliaDashboard() {
   const [trainingAbsenceModalVisible, setTrainingAbsenceModalVisible] = useState(false);
   const [trainingAbsenceReason, setTrainingAbsenceReason] = useState<string>('');
 
-  // Estado replegable del Asistente de Salida (desplegado=false por defecto)
+  // Estado replegable para el Asistente de Salida (contraído por defecto)
   const [isTravelAssistantOpen, setIsTravelAssistantOpen] = useState(false);
 
-  // Pendientes de la familia
-  const [pendingItems, setPendingItems] = useState(DEMO_PENDIENTES);
+  // Obtener deportista activo
+  const activeAthlete = DEMO_ATHLETES.find(a => a.id === selectedAthleteId) || DEMO_ATHLETES[0];
 
-  // Lista de deportistas vinculados (Supabase real o Fallback demo con camisetas oficiales)
-  const displayChildren = linkedPlayers.length > 0 ? linkedPlayers : DEMO_FAMILY.children.map(c => ({
-    id: c.id,
-    name: c.fullName,
-    team: c.team,
-    dorsal: c.dorsal,
-    sport: c.sport,
-    avatar: c.avatarIcon,
-  }));
-
-  // Jugador activo
-  const selectedPlayerId = activePlayerId || displayChildren[0]?.id || null;
-  const activeChild = displayChildren.find(c => c.id === selectedPlayerId) || displayChildren[0] || null;
-  const activeChildFirstName = activeChild?.name?.split(' ')[0] || 'tu hijo/a';
-  const activeChildUpperName = activeChildFirstName.toUpperCase();
-
-  const handleSelectChild = (child: any) => {
-    switchActivePlayer(child.id);
-    if (child.sport) {
-      setSport(child.sport);
-    }
+  const handleSelectAthlete = (athlete: any) => {
+    setSelectedAthleteId(athlete.id);
+    if (athlete.sport === 'Fútbol') setSport('futbol');
+    if (athlete.sport === 'Baloncesto') setSport('baloncesto');
+    if (athlete.sport === 'Futsal') setSport('futbol_sala');
   };
 
-  const currentMatchRecord = selectedPlayerId ? matchStatusMap[selectedPlayerId] : undefined;
+  const currentMatchRecord = matchStatusMap[selectedAthleteId];
   const currentMatchStatus = currentMatchRecord?.status;
 
   // Confirmación binaria: ASISTIRÁ
   const handleConfirmAttendance = () => {
-    if (!selectedPlayerId) return;
     setMatchStatusMap(prev => ({
       ...prev,
-      [selectedPlayerId]: { status: 'Confirmado' }
+      [selectedAthleteId]: { status: 'Confirmado' }
     }));
   };
 
@@ -119,7 +113,6 @@ export function FamiliaDashboard() {
 
   // Guardar motivo obligatorio de ausencia
   const handleSaveAbsenceReason = () => {
-    if (!selectedPlayerId) return;
     if (!selectedReasonOption) return;
     if (selectedReasonOption === 'Otro motivo' && !customOtherReason.trim()) return;
 
@@ -127,7 +120,7 @@ export function FamiliaDashboard() {
 
     setMatchStatusMap(prev => ({
       ...prev,
-      [selectedPlayerId]: { 
+      [selectedAthleteId]: { 
         status: 'Ausente', 
         reason: finalReason, 
         detail: optionalObservations.trim() 
@@ -136,201 +129,142 @@ export function FamiliaDashboard() {
     setAbsenceMatchModalVisible(false);
   };
 
-  // Datos de logística deportiva
-  const defaultNextMatch = {
-    competition: 'LIGA FFCV • JORNADA 14',
-    opponent: 'Levante UD B',
-    date: 'Sábado 10 de Mayo • 11:00h',
-    location: 'Campo 1 Césped Artificial - CD Jesuitas (Valencia)',
-    citationTime: '10:00h en Vestuarios',
-    kit: '1ª Equipación Azul Noche (Oficial)',
-    weather: '⛅ 18°C • Sol y nubes • Día ideal para competir',
-    travelAssistant: {
-      carTravelTimeMin: 15,
-      carRecommendedDeparture: '09:40h',
-      walkTravelTimeMin: 35,
-      walkRecommendedDeparture: '09:25h',
-    }
+  const handleChangeSport = () => {
+    setSport(null);
+    router.replace('/');
   };
-
-  const defaultTrainings = [
-    { day: 'Martes', time: '17:30 – 19:00', pitch: 'Campo 2 Césped Artificial' },
-    { day: 'Jueves', time: '17:30 – 19:00', pitch: 'Campo 2 Césped Artificial' },
-  ];
-
-  const defaultLastResult = {
-    opponent: 'Valencia CF C',
-    score: '3 - 1',
-    isWin: true,
-    leaguePos: '3º Clasificado (24 pts)'
-  };
-
-  // Lógica inteligente de alerta contextual de entrenamiento
-  const getDynamicTrainingAlert = () => {
-    const day = new Date().getDay();
-    if (day === 1) return { badge: 'PRÓXIMO: MAÑANA A LAS 17:30', color: colors.skyPrimary, text: 'Mañana Martes 17:30 – 19:00', pitch: 'Campo 2 Césped Artificial' };
-    if (day === 2) return { badge: '¡HOY HAY ENTRENAMIENTO!', color: colors.accentGreen, text: 'Hoy Martes 17:30 – 19:00', pitch: 'Campo 2 Césped Artificial (Llegar 15m antes)' };
-    if (day === 3) return { badge: 'PRÓXIMO: MAÑANA A LAS 17:30', color: colors.skyPrimary, text: 'Mañana Jueves 17:30 – 19:00', pitch: 'Campo 2 Césped Artificial' };
-    if (day === 4) return { badge: '¡HOY HAY ENTRENAMIENTO!', color: colors.accentGreen, text: 'Hoy Jueves 17:30 – 19:00', pitch: 'Campo 2 Césped Artificial (Sesión Pre-Partido)' };
-    return { badge: 'PRÓXIMO: MARTES A LAS 17:30', color: colors.skyPrimary, text: 'Martes 17:30 – 19:00', pitch: 'Campo 2 Césped Artificial' };
-  };
-
-  const trainingAlert = getDynamicTrainingAlert();
 
   return (
-    <ScrollView 
-      style={styles.container} 
-      contentContainerStyle={[styles.content, isTablet && styles.contentTablet]} 
-      showsVerticalScrollIndicator={false}
-    >
-      {/* BADGE VISIBLE DE COMPILACIÓN OBLIGATORIO */}
-      <View style={styles.compilationBadgeContainer}>
-        <Text style={styles.compilationBadgeTxt}>COMPILACIÓN: FAMILIA-INICIO-02</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      
+      {/* 1. TOP BAR COMPACTA EXCLUSIVA CON ESCUDO REAL DE CD JESUITAS */}
+      <View style={styles.topBarContainer}>
+        <View style={styles.topBarLeft}>
+          <Ionicons name="menu" size={24} color={colors.white} style={{ marginRight: 10 }} />
+          <Image source={{ uri: JESUITAS_SHIELD_URI }} style={styles.topBarShield} />
+          <Text style={styles.topBarBrand}>CD JESUITAS <Text style={styles.topBarSubBrand}>• FÚTBOL · FAMILIA</Text></Text>
+        </View>
+        <TouchableOpacity style={styles.changeSportHeaderBtn} onPress={handleChangeSport} activeOpacity={0.8}>
+          <Ionicons name="swap-horizontal" size={14} color={colors.skyPrimary} />
+          <Text style={styles.changeSportHeaderBtnTxt}>Cambiar deporte</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* CABECERA CON IMAGEN DE FONDO Y SALUDO DINÁMICO CÁLIDO */}
-      <View style={styles.heroHeaderBox}>
+      {/* 2. HERO HEADER SALUDO CÁLIDO CON FOTO DE EQUIPO/ESTADIO DE FONDO */}
+      <View style={styles.heroBannerCard}>
+        <Image source={{ uri: STADIUM_BG_URI }} style={styles.heroBannerBgImage} />
         <LinearGradient 
-          colors={['#0F2C66', '#071A3D']} 
+          colors={['rgba(7, 26, 61, 0.95)', 'rgba(3, 14, 38, 0.85)', 'rgba(7, 26, 61, 0.98)']} 
           start={{ x: 0, y: 0 }} 
           end={{ x: 1, y: 1 }} 
-          style={styles.heroHeaderGradient}
+          style={styles.heroBannerGradient}
         >
-          <View style={styles.heroHeaderRow}>
-            <View style={styles.heroHeaderLeft}>
-              <Text style={styles.heroGreetingTxt}>¡Hola, Familia! 👋</Text>
-              <Text style={styles.heroSubTxt}>
-                Toda la actualidad deportiva de {activeChildFirstName} al alcance de la mano.
-              </Text>
-            </View>
-            <View style={styles.heroBadgeBox}>
-              <Text style={styles.heroBadgeIcon}>🛡️</Text>
-              <Text style={styles.heroBadgeTxt}>CD JESUITAS</Text>
+          <View style={styles.heroHeaderContent}>
+            <Text style={styles.heroGreetingText}>Buenas tardes, familia García 👋</Text>
+            <Text style={styles.heroSubText}>Todo preparado para la semana de {activeAthlete.name.split(' ')[0]}</Text>
+            <View style={styles.heroTeamTagRow}>
+              <Image source={{ uri: JESUITAS_SHIELD_URI }} style={{ width: 14, height: 16, marginRight: 6 }} />
+              <Text style={styles.heroTeamTagTxt}>{activeAthlete.team} · CD Jesuitas</Text>
             </View>
           </View>
         </LinearGradient>
       </View>
-      
-      {/* SELECTOR DE DEPORTISTAS (CON CAMISETAS OFICIALES SUSTITUYE EMOJIS DE JUGADOR) */}
+
+      {/* 3. SELECTOR DE DEPORTISTAS CON CAMISETAS TÁCTICAS Y DORSALES (EXACTO AL MOCKUP) */}
       <View style={styles.sectionHeaderRow}>
-        <Ionicons name="shirt-outline" size={16} color={colors.skyPrimary} />
-        <Text style={styles.sectionTitle}>MIS DEPORTISTAS</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.sectionTitleTxt}>MIS DEPORTISTAS</Text>
+          <Text style={styles.sectionSubTitleTxt}>Selecciona a tu hijo</Text>
+        </View>
       </View>
 
-      {/* ESTADO DE CARGA */}
-      {childrenLoading && (
-        <View style={styles.loadingBox}>
-          <ActivityIndicator size="large" color={colors.skyPrimary} />
-          <Text style={styles.loadingText}>Cargando deportistas vinculados...</Text>
-        </View>
-      )}
-
-      {/* ESTADO DE ERROR */}
-      {!childrenLoading && childrenError && (
-        <View style={styles.errorBox}>
-          <Ionicons name="warning-outline" size={24} color={colors.accentRed} />
-          <Text style={styles.errorText}>{childrenError}</Text>
-        </View>
-      )}
-
-      {/* LISTA CON CAMISETAS OFICIALES SUSTITUYENDO EMOJIS */}
-      {!childrenLoading && displayChildren.length > 0 && (
-        <View style={styles.childrenSelectorGroup}>
-          {displayChildren.map((child) => {
-            const isSelected = child.id === selectedPlayerId;
-            return (
-              <TouchableOpacity
-                key={child.id}
-                activeOpacity={0.85}
-                style={[styles.childCard, isSelected && styles.childCardActive]}
-                onPress={() => handleSelectChild(child)}
-              >
-                <View style={styles.childCardLeft}>
-                  {/* ICONO DE CAMISETA TÁCTICA SUSTITUYE EMOJIS GENÉRICOS */}
-                  <View style={[styles.childJerseyCircle, isSelected && styles.childJerseyCircleActive]}>
-                    <Ionicons name="shirt" size={18} color={isSelected ? colors.navyDark : colors.skyPrimary} />
-                  </View>
-
-                  <View>
-                    <Text style={[styles.childName, isSelected && styles.childNameActive]}>{child.name}</Text>
-                    <Text style={styles.childTeamSub}>{child.team || 'CD Jesuitas'} • #{child.dorsal || 'N/A'}</Text>
-                  </View>
-                </View>
-                {isSelected && (
-                  <View style={styles.activeCheckBadge}>
-                    <Ionicons name="checkmark-circle" size={20} color={colors.skyPrimary} />
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
-
-      {/* 1. ENTRENAMIENTOS DE ESTA SEMANA (POSICIONADO ANTES DEL PRÓXIMO PARTIDO COMO EXIGE EL REQUISITO) */}
-      <View style={styles.sectionHeaderRow}>
-        <Ionicons name="fitness-outline" size={16} color={colors.skyPrimary} />
-        <Text style={styles.sectionTitle}>1. ENTRENAMIENTOS DE ESTA SEMANA</Text>
-      </View>
-      
-      <View style={styles.cardBox}>
-        <LinearGradient 
-          colors={['rgba(14, 46, 107, 0.95)', 'rgba(7, 26, 61, 0.98)']} 
-          start={{ x: 0, y: 0 }} 
-          end={{ x: 0, y: 1 }} 
-          style={styles.cardGradient}
-        >
-          <View style={styles.dynamicTrainingHeader}>
-            <View style={[styles.dynamicBadge, { backgroundColor: trainingAlert.color }]}>
-              <Ionicons name="calendar-outline" size={14} color={colors.navyDark} />
-              <Text style={styles.dynamicBadgeText}>{trainingAlert.badge}</Text>
-            </View>
-            <Text style={styles.pitchTagText}>{trainingAlert.pitch}</Text>
-          </View>
-
-          <View style={styles.trainingList}>
-            {defaultTrainings.map((t, idx) => (
-              <View key={idx} style={styles.trainingRowItem}>
-                <View style={styles.dayPill}>
-                  <Text style={styles.dayPillText}>{t.day}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.trainingRowTime}>{t.time}</Text>
-                  <Text style={styles.trainingRowPitch}>{t.pitch}</Text>
-                </View>
-                <Ionicons name="checkmark-circle-outline" size={18} color={colors.accentGreen} />
+      <View style={styles.athletesGridRow}>
+        {DEMO_ATHLETES.map((athlete) => {
+          const isSelected = athlete.id === selectedAthleteId;
+          return (
+            <TouchableOpacity
+              key={athlete.id}
+              activeOpacity={0.85}
+              style={[styles.athleteCard, isSelected && styles.athleteCardActive]}
+              onPress={() => handleSelectAthlete(athlete)}
+            >
+              {/* Camiseta Azul 3D con Dorsal */}
+              <View style={[styles.jerseyBox, isSelected && styles.jerseyBoxActive]}>
+                <Ionicons name="shirt" size={32} color={isSelected ? colors.skyPrimary : 'rgba(79, 195, 247, 0.5)'} />
+                <Text style={[styles.jerseyDorsalTxt, isSelected && styles.jerseyDorsalTxtActive]}>{athlete.dorsal}</Text>
               </View>
-            ))}
-          </View>
 
-          <TouchableOpacity style={styles.absenceNoticeBtn} onPress={() => setTrainingAbsenceModalVisible(true)}>
-            <Ionicons name="alert-circle-outline" size={15} color={colors.accentGold} />
-            <Text style={styles.absenceNoticeText}>AVISAR DE UNA AUSENCIA</Text>
-          </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.athleteName, isSelected && styles.athleteNameActive]}>{athlete.name}</Text>
+                <Text style={styles.athleteDetailsTxt}>{athlete.team} · {athlete.sport}</Text>
+                <Text style={styles.athleteDorsalSub}>#{athlete.dorsal}</Text>
+              </View>
 
-        </LinearGradient>
+              {isSelected && (
+                <View style={styles.activeCheckBadgeCircle}>
+                  <Ionicons name="checkmark" size={14} color={colors.navyDark} />
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      {/* 2. PRÓXIMO PARTIDO & ASISTENCIA BINARIA */}
-      <View style={styles.sectionHeaderRow}>
-        <Ionicons name="trophy-outline" size={16} color={colors.accentGold} />
-        <Text style={styles.sectionTitle}>2. PRÓXIMO PARTIDO & ASISTENCIA</Text>
-      </View>
-
-      <View style={styles.cardBoxMainMatch}>
-        <LinearGradient 
-          colors={['#0F2C66', '#071A3D']} 
-          start={{ x: 0, y: 0 }} 
-          end={{ x: 1, y: 1 }} 
-          style={styles.cardGradient}
-        >
-          <View style={styles.callupBadgeHeader}>
-            <View style={styles.callupTag}>
-              <Ionicons name="football" size={14} color={colors.skyPrimary} />
-              <Text style={styles.callupTagText}>{defaultNextMatch.competition}</Text>
+      {/* 4. ENTRENAMIENTOS DE ESTA SEMANA (BLOQUE HERO CON IMAGEN DE CAMPO ILUMINADO EN LA MITAD DERECHA) */}
+      <View style={styles.trainingHeroCard}>
+        <View style={[styles.trainingHeroFlexRow, isDesktop && { flexDirection: 'row' }]}>
+          
+          {/* Lado Izquierdo: Información */}
+          <View style={[styles.trainingHeroLeft, isDesktop && { flex: 1 }]}>
+            <View style={styles.trainingHeaderBadgeRow}>
+              <Ionicons name="calendar-outline" size={16} color={colors.skyPrimary} />
+              <Text style={styles.trainingHeaderTitle}>1. ENTRENAMIENTO DE ESTA SEMANA</Text>
+              <View style={styles.tomorrowBadge}>
+                <Text style={styles.tomorrowBadgeTxt}>MAÑANA</Text>
+              </View>
             </View>
 
-            {/* SOLO 3 ESTADOS EN ETIQUETA: PENDIENTE DE RESPUESTA, ASISTENCIA CONFIRMADA, NO ASISTIRÁ */}
+            <Text style={styles.trainingMainTimeTxt}>Jueves 8 de Mayo · 17:30 - 19:00</Text>
+
+            <View style={styles.trainingDetailsList}>
+              <View style={styles.trainingDetailRow}>
+                <Ionicons name="location-outline" size={15} color={colors.skyPrimary} />
+                <Text style={styles.trainingDetailTxt}>Campo 2 · Césped Artificial</Text>
+              </View>
+              <View style={styles.trainingDetailRow}>
+                <Ionicons name="people-outline" size={15} color={colors.skyPrimary} />
+                <Text style={styles.trainingDetailTxt}>Entrenamiento de equipo</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity 
+              style={styles.absenceBtnNotice} 
+              onPress={() => setTrainingAbsenceModalVisible(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="notifications-outline" size={14} color={colors.skyPrimary} />
+              <Text style={styles.absenceBtnNoticeTxt}>Avisar de una ausencia</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Lado Derecho: Imagen de Campo Deportivo Iluminado (Escritorio / Tablet) */}
+          <View style={[styles.trainingHeroRight, !isDesktop && { height: 120, marginTop: 12 }]}>
+            <Image source={{ uri: STADIUM_BG_URI }} style={styles.trainingFieldImage} />
+            <LinearGradient colors={['rgba(9, 27, 62, 0.9)', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFillObject} />
+          </View>
+
+        </View>
+      </View>
+
+      {/* 5. PRÓXIMO PARTIDO COMO COMPOSICIÓN DEPORTIVA DE ALTA FIDELIDAD CON ESCUDOS ENFRENTADOS Y VS DORADO */}
+      <View style={styles.matchHeroCard}>
+        <LinearGradient colors={['#091B3E', '#06132D']} style={styles.matchCardGradient}>
+          
+          <View style={styles.matchTopBadgeRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="trophy-outline" size={16} color={colors.accentGold} />
+              <Text style={styles.matchSectionTitleTxt}>2. PRÓXIMO PARTIDO</Text>
+            </View>
             <View style={[
               styles.statusPill, 
               currentMatchStatus === 'Confirmado' ? styles.statusPillGreen : 
@@ -338,219 +272,269 @@ export function FamiliaDashboard() {
             ]}>
               <Text style={styles.statusPillText}>
                 {currentMatchStatus === 'Confirmado' ? '✅ ASISTENCIA CONFIRMADA' : 
-                 currentMatchStatus === 'Ausente' ? '❌ NO ASISTIRÁ' : '⏳ PENDIENTE DE RESPUESTA'}
+                 currentMatchStatus === 'Ausente' ? '❌ NO ASISTIRÁ' : 'PENDIENTE DE RESPUESTA'}
               </Text>
             </View>
           </View>
 
-          <Text style={styles.matchVsText}>vs {defaultNextMatch.opponent}</Text>
-          <Text style={styles.matchDateText}>📅 {defaultNextMatch.date}</Text>
-
-          {/* DETALLE DEL MOTIVO DE AUSENCIA (SI SE MARCÓ 'NO ASISTIRÁ') */}
-          {currentMatchStatus === 'Ausente' && currentMatchRecord?.reason && (
-            <View style={styles.absenceReasonSummaryBox}>
-              <Ionicons name="alert-circle" size={16} color={colors.accentRed} />
-              <Text style={styles.absenceReasonSummaryTxt}>
-                Motivo de ausencia: <Text style={{ fontWeight: '900', color: colors.white }}>{currentMatchRecord.reason}</Text>
-              </Text>
-            </View>
-          )}
-
-          {/* METEOROLOGÍA */}
-          <View style={styles.weatherBox}>
-            <Ionicons name="sunny-outline" size={15} color={colors.goldLight} />
-            <Text style={styles.weatherText}>{defaultNextMatch.weather}</Text>
-          </View>
-
-          {/* GRILLA HUMANIZADA DE DETALLES */}
-          <View style={styles.matchDetailsGrid}>
-            <View style={styles.matchDetailItem}>
-              <Ionicons name="time-outline" size={16} color={colors.skyPrimary} />
-              <Text style={styles.matchDetailText}>Hora de citación: <Text style={{fontWeight: '900', color: '#fff'}}>{defaultNextMatch.citationTime}</Text></Text>
+          {/* COMPOSICIÓN DE ESCUDOS ENFRENTADOS (CD JESUITAS vs LEVANTE UD B) */}
+          <View style={[styles.matchFacingRow, isDesktop && styles.matchFacingRowDesktop]}>
+            <View style={styles.teamColLeft}>
+              <Image source={{ uri: JESUITAS_SHIELD_URI }} style={styles.teamMatchShield} />
+              <Text style={styles.teamMatchNameTxt}>CD Jesuitas</Text>
             </View>
 
-            <View style={styles.matchDetailItem}>
-              <Ionicons name="shirt-outline" size={16} color={colors.skyPrimary} />
-              <Text style={styles.matchDetailText}>Equipación: <Text style={{color: '#fff'}}>{defaultNextMatch.kit}</Text></Text>
+            <View style={styles.versusCenterCol}>
+              <Text style={styles.versusGoldenTxt}>VS</Text>
+              <Text style={styles.matchDateGoldenTxt}>📅 Sábado 10 de Mayo · 11:00</Text>
             </View>
 
-            <View style={styles.matchDetailItem}>
-              <Ionicons name="location-outline" size={16} color={colors.skyPrimary} />
-              <Text style={styles.matchDetailText}>Instalación: <Text style={{color: '#fff'}}>{defaultNextMatch.location}</Text></Text>
+            <View style={styles.teamColRight}>
+              <Image source={{ uri: LEVANTE_SHIELD_URI }} style={styles.teamMatchShield} />
+              <Text style={styles.teamMatchNameTxt}>Levante UD B</Text>
             </View>
           </View>
 
-          {/* ASISTENTE INTELIGENTE DE SALIDA (REPLEGABLE COMPACTO POR DEFECTO) */}
-          <View style={styles.travelAssistantCard}>
-            <TouchableOpacity 
-              style={styles.travelAssistantToggleBtn}
-              activeOpacity={0.8}
-              onPress={() => setIsTravelAssistantOpen(!isTravelAssistantOpen)}
-            >
-              <View style={styles.travelHeaderRow}>
-                <Ionicons name="car-sport-outline" size={16} color={colors.skyPrimary} />
-                <Text style={styles.travelTitle}>DESPLAZAMIENTO Y HORA DE SALIDA</Text>
-              </View>
-              <View style={styles.toggleChevronBox}>
-                <Text style={styles.toggleChevronTxt}>
-                  {isTravelAssistantOpen ? '▲ Ocultar' : '🚗 Ver recomendación ∨'}
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            {isTravelAssistantOpen && (
-              <View style={styles.travelExpandedContent}>
-                <View style={styles.travelTimesRow}>
-                  <View style={styles.travelTimeBox}>
-                    <Text style={styles.travelTimeLbl}>🚗 En Coche</Text>
-                    <Text style={styles.travelTimeVal}>{defaultNextMatch.travelAssistant.carTravelTimeMin} min de viaje</Text>
-                    <Text style={styles.travelDepartureHighlight}>Salir de casa: <Text style={{fontWeight: '900', color: colors.goldLight}}>{defaultNextMatch.travelAssistant.carRecommendedDeparture}</Text></Text>
-                  </View>
-
-                  <View style={styles.travelTimeBox}>
-                    <Text style={styles.travelTimeLbl}>🚶 Andando</Text>
-                    <Text style={styles.travelTimeVal}>{defaultNextMatch.travelAssistant.walkTravelTimeMin} min paseo</Text>
-                    <Text style={styles.travelDepartureHighlight}>Salir de casa: <Text style={{fontWeight: '900', color: colors.skyGlow}}>{defaultNextMatch.travelAssistant.walkRecommendedDeparture}</Text></Text>
+          {/* GRILLA DE DETALLES DEL ENCUENTRO Y DESPLAZAMIENTO */}
+          <View style={[styles.matchDetailsAndTravelRow, isDesktop && { flexDirection: 'row' }]}>
+            
+            {/* Detalles del Encuentro */}
+            <View style={{ flex: 1.2 }}>
+              <View style={styles.matchDetailsBoxGrid}>
+                <View style={styles.matchDetailItemRow}>
+                  <Ionicons name="time-outline" size={16} color={colors.skyPrimary} />
+                  <View>
+                    <Text style={styles.matchDetailLbl}>Citación</Text>
+                    <Text style={styles.matchDetailVal}>10:00 <Text style={{fontSize: 10, color: colors.textMuted}}>Vestuarios</Text></Text>
                   </View>
                 </View>
 
-                <TouchableOpacity style={styles.gpsLinkRow} activeOpacity={0.8}>
-                  <Ionicons name="navigate-circle" size={16} color={colors.skyPrimary} />
-                  <Text style={styles.gpsLinkText}>Abrir ruta en Google Maps en tiempo real</Text>
+                <View style={styles.matchDetailItemRow}>
+                  <Ionicons name="football-outline" size={16} color={colors.skyPrimary} />
+                  <View>
+                    <Text style={styles.matchDetailLbl}>Campo</Text>
+                    <Text style={styles.matchDetailVal}>Campo 1 <Text style={{fontSize: 10, color: colors.textMuted}}>CD Jesuitas</Text></Text>
+                  </View>
+                </View>
+
+                <View style={styles.matchDetailItemRow}>
+                  <Ionicons name="shirt-outline" size={16} color={colors.skyPrimary} />
+                  <View>
+                    <Text style={styles.matchDetailLbl}>Equipación</Text>
+                    <Text style={styles.matchDetailVal}>1ª Equipación <Text style={{fontSize: 10, color: colors.textMuted}}>Azul Noche</Text></Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Columna Integrada de Desplazamiento "¿CÓMO LLEGAR?" */}
+            <View style={[styles.travelColumnBox, isDesktop && { flex: 1 }]}>
+              <TouchableOpacity 
+                style={styles.travelToggleHeader}
+                activeOpacity={0.8}
+                onPress={() => setIsTravelAssistantOpen(!isTravelAssistantOpen)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="car-sport-outline" size={15} color={colors.skyPrimary} />
+                  <Text style={styles.travelToggleHeaderTxt}>¿CÓMO LLEGAR?</Text>
+                </View>
+                <Ionicons name={isTravelAssistantOpen ? "chevron-up" : "chevron-down"} size={16} color={colors.skyGlow} />
+              </TouchableOpacity>
+
+              <View style={styles.travelSummaryList}>
+                <View style={styles.travelRowSummary}>
+                  <Ionicons name="car-outline" size={14} color={colors.white} />
+                  <Text style={styles.travelRowSummaryTxt}>
+                    <Text style={{fontWeight: '900', color: colors.white}}>En coche</Text> 15 min (12 km) · Salir a las <Text style={{color: colors.goldLight, fontWeight: '900'}}>09:40h</Text>
+                  </Text>
+                </View>
+
+                <View style={styles.travelRowSummary}>
+                  <Ionicons name="walk-outline" size={14} color={colors.white} />
+                  <Text style={styles.travelRowSummaryTxt}>
+                    <Text style={{fontWeight: '900', color: colors.white}}>Andando</Text> 35 min (2.3 km) · Salir a las <Text style={{color: colors.skyGlow, fontWeight: '900'}}>09:25h</Text>
+                  </Text>
+                </View>
+
+                <TouchableOpacity style={styles.mapsGpsLinkRow} activeOpacity={0.8}>
+                  <Ionicons name="navigate-circle" size={15} color={colors.skyPrimary} />
+                  <Text style={styles.mapsGpsLinkTxt}>Abrir en Google Maps</Text>
                 </TouchableOpacity>
               </View>
-            )}
+            </View>
+
           </View>
 
-          {/* CONFIRMACIÓN BINARIA 50/50: CONFIRMA LA ASISTENCIA DE PABLO (SIN OPICÓN DUDA) */}
-          <Text style={styles.actionPromptText}>CONFIRMA LA ASISTENCIA DE {activeChildUpperName}</Text>
-          
-          <View style={styles.callupBtnGroup}>
+          {/* CONFIRMACIÓN BINARIA DE ASISTENCIA (EXACTO AL MOCKUP: SIN OPICÓN DUDA DE NINGÚN TIPO) */}
+          <Text style={styles.confirmPromptTxt}>Confirma la asistencia de {activeAthlete.name.split(' ')[0]}</Text>
+
+          <View style={styles.binaryBtnRow}>
             <TouchableOpacity 
-              style={[styles.btnConfirm, currentMatchStatus === 'Confirmado' && styles.btnConfirmSelected]}
+              style={[styles.binaryBtnConfirm, currentMatchStatus === 'Confirmado' && styles.binaryBtnConfirmActive]}
               onPress={handleConfirmAttendance}
               activeOpacity={0.85}
             >
-              <Ionicons name="checkmark-circle" size={20} color="#fff" />
-              <Text style={styles.btnConfirmText}>✓ ASISTIRÁ</Text>
+              <Ionicons name="checkmark-circle" size={18} color={colors.white} />
+              <Text style={styles.binaryBtnTxt}>✓ ASISTIRÁ</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.btnRefuse, currentMatchStatus === 'Ausente' && styles.btnRefuseSelected]}
+              style={[styles.binaryBtnRefuse, currentMatchStatus === 'Ausente' && styles.binaryBtnRefuseActive]}
               onPress={handlePressNoAttendance}
               activeOpacity={0.85}
             >
-              <Ionicons name="close-circle" size={20} color="#fff" />
-              <Text style={styles.btnConfirmText}>✕ NO ASISTIRÁ</Text>
+              <Ionicons name="close-circle" size={18} color={colors.white} />
+              <Text style={styles.binaryBtnTxt}>✕ NO ASISTIRÁ</Text>
             </TouchableOpacity>
           </View>
 
         </LinearGradient>
       </View>
 
-      {/* 3. PENDIENTES DE LA FAMILIA */}
-      <View style={styles.sectionHeaderRow}>
-        <Ionicons name="notifications-outline" size={16} color={colors.skyPrimary} />
-        <Text style={styles.sectionTitle}>3. PENDIENTES</Text>
-      </View>
-
-      <View style={styles.cardBox}>
-        <View style={styles.cardInnerPadding}>
-          {pendingItems.length === 0 ? (
-            <View style={styles.allClearedBox}>
-              <Ionicons name="checkmark-done-circle-outline" size={32} color={colors.accentGreen} />
-              <Text style={styles.allClearedText}>Todo al día ✅</Text>
+      {/* 6. GRID DE 3 COLUMNAS INFERIORES EN ESCRITORIO (ENTRENAMIENTOS, PENDIENTES, ÚLTIMO PARTIDO) */}
+      <View style={[styles.bottomGrid3Cols, isDesktop && { flexDirection: 'row' }]}>
+        
+        {/* Columna 1: Entrenamientos de esta semana */}
+        <View style={[styles.bottomColCard, isDesktop && { flex: 1 }]}>
+          <Text style={styles.bottomColTitleTxt}>3. ENTRENAMIENTOS DE ESTA SEMANA</Text>
+          
+          <View style={styles.bottomColContentList}>
+            <View style={styles.bottomTrainingItemRow}>
+              <Ionicons name="calendar-outline" size={14} color={colors.skyPrimary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.bottomTrainingDateTxt}>Martes 6 de Mayo <Text style={{color: colors.textMuted}}>17:30 - 19:00</Text></Text>
+                <Text style={styles.bottomTrainingSubTxt}>• Campo 2 · Césped Artificial</Text>
+              </View>
+              <Ionicons name="checkmark-circle-outline" size={16} color={colors.accentGreen} />
             </View>
-          ) : (
-            <View style={styles.pendingListContainer}>
-              {pendingItems.map((item) => (
-                <TouchableOpacity 
-                  key={item.id}
-                  style={styles.pendingItemRow}
-                  activeOpacity={0.8}
-                  onPress={() => router.push(item.route as any)}
-                >
-                  <View style={styles.pendingIconBox}>
-                    <Ionicons name={item.icon as any} size={18} color={colors.skyPrimary} />
-                  </View>
 
-                  <Text style={styles.pendingItemLabel}>{item.label}</Text>
-
-                  <View style={[styles.pendingBadgePill, { backgroundColor: `${item.badgeColor}25`, borderColor: item.badgeColor }]}>
-                    <Text style={[styles.pendingBadgeTxt, { color: item.badgeColor }]}>{item.badge}</Text>
-                  </View>
-
-                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
-      </View>
-
-      {/* 4. ÚLTIMO RESULTADO Y CLASIFICACIÓN DEL EQUIPO */}
-      <View style={styles.sectionHeaderRow}>
-        <Ionicons name="stats-chart-outline" size={16} color={colors.skyPrimary} />
-        <Text style={styles.sectionTitle}>4. ÚLTIMO RESULTADO & CLASIFICACIÓN</Text>
-      </View>
-      
-      <View style={styles.cardBox}>
-        <View style={styles.cardInnerPadding}>
-          <View style={styles.resultHeaderRow}>
-            <View>
-              <Text style={styles.lastMatchSub}>JORNADA ANTERIOR</Text>
-              <Text style={styles.lastMatchScore}>CD Jesuitas {defaultLastResult.score} {defaultLastResult.opponent}</Text>
-            </View>
-            <View style={styles.winBadge}>
-              <Text style={styles.winBadgeText}>VICTORIA (+3 PTS)</Text>
+            <View style={styles.bottomTrainingItemRow}>
+              <Ionicons name="calendar-outline" size={14} color={colors.skyPrimary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.bottomTrainingDateTxt}>Jueves 8 de Mayo <Text style={{color: colors.textMuted}}>17:30 - 19:00</Text></Text>
+                <Text style={styles.bottomTrainingSubTxt}>• Campo 2 · Césped Artificial</Text>
+              </View>
+              <View style={styles.nextTagSmall}>
+                <Text style={styles.nextTagSmallTxt}>PRÓXIMO</Text>
+              </View>
             </View>
           </View>
-          <View style={styles.divider} />
-          <View style={styles.leaguePosRow}>
-            <Ionicons name="ribbon-outline" size={18} color={colors.accentGold} />
-            <Text style={styles.leaguePosText}>Clasificación actual: <Text style={{color: colors.white, fontWeight: '900'}}>{defaultLastResult.leaguePos}</Text></Text>
+
+          <TouchableOpacity style={styles.bottomColLinkRow} activeOpacity={0.8} onPress={() => router.push('/(drawer)/calendario')}>
+            <Ionicons name="calendar" size={13} color={colors.skyPrimary} />
+            <Text style={styles.bottomColLinkTxt}>Ver calendario completo</Text>
+            <Ionicons name="chevron-forward" size={13} color={colors.skyPrimary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Columna 2: Pendientes */}
+        <View style={[styles.bottomColCard, isDesktop && { flex: 1 }]}>
+          <Text style={styles.bottomColTitleTxt}>4. PENDIENTES</Text>
+
+          <View style={styles.bottomColContentList}>
+            <View style={styles.pendingItemMiniRow}>
+              <Ionicons name="notifications" size={14} color={colors.accentGold} />
+              <Text style={styles.pendingItemMiniTxt}>1 comunicado nuevo</Text>
+              <View style={styles.dotGoldAlert} />
+            </View>
+
+            <View style={styles.pendingItemMiniRow}>
+              <Ionicons name="card-outline" size={14} color={colors.skyPrimary} />
+              <Text style={styles.pendingItemMiniTxt}>Cuota pendiente: Septiembre</Text>
+              <View style={styles.dotGoldAlert} />
+            </View>
+
+            <View style={styles.pendingItemMiniRow}>
+              <Ionicons name="document-text-outline" size={14} color={colors.accentRed} />
+              <Text style={styles.pendingItemMiniTxt}>Autorización de imagen pendiente</Text>
+              <View style={styles.dotGoldAlert} />
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.bottomColLinkRow} activeOpacity={0.8} onPress={() => router.push('/(drawer)/avisos')}>
+            <Text style={styles.bottomColLinkTxt}>Ver todos los pendientes</Text>
+            <Ionicons name="chevron-forward" size={13} color={colors.skyPrimary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Columna 3: Último partido */}
+        <View style={[styles.bottomColCard, isDesktop && { flex: 1 }]}>
+          <Text style={styles.bottomColTitleTxt}>5. ÚLTIMO PARTIDO</Text>
+
+          <View style={styles.lastResultMatchBox}>
+            <View style={styles.lastResultTeamsFacingRow}>
+              <Image source={{ uri: JESUITAS_SHIELD_URI }} style={{ width: 24, height: 28 }} />
+              <Text style={styles.lastResultTeamNameTxt}>CD Jesuitas</Text>
+              <Text style={styles.lastResultScoreTxt}>3 - 1</Text>
+              <Text style={styles.lastResultTeamNameTxt}>Valencia CF C</Text>
+              <Image source={{ uri: VALENCIA_SHIELD_URI }} style={{ width: 24, height: 28 }} />
+            </View>
+
+            <View style={styles.lastResultWinBadgeRow}>
+              <View style={styles.winBadgeGreen}>
+                <Text style={styles.winBadgeGreenTxt}>VICTORIA  +3 puntos</Text>
+              </View>
+            </View>
+
+            <View style={styles.leaguePositionFooterRow}>
+              <Ionicons name="ribbon-outline" size={14} color={colors.accentGold} />
+              <Text style={styles.leaguePositionFooterTxt}>3.º Clasificado · 24 puntos 📈</Text>
+            </View>
           </View>
         </View>
+
       </View>
 
-      {/* 5. MI ZONA COMO CIERRE DEL DASHBOARD */}
-      <View style={styles.sectionHeaderRow}>
-        <Ionicons name="star-outline" size={16} color={colors.skyPrimary} />
-        <Text style={styles.sectionTitle}>5. MI ZONA</Text>
-      </View>
-
+      {/* 7. BLOQUE MI ZONA COMO BANNER PREMIUM DE CIERRE CON EL CROMO Y LAS INSIGNIAS DEL JUGADOR */}
       <TouchableOpacity 
-        style={styles.miZonaCardBanner} 
+        style={styles.miZonaClosingBannerCard} 
         activeOpacity={0.9}
         onPress={() => router.push('/(drawer)/mi-zona')}
       >
-        <LinearGradient
-          colors={['#0E2E6B', '#071A3D']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.miZonaCardGradient}
-        >
-          <View style={styles.miZonaCardLeft}>
-            <View style={styles.miZonaIconCircle}>
-              <Text style={{ fontSize: 20 }}>🌟</Text>
+        <LinearGradient colors={['#0B224F', '#071A3D']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.miZonaBannerGradient}>
+          
+          <View style={styles.miZonaBannerLeftContent}>
+            <View style={styles.miZonaStarHeaderRow}>
+              <Text style={{ fontSize: 22 }}>🌟</Text>
+              <Text style={styles.miZonaBannerMainTitle}>MI ZONA</Text>
             </View>
-            <View>
-              <Text style={styles.miZonaTitle}>MI ZONA</Text>
-              <Text style={styles.miZonaSub}>Cromo, retos e insignias de {activeChildFirstName}</Text>
+            <Text style={styles.miZonaBannerSubTitle}>El cromo, retos e insignias de {activeAthlete.name.split(' ')[0]}</Text>
+          </View>
+
+          {/* Cromo Miniatura FIFA Gold e Insignias Doradas */}
+          <View style={styles.miZonaBannerRightVisuals}>
+            <View style={styles.miniCromoCardBox}>
+              <Text style={{ fontSize: 9, fontWeight: '900', color: colors.goldLight }}>88</Text>
+              <Text style={{ fontSize: 8, fontWeight: '900', color: colors.white }}>{activeAthlete.name.split(' ')[0]}</Text>
+            </View>
+
+            <View style={styles.badgesRowMini}>
+              <Ionicons name="trophy" size={16} color={colors.accentGold} />
+              <Ionicons name="star" size={16} color={colors.skyGlow} />
+              <Ionicons name="shield-checkmark" size={16} color={colors.accentGreen} />
+            </View>
+
+            <View style={styles.miZonaCircleArrowBtn}>
+              <Ionicons name="arrow-forward" size={16} color={colors.navyDark} />
             </View>
           </View>
-          <View style={styles.miZonaArrowBtn}>
-            <Ionicons name="arrow-forward" size={16} color={colors.navyDark} />
-          </View>
+
         </LinearGradient>
       </TouchableOpacity>
+
+      {/* 8. FOOTER CORPORATIVO DISCRETO OBLIGATORIO */}
+      <View style={styles.footerContainerRow}>
+        <Text style={styles.footerCompilationTxt}>COMPILACIÓN: FAMILIA-INICIO-03</Text>
+        <Text style={styles.footerMottoTxt}>CD JESUITAS · FORJANDO FUTURO</Text>
+        <Image source={{ uri: JESUITAS_SHIELD_URI }} style={{ width: 16, height: 18 }} />
+      </View>
 
       {/* MODAL OBLIGATORIO: MOTIVO DE AUSENCIA A PARTIDO ("NO ASISTIRÁ") */}
       <Modal visible={absenceMatchModalVisible} transparent animationType="fade">
         <View style={styles.modalBg}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Indica el motivo de la ausencia</Text>
-            <Text style={styles.modalSub}>Es obligatorio indicar la razón para notificar la baja de {activeChildFirstName} al partido.</Text>
+            <Text style={styles.modalSub}>Es obligatorio indicar la razón para notificar la baja de {activeAthlete.name.split(' ')[0]} al partido.</Text>
 
             <View style={styles.reasonOptionGroup}>
               {[
@@ -578,7 +562,6 @@ export function FamiliaDashboard() {
               ))}
             </View>
 
-            {/* CAMPO DE TEXTO OBLIGATORIO PARA "OTRO MOTIVO" */}
             {selectedReasonOption === 'Otro motivo' && (
               <View style={styles.inputBoxContainer}>
                 <Text style={styles.inputLabel}>Describe el motivo (obligatorio):</Text>
@@ -592,7 +575,6 @@ export function FamiliaDashboard() {
               </View>
             )}
 
-            {/* CAMPO DE OBSERVACIONES OPCIONAL PARA EL RESTO */}
             {selectedReasonOption !== '' && selectedReasonOption !== 'Otro motivo' && (
               <View style={styles.inputBoxContainer}>
                 <Text style={styles.inputLabel}>Observaciones adicionales (opcional):</Text>
@@ -637,7 +619,7 @@ export function FamiliaDashboard() {
         <View style={styles.modalBg}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Aviso de Ausencia a Entrenamiento</Text>
-            <Text style={styles.modalSub}>Informa al cuerpo técnico sobre la falta de {activeChildFirstName}</Text>
+            <Text style={styles.modalSub}>Informa al cuerpo técnico sobre la falta de {activeAthlete.name.split(' ')[0]}</Text>
 
             <View style={styles.reasonOptionGroup}>
               {['Motivo Médico / Enfermedad', 'Examen / Estudios', 'Viaje Familiar'].map((r, i) => (
@@ -679,296 +661,201 @@ export function FamiliaDashboard() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.navyDark },
-  content: { padding: 16, paddingBottom: 60 },
-  contentTablet: { maxWidth: 900, alignSelf: 'center', width: '100%' },
+  content: { padding: 14, paddingBottom: 60 },
+  contentTablet: { maxWidth: 1100, alignSelf: 'center', width: '100%' },
 
-  compilationBadgeContainer: {
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  compilationBadgeTxt: {
-    color: colors.skyPrimary,
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
+  compilationBadgeContainer: { alignItems: 'center', marginBottom: 6 },
+  compilationBadgeTxt: { color: colors.skyPrimary, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
 
-  // HERO HEADER CÁLIDO
-  heroHeaderBox: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    marginBottom: 14,
+  // TOP BAR COMPACTA EXCLUSIVA
+  topBarContainer: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#05122E', paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 14, borderWidth: 1, borderColor: 'rgba(79, 195, 247, 0.2)', marginBottom: 10
   },
-  heroHeaderGradient: {
-    padding: 16,
+  topBarLeft: { flexDirection: 'row', alignItems: 'center' },
+  topBarShield: { width: 22, height: 26, marginRight: 8 },
+  topBarBrand: { color: colors.white, fontSize: 13, fontWeight: '900', letterSpacing: 0.5 },
+  topBarSubBrand: { color: colors.skyPrimary, fontSize: 11, fontWeight: '700' },
+  changeSportHeaderBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(79, 195, 247, 0.12)', paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: 10, borderWidth: 1, borderColor: 'rgba(79, 195, 247, 0.3)'
   },
-  heroHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  heroHeaderLeft: { flex: 1 },
-  heroGreetingTxt: { color: colors.white, fontSize: 18, fontWeight: '900' },
-  heroSubTxt: { color: colors.skyGlow, fontSize: 11, fontWeight: '600', marginTop: 3 },
-  heroBadgeBox: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-  },
-  heroBadgeIcon: { fontSize: 16 },
-  heroBadgeTxt: { color: colors.goldLight, fontSize: 9, fontWeight: '900', marginTop: 2, letterSpacing: 0.5 },
+  changeSportHeaderBtnTxt: { color: colors.skyPrimary, fontSize: 11, fontWeight: '800' },
 
-  loadingBox: { padding: 30, alignItems: 'center', justifyContent: 'center' },
-  loadingText: { color: colors.skyGlow, marginTop: 12, fontSize: 13, fontWeight: '700' },
+  // HERO HEADER BANNER CON FOTO Y SALUDO
+  heroBannerCard: { borderRadius: 18, overflow: 'hidden', marginBottom: 12, borderWidth: 1, borderColor: colors.borderGlow },
+  heroBannerBgImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', resizeMode: 'cover' },
+  heroBannerGradient: { padding: 16 },
+  heroHeaderContent: {},
+  heroGreetingText: { color: colors.white, fontSize: 20, fontWeight: '900' },
+  heroSubText: { color: colors.skyGlow, fontSize: 12, fontWeight: '600', marginTop: 2 },
+  heroTeamTagRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' },
+  heroTeamTagTxt: { color: colors.goldLight, fontSize: 11, fontWeight: '800' },
 
-  errorBox: { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: colors.accentRed, padding: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 12 },
-  errorText: { color: colors.accentRed, fontSize: 13, fontWeight: '700', flex: 1 },
+  sectionHeaderRow: { marginBottom: 6 },
+  sectionTitleTxt: { fontSize: 11, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 1.5 },
+  sectionSubTitleTxt: { fontSize: 11, color: colors.textMuted, marginTop: 1 },
 
-  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, marginBottom: 8 },
-  sectionTitle: { fontSize: 11, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 1.5 },
-
-  // SELECTOR DE HIJOS CON CAMISETA OFICIAL
-  childrenSelectorGroup: { flexDirection: 'row', gap: 8, marginBottom: 6 },
-  childCard: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  // SELECTOR DE DEPORTISTAS CON CAMISETAS TÁCTICAS
+  athletesGridRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  athleteCard: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: colors.navyCard, padding: 10, borderRadius: 14,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)'
   },
-  childCardActive: { borderColor: colors.skyPrimary, backgroundColor: '#0E2E6B' },
-  childCardLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  childJerseyCircle: {
-    width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(79, 195, 247, 0.15)',
-    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.skyPrimary
+  athleteCardActive: { borderColor: colors.skyPrimary, backgroundColor: colors.navyCardHighlight },
+  jerseyBox: {
+    width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(79, 195, 247, 0.1)',
+    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(79, 195, 247, 0.3)',
+    position: 'relative'
   },
-  childJerseyCircleActive: { backgroundColor: colors.skyPrimary },
-  childName: { color: colors.white, fontSize: 13, fontWeight: '800' },
-  childNameActive: { color: colors.skyGlow },
-  childTeamSub: { color: colors.textMuted, fontSize: 10, fontWeight: '600' },
-  activeCheckBadge: {},
+  jerseyBoxActive: { backgroundColor: 'rgba(79, 195, 247, 0.2)', borderColor: colors.skyPrimary },
+  jerseyDorsalTxt: { position: 'absolute', color: colors.skyPrimary, fontSize: 10, fontWeight: '900' },
+  jerseyDorsalTxtActive: { color: colors.white },
+  athleteName: { color: colors.white, fontSize: 13, fontWeight: '800' },
+  athleteNameActive: { color: colors.skyGlow },
+  athleteDetailsTxt: { color: colors.textMuted, fontSize: 10, fontWeight: '600' },
+  athleteDorsalSub: { color: colors.skyPrimary, fontSize: 10, fontWeight: '800' },
+  activeCheckBadgeCircle: { width: 20, height: 20, borderRadius: 10, backgroundColor: colors.skyPrimary, justifyContent: 'center', alignItems: 'center' },
 
-  // CARD BOX PRINCIPAL PARTIDO / ENTRENAMIENTO
-  cardBoxMainMatch: { borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(79, 195, 247, 0.4)', backgroundColor: colors.navyCard },
-  cardBox: { borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderGlow, backgroundColor: colors.navyCard },
-  cardGradient: { padding: 16 },
-  cardInnerPadding: { padding: 16 },
+  // 1. ENTRENAMIENTOS DE ESTA SEMANA (BLOQUE HERO CON IMAGEN DE CAMPO ILUMINADO EN MITAD DERECHA)
+  trainingHeroCard: { borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderGlow, backgroundColor: colors.navyCard, marginBottom: 14 },
+  trainingHeroFlexRow: { padding: 14 },
+  trainingHeroLeft: {},
+  trainingHeaderBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  trainingHeaderTitle: { color: colors.skyPrimary, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  tomorrowBadge: { backgroundColor: colors.accentGreen, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  tomorrowBadgeTxt: { color: colors.navyDark, fontSize: 9, fontWeight: '900' },
+  trainingMainTimeTxt: { color: colors.white, fontSize: 18, fontWeight: '900', marginBottom: 10 },
+  trainingDetailsList: { gap: 6, marginBottom: 12 },
+  trainingDetailRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  trainingDetailTxt: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
+  absenceBtnNotice: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(79, 195, 247, 0.12)', borderWidth: 1, borderColor: colors.skyPrimary,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, alignSelf: 'flex-start'
+  },
+  absenceBtnNoticeTxt: { color: colors.skyPrimary, fontSize: 11, fontWeight: '800' },
 
-  // CONVOCATORIA Y PARTIDO
-  callupBadgeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  callupTag: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  callupTagText: { color: colors.skyPrimary, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
-  
+  trainingHeroRight: { width: '100%', minWidth: 260, borderRadius: 14, overflow: 'hidden', position: 'relative' },
+  trainingFieldImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+
+  // 2. PRÓXIMO PARTIDO COMO COMPOSICIÓN DEPORTIVA
+  matchHeroCard: { borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderGlow, backgroundColor: colors.navyCard, marginBottom: 14 },
+  matchCardGradient: { padding: 16 },
+  matchTopBadgeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  matchSectionTitleTxt: { color: colors.accentGold, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+
   statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
   statusPillGreen: { backgroundColor: 'rgba(16, 185, 129, 0.25)', borderWidth: 1, borderColor: colors.accentGreen },
   statusPillRed: { backgroundColor: 'rgba(239, 68, 68, 0.25)', borderWidth: 1, borderColor: colors.accentRed },
   statusPillYellow: { backgroundColor: 'rgba(245, 158, 11, 0.25)', borderWidth: 1, borderColor: colors.accentGold },
   statusPillText: { color: '#fff', fontSize: 10, fontWeight: '900' },
 
-  matchVsText: { color: colors.white, fontSize: 22, fontWeight: '900', marginBottom: 2 },
-  matchDateText: { color: colors.skyGlow, fontSize: 13, fontWeight: '700', marginBottom: 8 },
+  // ENFRENTAMIENTO DE ESCUDOS
+  matchFacingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginVertical: 10 },
+  matchFacingRowDesktop: { paddingHorizontal: 20 },
+  teamColLeft: { alignItems: 'center', flex: 1 },
+  teamColRight: { alignItems: 'center', flex: 1 },
+  teamMatchShield: { width: 50, height: 60, marginBottom: 6 },
+  teamMatchNameTxt: { color: colors.white, fontSize: 15, fontWeight: '900', textAlign: 'center' },
 
-  absenceReasonSummaryBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.4)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  absenceReasonSummaryTxt: {
-    color: colors.white,
-    fontSize: 11,
-    fontWeight: '600',
-  },
+  versusCenterCol: { alignItems: 'center', paddingHorizontal: 12 },
+  versusGoldenTxt: { color: colors.goldLight, fontSize: 24, fontWeight: '900', letterSpacing: 1 },
+  matchDateGoldenTxt: { color: colors.skyGlow, fontSize: 11, fontWeight: '700', marginTop: 2, textAlign: 'center' },
 
-  weatherBox: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(79, 195, 247, 0.12)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, marginBottom: 10, alignSelf: 'flex-start' },
-  weatherText: { color: colors.skyGlow, fontSize: 11, fontWeight: '700' },
+  absenceReasonSummaryBox: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.4)', padding: 8, borderRadius: 8, marginVertical: 8 },
+  absenceReasonSummaryTxt: { color: colors.white, fontSize: 11 },
 
-  matchDetailsGrid: { gap: 6, marginBottom: 12, backgroundColor: 'rgba(0,0,0,0.25)', padding: 10, borderRadius: 10 },
-  matchDetailItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  matchDetailText: { color: colors.white, fontSize: 11, fontWeight: '600' },
+  matchDetailsAndTravelRow: { gap: 12, marginTop: 14, marginBottom: 14 },
+  matchDetailsBoxGrid: { backgroundColor: 'rgba(0,0,0,0.25)', padding: 12, borderRadius: 12, gap: 8 },
+  matchDetailItemRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  matchDetailLbl: { color: colors.textMuted, fontSize: 10, fontWeight: '700' },
+  matchDetailVal: { color: colors.white, fontSize: 12, fontWeight: '800' },
 
-  // ASISTENTE DE SALIDA Y VIAJE REPLEGABLE
-  travelAssistantCard: {
-    backgroundColor: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 12,
-    borderWidth: 1, borderColor: 'rgba(79, 195, 247, 0.2)', marginBottom: 14
-  },
-  travelAssistantToggleBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'
-  },
-  travelHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  travelTitle: { color: colors.skyPrimary, fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
-  toggleChevronBox: {},
-  toggleChevronTxt: { color: colors.skyGlow, fontSize: 10, fontWeight: '800' },
+  travelColumnBox: { backgroundColor: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(79, 195, 247, 0.2)' },
+  travelToggleHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  travelToggleHeaderTxt: { color: colors.skyPrimary, fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
+  travelSummaryList: { marginTop: 10, gap: 6 },
+  travelRowSummary: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  travelRowSummaryTxt: { color: colors.textMuted, fontSize: 10 },
+  mapsGpsLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  mapsGpsLinkTxt: { color: colors.skyPrimary, fontSize: 10, fontWeight: '800', textDecorationLine: 'underline' },
 
-  travelExpandedContent: { marginTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', paddingTop: 10 },
-  travelTimesRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  travelTimeBox: { flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', padding: 8, borderRadius: 8 },
-  travelTimeLbl: { color: colors.white, fontSize: 11, fontWeight: '800' },
-  travelTimeVal: { color: colors.textMuted, fontSize: 10, marginTop: 2 },
-  travelDepartureHighlight: { color: colors.white, fontSize: 10, marginTop: 4 },
+  confirmPromptTxt: { color: colors.white, fontSize: 12, fontWeight: '900', textAlign: 'center', marginBottom: 8 },
+  binaryBtnRow: { flexDirection: 'row', gap: 10 },
+  binaryBtnConfirm: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#059669', paddingVertical: 12, borderRadius: 12 },
+  binaryBtnConfirmActive: { borderWidth: 2, borderColor: '#fff' },
+  binaryBtnRefuse: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#DC2626', paddingVertical: 12, borderRadius: 12 },
+  binaryBtnRefuseActive: { borderWidth: 2, borderColor: '#fff' },
+  binaryBtnTxt: { color: colors.white, fontSize: 12, fontWeight: '900' },
 
-  gpsLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'center' },
-  gpsLinkText: { color: colors.skyPrimary, fontSize: 11, fontWeight: '700', textDecorationLine: 'underline' },
+  // GRID 3 COLUMNAS INFERIORES
+  bottomGrid3Cols: { gap: 10, marginBottom: 14 },
+  bottomColCard: { backgroundColor: colors.navyCard, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  bottomColTitleTxt: { color: colors.skyPrimary, fontSize: 10, fontWeight: '900', letterSpacing: 0.5, marginBottom: 10 },
+  bottomColContentList: { gap: 8, marginBottom: 10 },
 
-  actionPromptText: { color: colors.white, fontSize: 12, fontWeight: '900', letterSpacing: 0.8, marginBottom: 10, textAlign: 'center' },
-  
-  // ZONA DE BOTONES BINARIOS AL 50% ANCHO CADA UNO (AMPLIOS, DESTACADOS, SIN BOTÓN DUDA)
-  callupBtnGroup: { flexDirection: 'row', gap: 10 },
-  btnConfirm: { 
-    flex: 1, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    gap: 8, 
-    backgroundColor: '#059669', 
-    paddingVertical: 14, 
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)'
-  },
-  btnConfirmSelected: { borderWidth: 2, borderColor: '#fff', shadowColor: '#10B981', shadowOpacity: 0.5, elevation: 4 },
-  btnRefuse: { 
-    flex: 1, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    gap: 8, 
-    backgroundColor: '#DC2626', 
-    paddingVertical: 14, 
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)'
-  },
-  btnRefuseSelected: { borderWidth: 2, borderColor: '#fff', shadowColor: '#EF4444', shadowOpacity: 0.5, elevation: 4 },
-  btnConfirmText: { color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 0.5 },
+  bottomTrainingItemRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.2)', padding: 8, borderRadius: 10 },
+  bottomTrainingDateTxt: { color: colors.white, fontSize: 11, fontWeight: '800' },
+  bottomTrainingSubTxt: { color: colors.textMuted, fontSize: 9 },
+  nextTagSmall: { backgroundColor: colors.skyPrimary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  nextTagSmallTxt: { color: colors.navyDark, fontSize: 8, fontWeight: '900' },
 
-  // ENTRENAMIENTOS
-  dynamicTrainingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  dynamicBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  dynamicBadgeText: { color: colors.navyDark, fontSize: 10, fontWeight: '900' },
-  pitchTagText: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
+  bottomColLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  bottomColLinkTxt: { color: colors.skyPrimary, fontSize: 10, fontWeight: '800' },
 
-  trainingList: { gap: 6, marginBottom: 12, backgroundColor: 'rgba(0,0,0,0.25)', padding: 10, borderRadius: 10 },
-  trainingRowItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  dayPill: { backgroundColor: colors.skyPrimary, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6 },
-  dayPillText: { color: colors.navyDark, fontSize: 10, fontWeight: '900' },
-  trainingRowTime: { color: colors.white, fontSize: 11, fontWeight: '800' },
-  trainingRowPitch: { color: colors.textMuted, fontSize: 10 },
+  pendingItemMiniRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.2)', padding: 8, borderRadius: 10 },
+  pendingItemMiniTxt: { color: colors.white, fontSize: 11, flex: 1 },
+  dotGoldAlert: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accentGold },
 
-  absenceNoticeBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)', borderWidth: 1, borderColor: colors.accentGold,
-    paddingVertical: 9, borderRadius: 10
-  },
-  absenceNoticeText: { color: colors.accentGold, fontSize: 11, fontWeight: '900' },
+  lastResultMatchBox: { backgroundColor: 'rgba(0,0,0,0.2)', padding: 10, borderRadius: 10, gap: 8 },
+  lastResultTeamsFacingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
+  lastResultTeamNameTxt: { color: colors.white, fontSize: 11, fontWeight: '800' },
+  lastResultScoreTxt: { color: colors.goldLight, fontSize: 16, fontWeight: '900' },
+  lastResultWinBadgeRow: { alignItems: 'center' },
+  winBadgeGreen: { backgroundColor: 'rgba(16, 185, 129, 0.2)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  winBadgeGreenTxt: { color: colors.accentGreen, fontSize: 9, fontWeight: '900' },
+  leaguePositionFooterRow: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' },
+  leaguePositionFooterTxt: { color: colors.textMuted, fontSize: 10, fontWeight: '700' },
 
-  // PENDIENTES DE LA FAMILIA
-  pendingListContainer: { gap: 8 },
-  pendingItemRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: 'rgba(0,0,0,0.25)', padding: 10, borderRadius: 12,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)'
-  },
-  pendingIconBox: { width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(79, 195, 247, 0.15)', justifyContent: 'center', alignItems: 'center' },
-  pendingItemLabel: { flex: 1, color: colors.white, fontSize: 12, fontWeight: '700' },
-  pendingBadgePill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
-  pendingBadgeTxt: { fontSize: 9, fontWeight: '900' },
-  allClearedBox: { alignItems: 'center', paddingVertical: 10 },
-  allClearedText: { color: colors.accentGreen, fontSize: 14, fontWeight: '900', marginTop: 4 },
+  // BANNER DE CIERRE MI ZONA
+  miZonaClosingBannerCard: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: colors.skyPrimary, marginBottom: 16 },
+  miZonaBannerGradient: { padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  miZonaBannerLeftContent: { flex: 1 },
+  miZonaStarHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  miZonaBannerMainTitle: { color: colors.white, fontSize: 14, fontWeight: '900', letterSpacing: 0.8 },
+  miZonaBannerSubTitle: { color: colors.skyGlow, fontSize: 10, marginTop: 2 },
+  miZonaBannerRightVisuals: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  miniCromoCardBox: { width: 32, height: 42, borderRadius: 6, backgroundColor: colors.accentGold, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.goldLight },
+  badgesRowMini: { flexDirection: 'row', gap: 4 },
+  miZonaCircleArrowBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.skyPrimary, justifyContent: 'center', alignItems: 'center' },
 
-  // RESULTADO
-  resultHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  lastMatchSub: { color: colors.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  lastMatchScore: { color: colors.white, fontSize: 15, fontWeight: '900', marginTop: 2 },
-  winBadge: { backgroundColor: 'rgba(16, 185, 129, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  winBadgeText: { color: colors.accentGreen, fontSize: 10, fontWeight: '900' },
-  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginVertical: 10 },
-  leaguePosRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  leaguePosText: { color: colors.textMuted, fontSize: 12, fontWeight: '600' },
+  // FOOTER CORPORATIVO DISCRETO
+  footerContainerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' },
+  footerCompilationTxt: { color: colors.skyPrimary, fontSize: 9, fontWeight: '900' },
+  footerMottoTxt: { color: colors.textMuted, fontSize: 9, fontWeight: '800' },
 
-  // TARJETA ACCESO MI ZONA
-  miZonaCardBanner: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.skyPrimary,
-    marginBottom: 20,
-  },
-  miZonaCardGradient: {
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  miZonaCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  miZonaIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(79, 195, 247, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.skyPrimary,
-  },
-  miZonaTitle: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-  miZonaSub: {
-    color: colors.skyGlow,
-    fontSize: 10,
-    fontWeight: '600',
-    marginTop: 1,
-  },
-  miZonaArrowBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.skyPrimary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  loadingBox: { padding: 30, alignItems: 'center' },
+  loadingText: { color: colors.skyGlow, marginTop: 10, fontSize: 12 },
+  errorBox: { backgroundColor: 'rgba(239, 68, 68, 0.15)', padding: 12, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  errorText: { color: colors.accentRed, fontSize: 12 },
 
-  // MODAL DE MOTIVO DE AUSENCIA
+  // MODAL
   modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', padding: 20 },
   modalContent: { backgroundColor: colors.navyCard, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: colors.skyPrimary },
-  modalTitle: { color: colors.white, fontSize: 17, fontWeight: '900', marginBottom: 4 },
-  modalSub: { color: colors.textMuted, fontSize: 11, marginBottom: 14, lineHeight: 16 },
-
+  modalTitle: { color: colors.white, fontSize: 16, fontWeight: '900', marginBottom: 4 },
+  modalSub: { color: colors.textMuted, fontSize: 11, marginBottom: 14 },
   reasonOptionGroup: { gap: 6, marginBottom: 14 },
-  reasonOption: { 
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: 'rgba(255,255,255,0.05)', padding: 10, borderRadius: 10, 
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' 
-  },
+  reasonOption: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.05)', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   reasonOptionActive: { backgroundColor: colors.navyDark, borderColor: colors.skyPrimary },
   reasonText: { color: colors.white, fontSize: 12, fontWeight: '700' },
   reasonTextActive: { color: colors.skyPrimary, fontWeight: '900' },
-
   inputBoxContainer: { marginBottom: 14 },
   inputLabel: { color: colors.skyGlow, fontSize: 11, fontWeight: '700', marginBottom: 4 },
-  textInputStyle: {
-    backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 10, padding: 10, color: colors.white, fontSize: 12
-  },
-
+  textInputStyle: { backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', borderRadius: 10, padding: 10, color: colors.white, fontSize: 12 },
   modalBtnRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
   modalBtnCancel: { flex: 1, paddingVertical: 11, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center' },
   modalBtnCancelText: { color: colors.white, fontWeight: '800', fontSize: 11 },
