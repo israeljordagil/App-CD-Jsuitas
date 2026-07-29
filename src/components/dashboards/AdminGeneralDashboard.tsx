@@ -10,6 +10,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useRouter } from 'expo-router';
+
 interface AdminModuleCard {
   id: string;
   title: string;
@@ -17,6 +19,7 @@ interface AdminModuleCard {
   icon: keyof typeof Ionicons.glyphMap;
   badge?: string;
   color: string;
+  route?: string;
 }
 
 const ADMIN_MODULES: AdminModuleCard[] = [
@@ -25,8 +28,9 @@ const ADMIN_MODULES: AdminModuleCard[] = [
     title: 'Usuarios y Roles',
     subtitle: 'Gestión de permisos, perfiles y accesos',
     icon: 'people-circle-outline',
-    badge: 'Próximamente',
+    badge: 'ACTIVO',
     color: '#4FC3F7',
+    route: '/(drawer)/usuarios-roles',
   },
   {
     id: 'sports',
@@ -87,6 +91,7 @@ const ADMIN_MODULES: AdminModuleCard[] = [
 ];
 
 export function AdminGeneralDashboard() {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
 
@@ -117,6 +122,11 @@ export function AdminGeneralDashboard() {
             key={module.id} 
             style={[styles.card, isDesktop && styles.cardDesktop]}
             activeOpacity={0.8}
+            onPress={() => {
+              if (module.route) {
+                router.push(module.route as any);
+              }
+            }}
           >
             <View style={styles.cardHeader}>
               <View style={[styles.iconBox, { backgroundColor: `${module.color}20` }]}>

@@ -1,15 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured, getSupabaseConfigError } from '../lib/supabase';
-import { Platform } from 'react-native';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { AppRole, UserStatus, UserRoleAssignment, ManagedUser } from '../types/roles';
 
-export type ActiveContextType = 'FAMILIA' | 'JUGADOR' | 'ENTRENADOR' | 'COORDINADOR' | 'DIR_DEPORTIVA' | 'ADMIN_GENERAL';
+export type ActiveContextType = AppRole;
 
 export interface UserProfile {
   id: string;
   full_name: string | null;
   email: string | null;
-  roles: ActiveContextType[];
+  roles: AppRole[];
 }
 
 interface AuthContextProps {
@@ -26,6 +26,22 @@ interface AuthContextProps {
   assignedTeams: any[];
   activeTeamId: string | null;
 
+  // Gestión de Usuarios y Roles (ADMIN_GENERAL)
+  managedUsers: ManagedUser[];
+  updateUserRolesAndStatus: (
+    userId: string, 
+    newRoles: AppRole[], 
+    newStatus: UserStatus, 
+    assignments?: UserRoleAssignment[]
+  ) => { success: boolean; error?: string };
+  createManagedUser: (
+    fullName: string, 
+    email: string, 
+    roles: AppRole[], 
+    assignments?: UserRoleAssignment[]
+  ) => { success: boolean; user?: ManagedUser; error?: string };
+  loginAsTestUserByEmail: (email: string) => void;
+
   // Acciones de Autenticación Supabase
   loginWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
   resetPassword: (email: string) => Promise<{ success: boolean; message: string }>;
@@ -41,7 +57,7 @@ interface AuthContextProps {
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
-const VALID_ROLES = new Set<ActiveContextType>([
+const VALID_ROLES = new Set<AppRole>([
   'FAMILIA', 
   'JUGADOR', 
   'ENTRENADOR', 
@@ -49,6 +65,53 @@ const VALID_ROLES = new Set<ActiveContextType>([
   'DIR_DEPORTIVA', 
   'ADMIN_GENERAL'
 ]);
+
+// Usuarios de prueba iniciales (SIN ADMIN_GENERAL DE PRUEBA)
+const INITIAL_TEST_USERS: ManagedUser[] = [
+  {
+    id: 'usr-dir-1',
+    fullName: 'Dirección Prueba',
+    email: 'direccion.prueba@cdjesuitas.es',
+    status: 'ACTIVE',
+    roles: ['DIR_DEPORTIVA'],
+    assignments: [{ role: 'DIR_DEPORTIVA', sport: 'Fútbol' }],
+    createdAt: '2026-07-01T10:00:00Z'
+  },
+  {
+    id: 'usr-coord-1',
+    fullName: 'Coordinación Prueba',
+    email: 'coordinacion.prueba@cdjesuitas.es',
+    status: 'ACTIVE',
+    roles: ['COORDINADOR'],
+    assignments: [{ role: 'COORDINADOR', sport: 'Fútbol', category: 'Cadete' }],
+    createdAt: '2026-07-01T10:00:00Z'
+  },
+  {
+    id: 'usr-coach-1',
+    fullName: 'Entrenador Prueba',
+    email: 'entrenador.prueba@cdjesuitas.es',
+    status: 'ACTIVE',
+    roles: ['ENTRENADOR'],
+    assignments: [{ role: 'ENTRENADOR', sport: 'Fútbol', team: 'Cadete B' }],
+    createdAt: '2026-07-01T10:00:00Z'
+  },
+  {
+    id: 'usr-fam-1',
+    fullName: 'Familia Prueba',
+    email: 'familia.prueba@cdjesuitas.es',
+    status: 'ACTIVE',
+    roles: ['FAMILIA'],
+    createdAt: '2026-07-01T10:00:00Z'
+  },
+  {
+    id: 'usr-jug-1',
+    fullName: 'Jugador Prueba',
+    email: 'jugador.prueba@cdjesuitas.es',
+    status: 'ACTIVE',
+    roles: ['JUGADOR'],
+    createdAt: '2026-07-01T10:00:00Z'
+  }
+];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -61,7 +124,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [assignedTeams, setAssignedTeams] = useState<any[]>([]);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
 
-  // DATOS MOCK SOLO SI EXPO_PUBLIC_ENABLE_DEMO_ACCESS ES 'true'
+  // Lista de usuarios gestionados por el módulo
+  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>(INITIAL_TEST_USERS);
+
   const isDemoEnabled = process.env.EXPO_PUBLIC_ENABLE_DEMO_ACCESS === 'true';
 
   const mockPlayers = [
@@ -72,10 +137,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     { 
       id: 'p2', name: 'Hugo Martínez', sport: 'baloncesto', 
       category: 'Infantil', team: 'Infantil Basket', dorsal: '7', position: 'Base', gender: 'masculino' 
-    },
-    { 
-      id: 'p3', name: 'Laura Martínez', sport: 'voleibol', 
-      category: 'Cadete', team: 'Cadete Vóley Femenino', dorsal: '10', position: 'Colocadora', gender: 'femenino' 
     }
   ];
   
@@ -87,10 +148,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadUserProfileAndRoles = async (authUser: User) => {
     try {
       let fullName: string | null = authUser.user_metadata?.full_name || null;
-      let userRoles: ActiveContextType[] = [];
+      let userRoles: AppRole[] = [];
 
       if (supabase && isSupabaseConfigured) {
-        // 1. Consultar la tabla public.profiles
+        // 1. Consultar public.profiles
         const { data: profileData } = await supabase
           .from('profiles')
           .select('full_name, email')
@@ -101,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           fullName = profileData.full_name;
         }
 
-        // 2. Consultar la tabla public.user_roles (NO ASIGNAR FAMILIA AUTOMÁTICAMENTE SI ESTÁ VACÍO)
+        // 2. Consultar public.user_roles
         const { data: rolesData } = await supabase
           .from('user_roles')
           .select('role')
@@ -109,8 +170,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (rolesData && rolesData.length > 0) {
           userRoles = rolesData
-            .map((r: any) => r.role as ActiveContextType)
-            .filter((role: ActiveContextType) => VALID_ROLES.has(role));
+            .map((r: any) => r.role as AppRole)
+            .filter((role: AppRole) => VALID_ROLES.has(role));
         }
       } else if (isDemoEnabled) {
         userRoles = ['FAMILIA', 'JUGADOR', 'ENTRENADOR', 'COORDINADOR'];
@@ -125,26 +186,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(profile);
 
-      // Separación estricta de datos Mock vs Reales
-      if (isDemoEnabled) {
+      // Sincronizar el usuario actual en managedUsers sin duplicados
+      setManagedUsers(prev => {
+        const exists = prev.some(u => u.id === profile.id || u.email.toLowerCase() === profile.email?.toLowerCase());
+        if (exists) {
+          return prev.map(u => 
+            (u.id === profile.id || u.email.toLowerCase() === profile.email?.toLowerCase())
+              ? { ...u, id: profile.id, fullName: profile.full_name || u.fullName, email: profile.email || u.email, roles: profile.roles }
+              : u
+          );
+        } else {
+          return [
+            {
+              id: profile.id,
+              fullName: profile.full_name || 'Usuario Principal',
+              email: profile.email || '',
+              status: 'ACTIVE',
+              roles: profile.roles,
+              createdAt: new Date().toISOString()
+            },
+            ...prev
+          ];
+        }
+      });
+
+      // Configurar vinculaciones según perfil
+      if (profile.roles.includes('FAMILIA')) {
         setLinkedPlayers(mockPlayers);
-        setActivePlayerId('p2');
-        setAssignedTeams(mockTeams);
-        setActiveTeamId('t1');
+        setActivePlayerId('p1');
       } else {
         setLinkedPlayers([]);
         setActivePlayerId(null);
+      }
+
+      if (profile.roles.includes('ENTRENADOR')) {
+        setAssignedTeams(mockTeams);
+        setActiveTeamId('t1');
+      } else {
         setAssignedTeams([]);
         setActiveTeamId(null);
       }
 
-      // Si el usuario tiene roles válidos, asignar el primero como contexto activo por defecto
+      // Si el usuario tiene roles válidos, asignar el primero como contexto activo automáticamente
       if (profile.roles.length > 0) {
         if (!activeContext || !profile.roles.includes(activeContext)) {
           setActiveContext(profile.roles[0]);
         }
       } else {
-        // Usuario autenticado pero SIN ROL asignado en Supabase
         setActiveContext(null);
       }
     } catch (err) {
@@ -200,140 +288,170 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       mounted = false;
-      if (authListener) {
-        authListener.unsubscribe();
-      }
+      if (authListener) authListener.unsubscribe();
     };
   }, []);
 
-  // Inicio de Sesión con Supabase Auth (signInWithPassword)
-  const loginWithEmail = async (email: string, password: string): Promise<{ error: string | null }> => {
-    const cleanEmail = email.trim();
-    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-      return { error: 'El correo electrónico no es válido.' };
-    }
-    if (!password || password.trim() === '') {
-      return { error: 'La contraseña es obligatoria.' };
+  // SEGURIDAD: Actualizar roles y estados sin permitir eliminar al ÚNICO Administrador General
+  const updateUserRolesAndStatus = (
+    targetUserId: string, 
+    newRoles: AppRole[], 
+    newStatus: UserStatus,
+    assignments?: UserRoleAssignment[]
+  ): { success: boolean; error?: string } => {
+    // 1. Contar cuántos Administradores Generales ACTIVOS existen en total
+    const currentAdmins = managedUsers.filter(u => u.status === 'ACTIVE' && u.roles.includes('ADMIN_GENERAL'));
+    const targetUser = managedUsers.find(u => u.id === targetUserId);
+
+    const targetIsAdmin = targetUser?.roles.includes('ADMIN_GENERAL');
+    const newIsAdmin = newRoles.includes('ADMIN_GENERAL');
+    const newIsActive = newStatus === 'ACTIVE';
+
+    // Regla de Protección: No permitir que un ADMIN_GENERAL pierda su rol si es el único
+    if (targetIsAdmin && (!newIsAdmin || !newIsActive)) {
+      if (currentAdmins.length <= 1) {
+        return { 
+          success: false, 
+          error: 'Acción denegada: Debe existir al menos un Administrador General activo en el club.' 
+        };
+      }
     }
 
+    // 2. Actualizar estado local de managedUsers
+    setManagedUsers(prev => prev.map(u => {
+      if (u.id === targetUserId) {
+        return {
+          ...u,
+          roles: newRoles,
+          status: newStatus,
+          assignments: assignments || u.assignments
+        };
+      }
+      return u;
+    }));
+
+    // 3. Si el usuario modificado es el usuario actualmente autenticado, actualizar su perfil
+    if (user && user.id === targetUserId) {
+      setUser(prev => prev ? { ...prev, roles: newRoles } : null);
+      if (activeContext && !newRoles.includes(activeContext)) {
+        setActiveContext(newRoles[0] || null);
+      }
+    }
+
+    // 4. Sincronizar en Supabase si está conectado y existe cliente
+    if (supabase && isSupabaseConfigured) {
+      supabase.from('profiles').update({ status: newStatus }).eq('id', targetUserId).then(() => {}).catch(() => {});
+    }
+
+    return { success: true };
+  };
+
+  // Crear nuevo usuario gestionado (Fase 1)
+  const createManagedUser = (
+    fullName: string, 
+    email: string, 
+    roles: AppRole[], 
+    assignments?: UserRoleAssignment[]
+  ): { success: boolean; user?: ManagedUser; error?: string } => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (managedUsers.some(u => u.email.toLowerCase() === cleanEmail)) {
+      return { success: false, error: 'Ya existe un usuario con este correo electrónico.' };
+    }
+
+    const newUser: ManagedUser = {
+      id: `usr-${Date.now()}`,
+      fullName: fullName.trim(),
+      email: cleanEmail,
+      status: 'ACTIVE',
+      roles: roles.length > 0 ? roles : ['FAMILIA'],
+      assignments: assignments || [],
+      createdAt: new Date().toISOString()
+    };
+
+    setManagedUsers(prev => [newUser, ...prev]);
+    return { success: true, user: newUser };
+  };
+
+  // Probar perfil con un usuario de prueba (ej. Familia Prueba)
+  const loginAsTestUserByEmail = (targetEmail: string) => {
+    const testUser = managedUsers.find(u => u.email.toLowerCase() === targetEmail.toLowerCase());
+    if (testUser) {
+      const profile: UserProfile = {
+        id: testUser.id,
+        full_name: testUser.fullName,
+        email: testUser.email,
+        roles: testUser.roles,
+      };
+      setUser(profile);
+      setActiveContext(testUser.roles[0] || 'FAMILIA');
+      if (testUser.roles.includes('FAMILIA')) {
+        setLinkedPlayers(mockPlayers);
+        setActivePlayerId('p1');
+      }
+    }
+  };
+
+  const loginWithEmail = async (email: string, password: string): Promise<{ error: string | null }> => {
     if (!supabase || !isSupabaseConfigured) {
-      const configErr = getSupabaseConfigError();
-      return { error: configErr || 'Falta la configuración de Supabase' };
+      return { error: 'Falta la configuración de Supabase. Comprueba las variables de entorno.' };
     }
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password: password,
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        return { error: error.message };
+      }
+      if (data.user) {
+        await loadUserProfileAndRoles(data.user);
+      }
+      return { error: null };
+    } catch (err: any) {
+      return { error: err.message || 'Error inesperado durante el inicio de sesión.' };
+    }
+  };
+
+  const resetPassword = async (email: string): Promise<{ success: boolean; message: string }> => {
+    if (!supabase || !isSupabaseConfigured) {
+      return { success: false, message: 'Supabase no está configurado.' };
+    }
+
+    try {
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://app-cd-jsuitas.vercel.app';
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${origin}/reset-password`,
       });
 
       if (error) {
-        const errorMsg = error.message.toLowerCase();
-        if (errorMsg.includes('invalid login credentials') || errorMsg.includes('invalid_credentials')) {
-          return { error: 'El correo o la contraseña no son correctos.' };
-        }
-        if (errorMsg.includes('email not confirmed')) {
-          return { error: 'Debes confirmar tu correo electrónico antes de acceder.' };
-        }
-        if (errorMsg.includes('fetch') || errorMsg.includes('network')) {
-          return { error: 'No se ha podido conectar. Inténtalo de nuevo.' };
-        }
-        return { error: 'El correo o la contraseña no son correctos.' };
+        return { success: false, message: error.message };
       }
 
-      if (data.session && data.user) {
-        setSession(data.session);
-        await loadUserProfileAndRoles(data.user);
-        return { error: null };
-      }
-
-      return { error: 'Ha ocurrido un error inesperado.' };
+      return { 
+        success: true, 
+        message: 'Se ha enviado un correo con instrucciones para restablecer tu contraseña.' 
+      };
     } catch (err: any) {
-      console.error('Error en signInWithPassword:', err);
-      return { error: 'No se ha podido conectar. Inténtalo de nuevo.' };
+      return { success: false, message: err.message || 'Error al solicitar restablecimiento de contraseña.' };
     }
   };
 
-  // Recuperación de Contraseña (resetPasswordForEmail)
-  const resetPassword = async (email: string): Promise<{ success: boolean; message: string }> => {
-    const cleanEmail = email.trim();
-    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-      return { success: false, message: 'El correo electrónico no es válido.' };
-    }
-
-    // Configuración exacta de la URL de redirección
-    let redirectUrl = 'https://app-cd-jsuitas.vercel.app/reset-password';
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const origin = window.location.origin;
-      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-        redirectUrl = `${origin}/reset-password`;
-      } else {
-        redirectUrl = 'https://app-cd-jsuitas.vercel.app/reset-password';
-      }
-    } else if (Platform.OS !== 'web') {
-      redirectUrl = 'jesuitasmobileapp://reset-password';
-    }
-
-    if (supabase && isSupabaseConfigured) {
-      try {
-        const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-          redirectTo: redirectUrl,
-        });
-
-        if (error) {
-          return { success: false, message: 'No se ha podido enviar el correo. Inténtalo de nuevo.' };
-        }
-      } catch (err) {
-        console.error('Error enviando reset password:', err);
-        return { success: false, message: 'No se ha podido enviar el correo. Inténtalo de nuevo.' };
-      }
-    }
-
-    return {
-      success: true,
-      message: 'Te hemos enviado un correo para restablecer tu contraseña.',
-    };
-  };
-
-  // Cierre de Sesión (signOut)
   const logout = async () => {
-    setIsLoading(true);
     if (supabase && isSupabaseConfigured) {
-      try {
-        await supabase.auth.signOut();
-      } catch (err) {
-        console.error('Error al cerrar sesión:', err);
-      }
+      await supabase.auth.signOut();
     }
-    setSession(null);
     setUser(null);
     setActiveContext(null);
+    setSession(null);
     setLinkedPlayers([]);
     setActivePlayerId(null);
     setAssignedTeams([]);
     setActiveTeamId(null);
-    setIsLoading(false);
-  };
-
-  const clearProfile = () => {
-    setActiveContext(null);
   };
 
   const switchContext = (context: ActiveContextType) => {
+    // Protección de SwitchContext: No permitir cambiar a un rol que el usuario no tenga asignado
     if (user && user.roles.length > 0 && !user.roles.includes(context)) {
-      return; // No permitir cambiar a un rol no autorizado
-    }
-
-    if (context === 'ENTRENADOR') {
-      setUser(prev => prev ? { ...prev, full_name: 'Raúl García Trujillo' } : null);
-      if (isDemoEnabled) {
-        setAssignedTeams([{ id: 't-infantil-a', name: 'Infantil A', sport: 'futbol', category: 'Infantil' }]);
-        setActiveTeamId('t-infantil-a');
-      }
-    } else if (context === 'COORDINADOR') {
-      setUser(prev => prev ? { ...prev, full_name: 'Coordinador de Fútbol' } : null);
-    } else if (context === 'JUGADOR') {
-      setUser(prev => prev ? { ...prev, full_name: 'Pablo Martínez' } : null);
+      console.warn(`Intento no autorizado de cambiar al contexto ${context}`);
+      return;
     }
     setActiveContext(context);
   };
@@ -346,44 +464,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setActiveTeamId(teamId);
   };
 
-  // Acceso de Prueba (Desactivado en producción si DEMO_ACCESS !== 'true')
   const loginAsCoachInfantilA = () => {
-    if (process.env.EXPO_PUBLIC_ENABLE_DEMO_ACCESS !== 'true') {
-      return;
-    }
-
-    setIsLoading(true);
+    if (!isDemoEnabled) return;
     setUser({
-      id: 'demo-entrenador-infantil-a',
-      full_name: 'Raúl García Trujillo',
-      email: 'raul@jesuitas.es',
+      id: 'demo-coach-id',
+      full_name: 'Carlos Ruíz',
+      email: 'carlos.ruiz@cdjesuitas.es',
       roles: ['ENTRENADOR']
     });
     setActiveContext('ENTRENADOR');
-    setAssignedTeams([{ id: 't-infantil-a', name: 'Infantil A', sport: 'futbol', category: 'Infantil' }]);
-    setActiveTeamId('t-infantil-a');
-    setIsLoading(false);
+    setAssignedTeams(mockTeams);
+    setActiveTeamId('t1');
+  };
+
+  const clearProfile = () => {
+    setActiveContext(null);
   };
 
   return (
-    <AuthContext.Provider value={{
-      session,
-      user,
-      activeContext,
-      linkedPlayers,
-      activePlayerId,
-      assignedTeams,
-      activeTeamId,
-      isLoading,
-      loginWithEmail,
-      resetPassword,
-      logout,
-      switchContext,
-      switchActivePlayer,
-      switchActiveTeam,
-      loginAsCoachInfantilA,
-      clearProfile,
-    }}>
+    <AuthContext.Provider
+      value={{
+        session,
+        user,
+        activeContext,
+        isLoading,
+        linkedPlayers,
+        activePlayerId,
+        assignedTeams,
+        activeTeamId,
+        managedUsers,
+        updateUserRolesAndStatus,
+        createManagedUser,
+        loginAsTestUserByEmail,
+        loginWithEmail,
+        resetPassword,
+        logout,
+        switchContext,
+        switchActivePlayer,
+        switchActiveTeam,
+        loginAsCoachInfantilA,
+        clearProfile,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -392,7 +514,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error('useAuth debe ser usado dentro de un AuthProvider');
   }
   return context;
 }
