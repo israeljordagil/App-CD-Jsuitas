@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -17,6 +17,7 @@ export interface CromoJugadorProps {
   streakWeeks?: number;
   photo?: string;
   avatarUrl?: string;
+  hideGamification?: boolean;
 }
 
 export const CromoJugador: React.FC<CromoJugadorProps> = ({
@@ -30,6 +31,7 @@ export const CromoJugador: React.FC<CromoJugadorProps> = ({
   nextLevelXp = 2000,
   streakWeeks = 4,
   photo = '👦',
+  hideGamification = false,
 }) => {
   const xpPct = Math.min(100, Math.max(0, (currentXp / nextLevelXp) * 100));
 
@@ -48,10 +50,12 @@ export const CromoJugador: React.FC<CromoJugadorProps> = ({
             <Text style={styles.clubTag}>CD JESUITAS</Text>
           </View>
 
-          <View style={styles.levelBadge}>
-            <Ionicons name="sparkles" size={14} color="#F59E0B" />
-            <Text style={styles.levelBadgeText}>NIVEL {level}</Text>
-          </View>
+          {!hideGamification && (
+            <View style={styles.levelBadge}>
+              <Ionicons name="sparkles" size={14} color="#F59E0B" />
+              <Text style={styles.levelBadgeText}>NIVEL {level}</Text>
+            </View>
+          )}
         </View>
 
         {/* AVATAR / FOTO Y DORSAL */}
@@ -72,7 +76,7 @@ export const CromoJugador: React.FC<CromoJugadorProps> = ({
         {/* NOMBRE DEL DEPORTISTA */}
         <Text style={styles.playerName}>{name}</Text>
 
-        {/* ETIQUETAS DE POSICIÓN Y EQUIPO (SI EXISTEN) */}
+        {/* ETIQUETAS DE POSICIÓN Y EQUIPO */}
         <View style={styles.tagsRow}>
           {team && (
             <View style={styles.tagPill}>
@@ -91,34 +95,42 @@ export const CromoJugador: React.FC<CromoJugadorProps> = ({
           )}
         </View>
 
-        {/* RESUMEN BARRA XP & RACHA (GAMIFICACIÓN PURA) */}
-        <View style={styles.xpSection}>
-          <View style={styles.xpHeaderRow}>
-            <Text style={styles.xpLabel}>EXPERIENCIA XP</Text>
-            <Text style={styles.xpVal}>{currentXp} / {nextLevelXp} XP</Text>
-          </View>
-          <View style={styles.xpBarTrack}>
-            <LinearGradient
-              colors={['#4FC3F7', '#F59E0B']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[styles.xpBarFill, { width: `${xpPct}%` }]}
-            />
-          </View>
-        </View>
+        {/* RESUMEN BARRA XP & RACHA (SI NO ESTÁ OCULTO) */}
+        {!hideGamification && (
+          <>
+            <View style={styles.xpSection}>
+              <View style={styles.xpHeaderRow}>
+                <Text style={styles.xpLabel}>EXPERIENCIA XP</Text>
+                <Text style={styles.xpVal}>{currentXp} / {nextLevelXp} XP</Text>
+              </View>
+              <View style={styles.xpBarTrack}>
+                <LinearGradient
+                  colors={['#4FC3F7', '#F59E0B']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[styles.xpBarFill, { width: `${xpPct}%` }]}
+                />
+              </View>
+            </View>
 
-        {/* INSIGNIA DE RACHA DEPORTIVA */}
-        <View style={styles.streakFooter}>
-          <View style={styles.streakPill}>
-            <Text style={{ fontSize: 16 }}>🔥</Text>
-            <Text style={styles.streakText}>RACHA: <Text style={{ color: '#F59E0B', fontWeight: '900' }}>{streakWeeks} Semanas Seguidas</Text></Text>
-          </View>
-        </View>
+            <View style={styles.streakFooter}>
+              <View style={styles.streakPill}>
+                <Text style={{ fontSize: 16 }}>🔥</Text>
+                <Text style={styles.streakText}>
+                  RACHA: <Text style={{ color: '#F59E0B', fontWeight: '900' }}>{streakWeeks} Semanas Seguidas</Text>
+                </Text>
+              </View>
+            </View>
+          </>
+        )}
 
       </LinearGradient>
     </View>
   );
 };
+
+// Alias unificado oficial
+export const PlayerCard = CromoJugador;
 
 const styles = StyleSheet.create({
   cardContainer: {
@@ -132,6 +144,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 8,
+    width: '100%',
   },
   cardGradient: {
     padding: 20,

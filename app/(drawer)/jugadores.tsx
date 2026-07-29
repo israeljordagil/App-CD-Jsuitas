@@ -1,7 +1,25 @@
 import React from 'react';
-import MiZonaScreen from './mi-zona';
+import { View, StyleSheet } from 'react-native';
+import { FamiliaMiHijo } from '../../src/components/dashboards/FamiliaMiHijo';
+import { PremiumHeader } from '../../src/components/ui/PremiumHeader';
 
-// Unificación técnica de la ruta /jugadores hacia /mi-zona
 export default function JugadoresScreen() {
-  return <MiZonaScreen />;
+  return (
+    <View style={styles.screenContainer}>
+      <PremiumHeader 
+        title="MIS HIJOS" 
+        subtitle="FICHA DE IDENTIDAD OFICIAL"
+        showSearchAndActions={false}
+        showAvatar={false}
+      />
+      <FamiliaMiHijo />
+    </View>
+  );
 }
+
+const styles = StyleSheet.create({
+  screenContainer: {
+    flex: 1,
+    backgroundColor: '#071A3D',
+  },
+});

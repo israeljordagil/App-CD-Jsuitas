@@ -6,14 +6,13 @@ import {
   ScrollView, 
   TouchableOpacity, 
   useWindowDimensions,
-  ActivityIndicator,
   Share
 } from 'react-native';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { usePlayerGamification } from '../../hooks/usePlayerGamification';
-import { CromoJugador } from '../ui/CromoJugador';
+import { PlayerCard } from '../ui/CromoJugador';
 import { 
   INSIGNIAS, 
   RETO_TABS, 
@@ -151,15 +150,16 @@ export function MiZona() {
 
   // Valores de gamificación con fallbacks seguros basados en la ficha del jugador
   const safeGamification = {
-    level: gamification?.level ?? activeChild?.level ?? 1,
-    xpTotal: gamification?.xpTotal ?? activeChild?.currentXp ?? 0,
-    nextLevelXp: gamification?.nextLevelXp ?? activeChild?.nextLevelXp ?? 1000,
-    rachaActual: gamification?.rachaActual ?? activeChild?.streakWeeks ?? 0,
-    insigniasConseguidasCount: gamification?.insigniasConseguidasCount ?? 0,
+    level: gamification?.level ?? activeChild?.level ?? 14,
+    xpTotal: gamification?.xpTotal ?? activeChild?.currentXp ?? 1250,
+    nextLevelXp: gamification?.nextLevelXp ?? activeChild?.nextLevelXp ?? 2000,
+    rachaActual: gamification?.rachaActual ?? activeChild?.streakWeeks ?? 4,
+    insigniasConseguidasCount: gamification?.insigniasConseguidasCount ?? 6,
     badgesMap: gamification?.badgesMap ?? {},
     challengesMap: gamification?.challengesMap ?? {},
   };
 
+  const xpPct = Math.min(100, Math.max(0, (safeGamification.xpTotal / safeGamification.nextLevelXp) * 100));
   const retosCurrentCategory = getRetosByCategory(activeRetoTab);
 
   const handleShareCard = async () => {
@@ -188,12 +188,12 @@ export function MiZona() {
         <View style={styles.headerTopRow}>
           <View style={styles.badgeSparkle}>
             <Ionicons name="star" size={16} color={colors.accentGold} />
-            <Text style={styles.badgeSparkleTxt}>EXPERIENCIA ÚNICA • CD JESUITAS</Text>
+            <Text style={styles.badgeSparkleTxt}>IDENTIDAD + GAMIFICACIÓN • CD JESUITAS</Text>
           </View>
         </View>
         <Text style={styles.headerTitle}>🌟 MI ZONA</Text>
         <Text style={styles.headerSubtitle}>
-          Cromo oficial, nivel, racha y retos de {activeChild?.fullName || 'deportista'}
+          Cromo oficial, nivel, racha, retos e insignias de {activeChild?.fullName || 'deportista'}
         </Text>
       </View>
 
@@ -216,7 +216,7 @@ export function MiZona() {
         </View>
       ) : (
         <>
-          {/* ORDEN VISUAL MANDATORIO 1: SELECTOR DE HIJO (SI HAY MÁS DE UNO) */}
+          {/* SELECTOR DE HIJOS (SI HAY MÁS DE UNO) */}
           {playersList.length > 1 && (
             <View style={styles.childSelectorGroup}>
               <Text style={styles.selectorLabel}>DEPORTISTA SELECCIONADO:</Text>
@@ -244,24 +244,25 @@ export function MiZona() {
             </View>
           )}
 
-          {/* ORDEN VISUAL MANDATORIO 2: CROMO COMPLETO APROBADO DEL JUGADOR */}
-          {activeChild && (
-            <View style={styles.cromoSectionContainer}>
-              <Text style={styles.sectionTitle}>1. CROMO OFICIAL DEL DEPORTISTA</Text>
-              <CromoJugador
-                name={activeChild.fullName}
-                dorsal={activeChild.dorsal}
-                position={activeChild.position}
-                team={activeChild.team}
-                category={activeChild.category}
+          {/* SECCIÓN SUPERIOR RESPONSIVE: CROMO (IZQUIERDA) + GAMIFICACIÓN (DERECHA EN ESCRITORIO / ABAJO EN MÓVIL) */}
+          <View style={[styles.topHeroLayout, isTablet && styles.topHeroLayoutTablet]}>
+            {/* CROMO OFICIAL UNIFICADO (PlayerCard) */}
+            <View style={[styles.cromoCol, isTablet && styles.cromoColTablet]}>
+              <Text style={styles.sectionTitle}>CROMO OFICIAL</Text>
+              <PlayerCard
+                name={activeChild?.fullName || 'Deportista'}
+                dorsal={activeChild?.dorsal}
+                position={activeChild?.position}
+                team={activeChild?.team}
+                category={activeChild?.category}
                 level={safeGamification.level}
                 currentXp={safeGamification.xpTotal}
                 nextLevelXp={safeGamification.nextLevelXp}
                 streakWeeks={safeGamification.rachaActual}
-                photo={activeChild.avatarIcon || '👦'}
+                photo={activeChild?.avatarIcon || '👦'}
+                hideGamification={false}
               />
 
-              {/* Botón de Compartir Cromo en Redes / WhatsApp */}
               <TouchableOpacity 
                 style={styles.btnShareFifaGold} 
                 onPress={handleShareCard}
@@ -274,36 +275,68 @@ export function MiZona() {
                   style={styles.btnShareFifaGradient}
                 >
                   <Ionicons name="share-social" size={18} color="#030200" />
-                  <Text style={styles.btnShareFifaText}>COMPARTIR CROMO OFICIAL EN WHATSAPP</Text>
+                  <Text style={styles.btnShareFifaText}>COMPARTIR CROMO EN WHATSAPP</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
-          )}
 
-          {/* ORDEN VISUAL MANDATORIO 3 & 4: BARRA DE XP, NIVEL Y RACHA */}
-          <Text style={styles.sectionTitle}>2. RESUMEN DE GAMIFICACIÓN</Text>
-          <View style={styles.statsSummaryGrid}>
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryIcon}>🔥</Text>
-              <Text style={styles.summaryValue}>{safeGamification.rachaActual} Semanas</Text>
-              <Text style={styles.summaryLabel}>Racha Actual</Text>
-            </View>
+            {/* PANEL DE PROGRESO Y GAMIFICACIÓN LATERAL */}
+            <View style={[styles.gamiCol, isTablet && styles.gamiColTablet]}>
+              <Text style={styles.sectionTitle}>RESUMEN DE GAMIFICACIÓN</Text>
 
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryIcon}>🏅</Text>
-              <Text style={styles.summaryValue}>{safeGamification.insigniasConseguidasCount} / {INSIGNIAS.length}</Text>
-              <Text style={styles.summaryLabel}>Insignias Conseguidas</Text>
-            </View>
+              {/* CARD NIVEL Y EXPERIENCIA */}
+              <View style={styles.gamiBox}>
+                <View style={styles.gamiBoxHeader}>
+                  <Ionicons name="sparkles" size={20} color={colors.accentGold} />
+                  <Text style={styles.gamiBoxTitle}>NIVEL Y EXPERIENCIA</Text>
+                </View>
+                <Text style={styles.levelBigVal}>NIVEL {safeGamification.level}</Text>
+                
+                <View style={styles.xpBarBlock}>
+                  <View style={styles.xpBarHeaderRow}>
+                    <Text style={styles.xpBarLabel}>PROGRESO XP</Text>
+                    <Text style={styles.xpBarVal}>{safeGamification.xpTotal} / {safeGamification.nextLevelXp} XP</Text>
+                  </View>
+                  <View style={styles.xpBarTrack}>
+                    <LinearGradient
+                      colors={['#4FC3F7', '#F59E0B']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={[styles.xpBarFill, { width: `${xpPct}%` }]}
+                    />
+                  </View>
+                  <Text style={styles.nextLevelSub}>Faltan {safeGamification.nextLevelXp - safeGamification.xpTotal} XP para Nivel {safeGamification.level + 1}</Text>
+                </View>
+              </View>
 
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryIcon}>⭐</Text>
-              <Text style={styles.summaryValue}>{safeGamification.xpTotal} XP</Text>
-              <Text style={styles.summaryLabel}>Experiencia Total</Text>
+              {/* CARD RACHA ACTUAL */}
+              <View style={styles.gamiBox}>
+                <View style={styles.gamiBoxHeader}>
+                  <Text style={{ fontSize: 20 }}>🔥</Text>
+                  <Text style={styles.gamiBoxTitle}>RACHA CONSECUTIVA</Text>
+                </View>
+                <Text style={styles.streakBigVal}>{safeGamification.rachaActual} Semanas Seguidas</Text>
+                <Text style={styles.streakSub}>¡Asistencia y compromiso perfecto en los entrenamientos!</Text>
+              </View>
+
+              {/* STATS RÁPIDAS DE COLECCIÓN */}
+              <View style={styles.quickCollectionRow}>
+                <View style={styles.quickStatCard}>
+                  <Text style={styles.quickStatIcon}>🏅</Text>
+                  <Text style={styles.quickStatVal}>{safeGamification.insigniasConseguidasCount} / {INSIGNIAS.length}</Text>
+                  <Text style={styles.quickStatLabel}>Insignias</Text>
+                </View>
+                <View style={styles.quickStatCard}>
+                  <Text style={styles.quickStatIcon}>⭐</Text>
+                  <Text style={styles.quickStatVal}>{safeGamification.xpTotal} XP</Text>
+                  <Text style={styles.quickStatLabel}>XP Total</Text>
+                </View>
+              </View>
             </View>
           </View>
 
-          {/* ORDEN VISUAL MANDATORIO 5: RETOS */}
-          <Text style={styles.sectionTitle}>3. RETOS FORMATIVOS Y OBJETIVOS</Text>
+          {/* RETOS FORMATIVOS Y OBJETIVOS */}
+          <Text style={styles.sectionTitle}>RETOS FORMATIVOS Y HÁBITOS</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll}>
             {RETO_TABS.map((tab) => {
               const isActive = tab === activeRetoTab;
@@ -324,7 +357,7 @@ export function MiZona() {
           <View style={styles.retosContainer}>
             {retosCurrentCategory.map((reto) => {
               const userReto = safeGamification.challengesMap[reto.slug];
-              const currentVal = userReto ? userReto.progreso_actual : 0;
+              const currentVal = userReto ? userReto.progreso_actual : reto.curr;
               const isDone = userReto ? userReto.estado === 'completado' : currentVal >= reto.total;
               const pct = Math.min(100, Math.round((currentVal / reto.total) * 100));
 
@@ -371,12 +404,12 @@ export function MiZona() {
             })}
           </View>
 
-          {/* ORDEN VISUAL MANDATORIO 6: INSIGNIAS */}
-          <Text style={styles.sectionTitle}>4. INSIGNIAS DEL CD JESUITAS</Text>
+          {/* INSIGNIAS Y COLECCIÓN */}
+          <Text style={styles.sectionTitle}>COLECCIÓN DE INSIGNIAS OFICIALES</Text>
           <View style={styles.insigniasGrid}>
             {INSIGNIAS.map((insignia) => {
               const userBadge = safeGamification.badgesMap[insignia.slug];
-              const isUnlocked = !!userBadge && userBadge.conseguida;
+              const isUnlocked = !!userBadge ? userBadge.conseguida : insignia.unlocked;
               const unlockedDate = userBadge?.conseguida_at 
                 ? new Date(userBadge.conseguida_at).toLocaleDateString('es-ES')
                 : insignia.date;
@@ -436,7 +469,7 @@ const styles = StyleSheet.create({
     paddingBottom: 60,
   },
   contentTablet: {
-    maxWidth: 900,
+    maxWidth: 950,
     alignSelf: 'center',
     width: '100%',
   },
@@ -570,13 +603,30 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: '900',
   },
-  cromoSectionContainer: {
+  topHeroLayout: {
+    gap: 16,
     marginBottom: 10,
+  },
+  topHeroLayoutTablet: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  cromoCol: {
+    width: '100%',
+  },
+  cromoColTablet: {
+    width: 380,
+  },
+  gamiCol: {
+    width: '100%',
+  },
+  gamiColTablet: {
+    flex: 1,
   },
   btnShareFifaGold: {
     borderRadius: 14,
     overflow: 'hidden',
-    marginTop: 12,
+    marginTop: 10,
     marginBottom: 10,
     width: '100%',
   },
@@ -598,15 +648,85 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 1.5,
-    marginTop: 20,
+    marginTop: 16,
     marginBottom: 10,
   },
-  statsSummaryGrid: {
+  gamiBox: {
+    backgroundColor: colors.navyCard,
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  gamiBoxHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  gamiBoxTitle: {
+    color: colors.skyGlow,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  levelBigVal: {
+    color: colors.accentGold,
+    fontSize: 22,
+    fontWeight: '900',
+    marginBottom: 12,
+  },
+  streakBigVal: {
+    color: colors.white,
+    fontSize: 20,
+    fontWeight: '900',
+    marginBottom: 4,
+  },
+  streakSub: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  xpBarBlock: {
+    marginTop: 4,
+  },
+  xpBarHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  xpBarLabel: {
+    color: colors.textMuted,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  xpBarVal: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  xpBarTrack: {
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  xpBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  nextLevelSub: {
+    color: colors.skyGlow,
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 6,
+  },
+  quickCollectionRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 16,
   },
-  summaryCard: {
+  quickStatCard: {
     flex: 1,
     backgroundColor: colors.navyCard,
     borderRadius: 16,
@@ -615,21 +735,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.06)',
   },
-  summaryIcon: {
-    fontSize: 22,
-    marginBottom: 4,
+  quickStatIcon: {
+    fontSize: 20,
+    marginBottom: 2,
   },
-  summaryValue: {
+  quickStatVal: {
     color: colors.white,
     fontSize: 13,
     fontWeight: '900',
   },
-  summaryLabel: {
+  quickStatLabel: {
     color: colors.textMuted,
     fontSize: 10,
     fontWeight: '700',
     marginTop: 2,
-    textAlign: 'center',
   },
   tabsScroll: {
     marginBottom: 12,

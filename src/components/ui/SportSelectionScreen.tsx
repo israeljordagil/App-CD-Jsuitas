@@ -288,7 +288,7 @@ export function SportSelectionScreen({ onChangeProfile }: SportSelectionScreenPr
         <View style={styles.footer}>
           <Text style={styles.footerClub}>Club Deportivo Colegio Jesuitas</Text>
           <Text style={styles.footerCopy}>Sistema Integrado de Gestión Deportiva • 2026</Text>
-          <Text style={{ color: '#4FC3F7', fontSize: 10, fontWeight: '900', marginTop: 4, letterSpacing: 1 }}>COMPILACIÓN: MIZONA-UNIFICADA-01</Text>
+          <Text style={{ color: '#4FC3F7', fontSize: 10, fontWeight: '900', marginTop: 4, letterSpacing: 1 }}>COMPILACIÓN: PLAYERCARD-DEFINITIVO-01</Text>
         </View>
 
       </ScrollView>
