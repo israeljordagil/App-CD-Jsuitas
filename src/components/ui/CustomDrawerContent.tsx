@@ -74,6 +74,34 @@ export function CustomDrawerContent(props: any) {
   const isEntrenador = targetContext === 'ENTRENADOR';
   const isCoordinador = targetContext === 'COORDINADOR' || targetContext === 'DIR_DEPORTIVA' || targetContext === 'ADMIN_GENERAL';
 
+  const BottomActions = () => (
+    <View style={styles.bottomActionsContainer}>
+      <TouchableOpacity 
+        style={styles.bottomActionBtn} 
+        onPress={() => {
+          setSport(null);
+          router.replace('/');
+        }}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.bottomActionIcon}>⚽</Text>
+        <Text style={[styles.bottomActionText, { color: clubColors.skyPrimary }]}>Cambiar deporte</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={styles.bottomActionBtn} 
+        onPress={() => {
+          clearProfile();
+          router.replace('/');
+        }}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.bottomActionIcon}>🚪</Text>
+        <Text style={styles.bottomActionText}>Cerrar Sesión</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   if (isEntrenador) {
     return (
       <ScrollView style={styles.containerFamilias} contentContainerStyle={{ paddingBottom: 40 }}>
