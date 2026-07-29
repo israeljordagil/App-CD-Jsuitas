@@ -4,7 +4,7 @@ import { useAuth } from '../../src/context/AuthContext';
 import { useDemoNavigation } from '../../src/context/DemoNavigationContext';
 import { MiZona } from '../../src/components/familia/MiZona';
 import { PremiumHeader } from '../../src/components/ui/PremiumHeader';
-import { demoFamilyData } from '../../src/data/demoFamilyData';
+import { DEMO_FAMILY } from '../../src/data/demoFamilyData';
 
 export default function MiZonaScreen() {
   const { selectedDemoProfile } = useDemoNavigation();
@@ -27,13 +27,14 @@ export default function MiZonaScreen() {
     );
   }
 
-  // Lista de deportistas vinculados a la cuenta familiar (del AuthContext o Mock de la Demo)
-  const availableChildren = linkedPlayers && linkedPlayers.length > 0 
+  // Obención defensiva de deportistas para evitar TypeErrors
+  const demoChildren = (DEMO_FAMILY && Array.isArray(DEMO_FAMILY.children)) ? DEMO_FAMILY.children : [];
+  const availableChildren = (Array.isArray(linkedPlayers) && linkedPlayers.length > 0)
     ? linkedPlayers 
-    : demoFamilyData.children;
+    : demoChildren;
 
   const selectedPlayerId = activePlayerId || availableChildren[0]?.id || null;
-  const isChildLinked = availableChildren.some(child => child.id === selectedPlayerId);
+  const isChildLinked = availableChildren.some((child: any) => child.id === selectedPlayerId);
 
   // Estado: No hay ningún hijo seleccionado aún
   if (!selectedPlayerId) {
@@ -45,15 +46,15 @@ export default function MiZonaScreen() {
           <Text style={styles.selectorTitle}>Selecciona uno de tus hijos para entrar en Mi Zona</Text>
           <Text style={styles.selectorSub}>Elige un deportista vinculado a tu cuenta familiar para consultar su progreso:</Text>
           <View style={styles.childrenGrid}>
-            {availableChildren.map((child) => (
+            {availableChildren.map((child: any) => (
               <TouchableOpacity
                 key={child.id}
                 style={styles.childBtn}
                 activeOpacity={0.8}
                 onPress={() => switchActivePlayer(child.id)}
               >
-                <Text style={styles.childBtnName}>{child.name}</Text>
-                <Text style={styles.childBtnCategory}>{child.category || child.teamName}</Text>
+                <Text style={styles.childBtnName}>{child.name || child.fullName}</Text>
+                <Text style={styles.childBtnCategory}>{child.category || child.team || child.teamName}</Text>
               </TouchableOpacity>
             ))}
           </View>

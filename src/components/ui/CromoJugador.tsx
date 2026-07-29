@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   heroSection: {
     position: 'relative',
     alignItems: 'center',
-    justify: 'center',
+    justifyContent: 'center',
     marginVertical: 8,
   },
   avatarGlowContainer: {
