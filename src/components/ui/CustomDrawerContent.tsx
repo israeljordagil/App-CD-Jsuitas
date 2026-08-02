@@ -62,6 +62,16 @@ const COORDINATOR_MENU_ITEMS = [
   { label: 'Ajustes', route: 'configuracion', icon: '⚙️' },
 ];
 
+const DELEGATE_MENU_ITEMS = [
+  { label: 'Inicio', route: 'index', icon: '🏠' },
+  { label: 'Mi Temporada', route: 'delegado/temporada', icon: '📅' },
+  { label: 'Documentación', route: 'delegado/documentacion', icon: '📄' },
+  { label: 'Mi Equipo', route: 'delegado/equipo', icon: '👥' },
+  { label: 'Preparación', route: 'delegado/preparacion', icon: '📋' },
+  { label: 'Partido en Vivo', route: 'delegado/partido-en-vivo', icon: '🏟️' },
+  { label: 'Ajustes', route: 'configuracion', icon: '⚙️' },
+];
+
 import { useDemoNavigation } from '../../context/DemoNavigationContext';
 
 export function CustomDrawerContent(props: any) {
@@ -72,12 +82,13 @@ export function CustomDrawerContent(props: any) {
   const { sport, setSport } = useSport();
 
   const activePlayer = linkedPlayers.find(p => p.id === activePlayerId) || linkedPlayers[0] || null;
-  const activeTeam = (assignedTeams && assignedTeams[0] && assignedTeams[0].name) ? assignedTeams[0].name : 'Infantil A';
+  const activeTeam = (assignedTeams && assignedTeams[0] && assignedTeams[0].name) ? assignedTeams[0].name : 'Cadete B';
 
   const targetContext = selectedDemoProfile || activeContext || 'FAMILIA';
 
   const isFamilias = targetContext === 'FAMILIA';
   const isEntrenador = targetContext === 'ENTRENADOR';
+  const isDelegado = targetContext === 'DELEGADO';
   const isCoordinador = targetContext === 'COORDINADOR' || targetContext === 'DIR_DEPORTIVA' || targetContext === 'ADMIN_GENERAL';
 
   const BottomActions = () => (
@@ -131,6 +142,46 @@ export function CustomDrawerContent(props: any) {
                key={idx}
                style={styles.menuItemFamilias}
                onPress={() => router.push(`/(drawer)/${item.route}` as any)}
+               activeOpacity={0.7}
+             >
+               <View style={styles.menuItemFamiliasLeft}>
+                  <Text style={{ fontSize: 20, marginRight: 16, width: 28, textAlign: 'center' }}>
+                    {item.icon}
+                  </Text>
+                  <Text style={styles.menuLabelFamilias}>
+                    {item.label}
+                  </Text>
+               </View>
+             </TouchableOpacity>
+           ))}
+        </View>
+        <BottomActions />
+      </ScrollView>
+    );
+  }
+
+  if (isDelegado) {
+    return (
+      <ScrollView style={styles.containerFamilias} contentContainerStyle={{ paddingBottom: 40 }}>
+        <View style={styles.headerFamilias}>
+          <FontAwesome name={sport === 'baloncesto' ? 'dribbble' : 'shield'} size={56} color={clubColors.white} style={{marginBottom: 16}} />
+          <View style={styles.headerFamiliasInfoRow}>
+             <View style={styles.avatarFamilias}>
+                <FontAwesome name="user" size={24} color={clubColors.navy} />
+             </View>
+             <View style={styles.textFamiliasBox}>
+                <Text style={styles.tutorName}>{user?.full_name || 'Carlos Ruiz'}</Text>
+                <Text style={styles.tutorRole}>Delegado • {activeTeam}</Text>
+             </View>
+          </View>
+        </View>
+
+        <View style={styles.menuContainerFamilias}>
+           {DELEGATE_MENU_ITEMS.map((item, idx) => (
+             <TouchableOpacity 
+               key={idx}
+               style={styles.menuItemFamilias}
+               onPress={() => item.route === 'index' ? router.replace('/(drawer)/inicio') : router.push(`/${item.route}` as any)}
                activeOpacity={0.7}
              >
                <View style={styles.menuItemFamiliasLeft}>

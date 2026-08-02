@@ -81,6 +81,7 @@ const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 const VALID_ROLES = new Set<AppRole>([
   'FAMILIA', 
   'ENTRENADOR', 
+  'DELEGADO',
   'COORDINADOR', 
   'DIR_DEPORTIVA', 
   'ADMIN_GENERAL'
@@ -90,6 +91,7 @@ export function resolveDefaultContext(roles: AppRole[]): ActiveContextType | nul
   if (!roles || roles.length === 0) return null;
   if (roles.includes('FAMILIA')) return 'FAMILIA';
   if (roles.includes('ENTRENADOR')) return 'ENTRENADOR';
+  if (roles.includes('DELEGADO')) return 'DELEGADO';
   if (roles.includes('COORDINADOR')) return 'COORDINADOR';
   if (roles.includes('DIR_DEPORTIVA')) return 'DIR_DEPORTIVA';
   if (roles.includes('ADMIN_GENERAL')) return 'ADMIN_GENERAL';

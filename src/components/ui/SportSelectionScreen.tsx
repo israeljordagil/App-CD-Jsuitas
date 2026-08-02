@@ -50,7 +50,7 @@ const SPORTS = [
     category: 'Futsal 5v5',
     description: 'Rotaciones rápidas, faltas acumuladas, marcador y cronómetro.',
     colorAccent: '#0284C7', // Azul Pista
-    gradientColors: ['rgba(2, 132, 199, 0.5)', 'rgba(3, 105, 161, 0.95)'],
+    gradientColors: ['rgba(7, 26, 61, 0.95)', 'rgba(3, 14, 38, 0.98)'] as const,
     badgeText: '5 EQUIPOS',
     nextEvent: 'Hoy 18:30 Sesión Pista',
     unreadCount: 1,
@@ -88,6 +88,7 @@ const SPORTS = [
 const ROLES_INFO: { id: ActiveContextType; label: string; icon: string }[] = [
   { id: 'FAMILIA', label: 'Familia', icon: '👨‍👩‍👧‍👦' },
   { id: 'ENTRENADOR', label: 'Entrenador', icon: '👨‍🏫' },
+  { id: 'DELEGADO', label: 'Delegado', icon: '📋' },
   { id: 'COORDINADOR', label: 'Coordinación', icon: '🧭' },
 ];
 
@@ -194,13 +195,13 @@ export function SportSelectionScreen({ onChangeProfile }: SportSelectionScreenPr
           <View style={styles.userInfoRow}>
             <View style={styles.userAvatarBadge}>
               <Text style={{ fontSize: 14 }}>
-                {activeContext === 'ENTRENADOR' ? '👨‍🏫' : activeContext === 'COORDINADOR' ? '🧭' : '👨‍👩‍👧‍👦'}
+                {activeContext === 'ENTRENADOR' ? '👨‍🏫' : activeContext === 'DELEGADO' ? '📋' : activeContext === 'COORDINADOR' ? '🧭' : '👨‍👩‍👧‍👦'}
               </Text>
             </View>
             <View>
               <Text style={styles.userGreeting}>Perfil activo:</Text>
               <Text style={styles.userName}>
-                {activeContext === 'ENTRENADOR' ? 'Entrenador' : activeContext === 'COORDINADOR' ? 'Coordinación' : 'Familia'}
+                {activeContext === 'ENTRENADOR' ? 'Entrenador' : activeContext === 'DELEGADO' ? 'Delegado' : activeContext === 'COORDINADOR' ? 'Coordinación' : 'Familia'}
               </Text>
             </View>
           </View>

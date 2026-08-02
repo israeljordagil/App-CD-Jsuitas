@@ -3,6 +3,7 @@ export type AppRole =
   | 'DIR_DEPORTIVA'
   | 'COORDINADOR'
   | 'ENTRENADOR'
+  | 'DELEGADO'
   | 'FAMILIA';
 
 export type UserStatus = 'ACTIVE' | 'DISABLED' | 'PENDING';

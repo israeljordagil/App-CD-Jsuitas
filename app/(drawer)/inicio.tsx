@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 
 import { FamiliaDashboard } from '../../src/components/dashboards/FamiliaDashboard';
 import { EntrenadorDashboard } from '../../src/components/dashboards/EntrenadorDashboard';
+import { DelegadoDashboard } from '../../src/components/dashboards/DelegadoDashboard';
 import { CoordinadorDashboard } from '../../src/components/dashboards/CoordinadorDashboard';
 import { DireccionDeportivaDashboard } from '../../src/components/dashboards/DireccionDeportivaDashboard';
 import { AdminGeneralDashboard } from '../../src/components/dashboards/AdminGeneralDashboard';
@@ -16,8 +17,9 @@ import { useDemoNavigation } from '../../src/context/DemoNavigationContext';
 const ALL_PROFILES: { id: ActiveContextType; label: string; icon: string }[] = [
   { id: 'FAMILIA', label: 'Familia', icon: '👨‍👩‍👧' },
   { id: 'ENTRENADOR', label: 'Entrenador', icon: '👨‍🏫' },
+  { id: 'DELEGADO', label: 'Delegado', icon: '📋' },
   { id: 'COORDINADOR', label: 'Coordinación', icon: '🧭' },
-  { id: 'DIR_DEPORTIVA', label: 'Dirección deportiva', icon: '📋' },
+  { id: 'DIR_DEPORTIVA', label: 'Dirección deportiva', icon: '📊' },
   { id: 'ADMIN_GENERAL', label: 'Administración', icon: '⚙️' },
 ];
 
@@ -69,6 +71,8 @@ export default function DashboardRouterScreen() {
         return <FamiliaDashboard />;
       case 'ENTRENADOR': 
         return <EntrenadorDashboard />;
+      case 'DELEGADO':
+        return <DelegadoDashboard />;
       case 'COORDINADOR': 
         return <CoordinadorDashboard />;
       case 'DIR_DEPORTIVA': 
@@ -88,7 +92,7 @@ export default function DashboardRouterScreen() {
         <View style={styles.stickyHeader}>
           <PremiumHeader 
             title={getHeaderTitle()}
-            subtitle={`Perfil activo: ${effectiveProfile === 'ENTRENADOR' ? 'Entrenador' : effectiveProfile === 'COORDINADOR' ? 'Coordinación' : 'Familia'}`}
+            subtitle={`Perfil activo: ${effectiveProfile === 'ENTRENADOR' ? 'Entrenador' : effectiveProfile === 'DELEGADO' ? 'Delegado' : effectiveProfile === 'COORDINADOR' ? 'Coordinación' : 'Familia'}`}
             showSearchAndActions={false}
             showAvatar={false}
             showBackButton={false}

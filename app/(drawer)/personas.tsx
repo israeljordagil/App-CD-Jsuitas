@@ -27,6 +27,7 @@ const ALL_ROLES: AppRole[] = [
   'DIR_DEPORTIVA', 
   'COORDINADOR', 
   'ENTRENADOR', 
+  'DELEGADO',
   'FAMILIA', 
   'JUGADOR'
 ];

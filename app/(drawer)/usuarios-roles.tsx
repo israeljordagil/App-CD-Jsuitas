@@ -19,6 +19,7 @@ const ALL_ROLES: { id: AppRole; label: string; icon: string; description: string
   { id: 'DIR_DEPORTIVA', label: 'Dirección Deportiva', icon: '📋', description: 'Planificación técnica global' },
   { id: 'COORDINADOR', label: 'Coordinación', icon: '🧭', description: 'Gestión de deportes y categorías' },
   { id: 'ENTRENADOR', label: 'Entrenador', icon: '👨‍🏫', description: 'Gestión de equipos y plantillas' },
+  { id: 'DELEGADO', label: 'Delegado', icon: '📋', description: 'Gestión y documentación de partidos' },
   { id: 'FAMILIA', label: 'Familia', icon: '👨‍👩‍👧', description: 'Acceso de tutores y seguimiento' },
   { id: 'JUGADOR', label: 'Jugador', icon: '👦', description: 'Área deportiva del deportista' },
 ];
