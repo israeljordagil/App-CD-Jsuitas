@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { ActiveContextType } from './AuthContext';
 import { SportType } from './SportContext';
 
-export type DemoProfileType = 'FAMILIA' | 'ENTRENADOR' | 'COORDINADOR' | null;
+export type DemoProfileType = 'FAMILIA' | 'ENTRENADOR' | 'DELEGADO' | 'COORDINADOR' | null;
 
 interface DemoNavigationContextProps {
   selectedDemoProfile: DemoProfileType;

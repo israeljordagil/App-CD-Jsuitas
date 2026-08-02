@@ -15,6 +15,7 @@ import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSport, SportType } from '../../context/SportContext';
 import { useAuth, ActiveContextType } from '../../context/AuthContext';
+import { useDemoNavigation } from '../../context/DemoNavigationContext';
 import { useRouter } from 'expo-router';
 
 // Colores corporativos de lujo
@@ -99,9 +100,11 @@ interface SportSelectionScreenProps {
 export function SportSelectionScreen({ onChangeProfile }: SportSelectionScreenProps) {
   const { setSport } = useSport();
   const { user, activeContext, switchContext, loginAsCoachInfantilA } = useAuth();
+  const { selectedDemoProfile } = useDemoNavigation();
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
 
+  const effectiveProfile = selectedDemoProfile || activeContext || 'FAMILIA';
   const isDesktop = screenWidth >= 640;
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -126,7 +129,7 @@ export function SportSelectionScreen({ onChangeProfile }: SportSelectionScreenPr
   const handleSelectSport = (sportId: SportType) => {
     setSport(sportId);
     if (!activeContext) {
-      switchContext('FAMILIA');
+      switchContext(effectiveProfile as any);
     }
     router.replace('/(drawer)/inicio' as any);
   };
@@ -195,13 +198,13 @@ export function SportSelectionScreen({ onChangeProfile }: SportSelectionScreenPr
           <View style={styles.userInfoRow}>
             <View style={styles.userAvatarBadge}>
               <Text style={{ fontSize: 14 }}>
-                {activeContext === 'ENTRENADOR' ? '👨‍🏫' : activeContext === 'DELEGADO' ? '📋' : activeContext === 'COORDINADOR' ? '🧭' : '👨‍👩‍👧‍👦'}
+                {effectiveProfile === 'ENTRENADOR' ? '👨‍🏫' : effectiveProfile === 'DELEGADO' ? '📋' : effectiveProfile === 'COORDINADOR' ? '🧭' : '👨‍👩‍👧‍👦'}
               </Text>
             </View>
             <View>
               <Text style={styles.userGreeting}>Perfil activo:</Text>
               <Text style={styles.userName}>
-                {activeContext === 'ENTRENADOR' ? 'Entrenador' : activeContext === 'DELEGADO' ? 'Delegado' : activeContext === 'COORDINADOR' ? 'Coordinación' : 'Familia'}
+                {effectiveProfile === 'ENTRENADOR' ? 'Entrenador' : effectiveProfile === 'DELEGADO' ? 'Delegado' : effectiveProfile === 'COORDINADOR' ? 'Coordinación' : 'Familia'}
               </Text>
             </View>
           </View>
