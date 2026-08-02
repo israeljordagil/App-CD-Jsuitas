@@ -90,9 +90,9 @@ export function DelegadoPartidoEnVivo() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={20} color={colors.white} />
         </TouchableOpacity>
-        <View>
-          <Text style={styles.titleTxt}>PARTIDO EN VIVO (ESTRUCTURAL)</Text>
-          <Text style={styles.subtitleTxt}>Registro de acta y eventos del partido</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.titleTxt}>PARTIDO EN VIVO</Text>
+          <Text style={styles.subtitleTxt}>Partido en Vivo · En revisión</Text>
         </View>
       </View>
 
