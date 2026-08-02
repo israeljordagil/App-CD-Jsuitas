@@ -64,11 +64,13 @@ const COORDINATOR_MENU_ITEMS = [
 
 const DELEGATE_MENU_ITEMS = [
   { label: 'Inicio', route: 'index', icon: '🏠' },
-  { label: 'Mi Temporada', route: 'delegado/temporada', icon: '📅' },
-  { label: 'Documentación', route: 'delegado/documentacion', icon: '📄' },
-  { label: 'Mi Equipo', route: 'delegado/equipo', icon: '👥' },
-  { label: 'Preparación', route: 'delegado/preparacion', icon: '📋' },
+  { label: 'Próximo Partido', route: 'delegado/preparacion', icon: '📋' },
   { label: 'Partido en Vivo', route: 'delegado/partido-en-vivo', icon: '🏟️' },
+  { label: 'Mi Equipo', route: 'delegado/equipo', icon: '👥' },
+  { label: 'Documentación', route: 'delegado/documentacion', icon: '📄' },
+  { label: 'Mi Temporada', route: 'delegado/temporada', icon: '📅' },
+  { label: 'Comunicaciones', route: 'mensajes', icon: '💬' },
+  { label: 'Ayuda', route: 'avisos', icon: '❓' },
   { label: 'Ajustes', route: 'configuracion', icon: '⚙️' },
 ];
 

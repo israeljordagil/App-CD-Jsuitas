@@ -169,9 +169,13 @@ const pendingStyles = StyleSheet.create({
   },
 });
 
+// ACCESO TEMPORAL DE REVISIÓN DEL PERFIL DELEGADO.
+// ELIMINAR CUANDO SE ACTIVE LA AUTENTICACIÓN DEFINITIVA.
+const IS_DELEGATE_PREVIEW_ACTIVE = true;
+
 // NAVEGACIÓN Y PROTECCIÓN REAL DE RUTAS
 function NavigationStack() {
-  const { session, user, isLoading } = useAuth();
+  const { session, user, isLoading, activeContext } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -188,11 +192,15 @@ function NavigationStack() {
 
     const isPrivateRoute = 
       currentSegment === '(drawer)' || 
-      currentSegment === 'deportes' ||
-      currentSegment === 'review-center';
+      (currentSegment as string) === 'deportes' ||
+      currentSegment === 'review-center' ||
+      (currentSegment as string) === 'delegado';
 
-    // 1. USUARIO SIN SESIÓN -> Redirigir si intenta acceder a una ruta privada
-    if (!session && isPrivateRoute) {
+    // BYPASS CONTROLADO DE REVISIÓN TEMPORAL PARA PERFIL DELEGADO
+    const isDevDelegateBypass = IS_DELEGATE_PREVIEW_ACTIVE && (activeContext === 'DELEGADO' || currentSegment === 'delegado');
+
+    // 1. USUARIO SIN SESIÓN -> Redirigir si intenta acceder a una ruta privada (salvo acceso temporal de Delegado)
+    if (!session && isPrivateRoute && !isDevDelegateBypass) {
       router.replace('/login');
     }
 
@@ -200,7 +208,7 @@ function NavigationStack() {
     if (session && user && user.roles.length > 0 && (currentSegment === 'login' || currentSegment === 'reset-password')) {
       router.replace('/(drawer)/inicio' as any);
     }
-  }, [session, user, isLoading, segments]);
+  }, [session, user, isLoading, segments, activeContext]);
 
   // Mientras se verifica la sesión en Supabase
   if (isLoading) {
@@ -211,8 +219,8 @@ function NavigationStack() {
     );
   }
 
-  // 3. USUARIO CON SESIÓN PERO SIN ROLES ASIGNADOS EN SUPABASE -> Pantalla Pendiente
-  if (session && user && user.roles.length === 0) {
+  // 3. USUARIO CON SESIÓN PERO SIN ROLES ASIGNADOS EN SUPABASE -> Pantalla Pendiente (salvo acceso temporal de Delegado)
+  if (session && user && user.roles.length === 0 && !(IS_DELEGATE_PREVIEW_ACTIVE && activeContext === 'DELEGADO')) {
     return <PendingRoleScreen />;
   }
 

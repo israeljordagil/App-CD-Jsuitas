@@ -22,6 +22,19 @@ import { useAuth, ActiveContextType } from '../../context/AuthContext';
 import { useDemoNavigation } from '../../context/DemoNavigationContext';
 import { useRouter } from 'expo-router';
 
+import { supabase } from '../../lib/supabase';
+
+const getEquipacionPublicUrl = (fileName: string): string => {
+  if (!supabase) return '';
+  const { data } = supabase.storage
+    .from('Equipaciones CD Jesuitas')
+    .getPublicUrl(fileName);
+
+  return `${data?.publicUrl}?v=png-final-20260802`;
+};
+
+const DELEGADO_PNG_URL = getEquipacionPublicUrl('Camiseta delegado 3D.png');
+
 // Colores corporativos de lujo
 const colors = {
   navyDark: '#020814',
@@ -55,7 +68,7 @@ const SPORTS = [
     category: 'Futsal 5v5',
     description: 'Rotaciones rápidas, faltas acumuladas, marcador y cronómetro.',
     colorAccent: '#0284C7', // Azul Pista
-    gradientColors: ['rgba(2, 132, 199, 0.5)', 'rgba(3, 105, 161, 0.95)'],
+    gradientColors: ['rgba(2, 132, 199, 0.5)', 'rgba(3, 105, 161, 0.95)'] as const,
     badgeText: '5 EQUIPOS',
     nextEvent: 'Hoy 18:30 Sesión Pista',
     unreadCount: 1,
@@ -133,6 +146,15 @@ export function SportSelectionScreen({ onChangeProfile }: SportSelectionScreenPr
   const handleSelectSport = (sportId: SportType) => {
     setSport(sportId);
     switchContext(effectiveProfile as any);
+    
+    // TODO:
+    // Eliminar este bypass cuando se implemente
+    // el login definitivo del Delegado.
+    if (__DEV__ && effectiveProfile === 'DELEGADO') {
+      router.replace('/(drawer)/inicio' as any);
+      return;
+    }
+
     router.replace('/(drawer)/inicio' as any);
   };
 
@@ -199,9 +221,17 @@ export function SportSelectionScreen({ onChangeProfile }: SportSelectionScreenPr
         <View style={styles.topContextBar}>
           <View style={styles.userInfoRow}>
             <View style={styles.userAvatarBadge}>
-              <Text style={{ fontSize: 14 }}>
-                {effectiveProfile === 'ENTRENADOR' ? '👨‍🏫' : effectiveProfile === 'DELEGADO' ? '📋' : effectiveProfile === 'COORDINADOR' ? '🧭' : '👨‍👩‍👧‍👦'}
-              </Text>
+              {effectiveProfile === 'DELEGADO' ? (
+                <Image 
+                  source={{ uri: DELEGADO_PNG_URL }} 
+                  style={{ width: 38, height: 42 }} 
+                  resizeMode="contain" 
+                />
+              ) : (
+                <Text style={{ fontSize: 14 }}>
+                  {effectiveProfile === 'ENTRENADOR' ? '👨‍🏫' : effectiveProfile === 'COORDINADOR' ? '🧭' : '👨‍👩‍👧‍👦'}
+                </Text>
+              )}
             </View>
             <View>
               <Text style={styles.userGreeting}>Perfil activo:</Text>
