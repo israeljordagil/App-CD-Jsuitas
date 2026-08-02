@@ -80,7 +80,11 @@ export default function DashboardRouterScreen() {
       case 'ADMIN_GENERAL': 
         return <AdminGeneralDashboard />;
       default: 
-        return <FamiliaDashboard />;
+        return (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '700' }}>Perfil no reconocido</Text>
+          </View>
+        );
     }
   };
 

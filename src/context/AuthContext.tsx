@@ -139,7 +139,17 @@ const INITIAL_TEST_USERS: ManagedUser[] = [
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [activeContext, setActiveContext] = useState<ActiveContextType | null>(null);
+  const [activeContext, setActiveContext] = useState<ActiveContextType | null>(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const saved = localStorage.getItem('cd_jesuitas_active_context');
+        if (saved && ['FAMILIA', 'ENTRENADOR', 'DELEGADO', 'COORDINADOR', 'DIR_DEPORTIVA', 'ADMIN_GENERAL'].includes(saved)) {
+          return saved as ActiveContextType;
+        }
+      } catch (e) {}
+    }
+    return null;
+  });
   const [isLoading, setIsLoading] = useState(true);
   
   const [linkedPlayers, setLinkedPlayers] = useState<any[]>([]);
@@ -778,11 +788,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const switchContext = (context: ActiveContextType) => {
-    if (user && user.roles.length > 0 && !user.roles.includes(context)) {
-      console.warn(`Intento no autorizado de cambiar al contexto ${context}`);
+    if (!context) {
+      setActiveContext(null);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          localStorage.removeItem('cd_jesuitas_active_context');
+        } catch (e) {}
+      }
       return;
     }
     setActiveContext(context);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        localStorage.setItem('cd_jesuitas_active_context', context);
+      } catch (e) {}
+    }
   };
 
   const switchActivePlayer = (playerId: string) => {

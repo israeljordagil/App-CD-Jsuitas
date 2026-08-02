@@ -128,9 +128,7 @@ export function SportSelectionScreen({ onChangeProfile }: SportSelectionScreenPr
 
   const handleSelectSport = (sportId: SportType) => {
     setSport(sportId);
-    if (!activeContext) {
-      switchContext(effectiveProfile as any);
-    }
+    switchContext(effectiveProfile as any);
     router.replace('/(drawer)/inicio' as any);
   };
 
