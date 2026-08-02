@@ -1,3 +1,7 @@
+// DISEÑO APROBADO EN PRODUCCIÓN
+// No modificar estructura, imágenes, orden, estilos ni navegación
+// sin autorización expresa del responsable del proyecto.
+
 import React, { useRef, useEffect } from 'react';
 import { 
   View, 
@@ -51,7 +55,7 @@ const SPORTS = [
     category: 'Futsal 5v5',
     description: 'Rotaciones rápidas, faltas acumuladas, marcador y cronómetro.',
     colorAccent: '#0284C7', // Azul Pista
-    gradientColors: ['rgba(7, 26, 61, 0.95)', 'rgba(3, 14, 38, 0.98)'] as const,
+    gradientColors: ['rgba(2, 132, 199, 0.5)', 'rgba(3, 105, 161, 0.95)'],
     badgeText: '5 EQUIPOS',
     nextEvent: 'Hoy 18:30 Sesión Pista',
     unreadCount: 1,
