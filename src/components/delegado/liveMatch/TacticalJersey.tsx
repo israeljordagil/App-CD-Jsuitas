@@ -20,12 +20,12 @@ export function TacticalJersey({
 }: TacticalJerseyProps) {
   // PRIMERA EQUIPACIÓN OFICIAL CD JESUITAS (PARTIDO COMO LOCAL)
   // Jugador Campo: Cuerpo Celeste (#38BDF8), Mangas Celestes (#38BDF8), Cuello Azul Marino (#071A3D), Puños Azul Marino (#071A3D), Dorsal Azul Marino (#071A3D)
-  // Portero Local: Cuerpo Granate (#800020), Mangas Granate (#800020), Cuello Azul Marino (#071A3D), Puños Azul Marino (#071A3D), Dorsal Blanco (#FFFFFF)
+  // Portero Local: Cuerpo Granate (#800020), Mangas Granate (#800020), Cuello Azul Marino (#071A3D), Puños Azul Marino (#071A3D), Dorsal Naranja (#FF6600)
   let bodyColor = isGoalkeeper ? '#800020' : isAway ? '#FFFFFF' : '#38BDF8'; // Granate oficial para portero local
   let sleeveColor = bodyColor; // Mangas del mismo color principal
   let collarColor = isAway ? '#0F172A' : '#071A3D'; // Cuello en azul marino
   let cuffColor = isAway ? '#0F172A' : '#071A3D'; // Puños en azul marino
-  let dorsalColor = isGoalkeeper ? '#FFFFFF' : isAway ? '#071A3D' : '#071A3D'; // Dorsal blanco para portero sobre granate
+  let dorsalColor = isGoalkeeper ? '#FF6600' : isAway ? '#071A3D' : '#071A3D'; // Dorsal naranja oficial para portero sobre granate
 
   return (
     <TouchableOpacity 
