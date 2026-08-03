@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { TacticalPitch, PitchPlayer } from './liveMatch/TacticalPitch';
@@ -54,11 +54,28 @@ interface PlayerStats {
 
 export type MatchStatus = 'BEFORE_START' | 'IN_PROGRESS' | 'PAUSED' | 'FINISHED';
 
-export interface PlayerModalState {
+export type PlayerActionType = 'GOAL' | 'YELLOW_CARD' | 'RED_CARD' | 'SUBSTITUTION' | 'INJURY';
+export type PlayerActionStep = 'MENU' | 'SELECT_ASSIST' | 'SELECT_SUBSTITUTE' | 'CONFIRM';
+
+export interface PlayerActionFlow {
   visible: boolean;
   player: PitchPlayer | null;
-  step: 'ACTION_MENU' | 'GOAL_DETAILS' | 'SUB_DETAILS';
+  action: PlayerActionType | null;
+  step: PlayerActionStep;
+  assister: PitchPlayer | null;
+  substitute: PitchPlayer | null;
+  isSubmitting: boolean;
 }
+
+const initialPlayerActionFlow: PlayerActionFlow = {
+  visible: false,
+  player: null,
+  action: null,
+  step: 'MENU',
+  assister: null,
+  substitute: null,
+  isSubmitting: false,
+};
 
 export function DelegadoPartidoEnVivo() {
   const router = useRouter();
@@ -83,16 +100,10 @@ export function DelegadoPartidoEnVivo() {
   // 4. TIMELINE DE EVENTOS CON ID ÚNICO Y CLAVE ESTABLE
   const [events, setEvents] = useState<any[]>([]);
 
-  // 5. MODAL ÚNICO CONTROLADO PARA ACCIONES DEL JUGADOR
-  const [playerModal, setPlayerModal] = useState<PlayerModalState>({
-    visible: false,
-    player: null,
-    step: 'ACTION_MENU',
-  });
-  const [selectedAssister, setSelectedAssister] = useState<PitchPlayer | null>(null);
-  const [isSubmittingPlayerAction, setIsSubmittingPlayerAction] = useState(false);
+  // 5. MÁQUINA DE ESTADOS ÚNICA PARA EL PANEL DE ACCIONES DE JUGADOR (RENDERIZADO DENTRO DEL ÁRBOL NORMAL SIN MODAL NI PORTAL)
+  const [playerAction, setPlayerAction] = useState<PlayerActionFlow>(initialPlayerActionFlow);
 
-  // Modales Secundarios Independientes
+  // Overlays independientes para Eventos Generales e IA (Renderizados en árbol normal sin Modal ni Portal)
   const [showAIReorgModal, setShowAIReorgModal] = useState(false);
   const [showGeneralEventModal, setShowGeneralEventModal] = useState(false);
   const [showIncidenceInput, setShowIncidenceInput] = useState(false);
@@ -210,46 +221,56 @@ export function DelegadoPartidoEnVivo() {
     setBenchPlayers(INITIAL_BENCH);
     setPlayerStats({});
     setEvents([]);
-    setPlayerModal({ visible: false, player: null, step: 'ACTION_MENU' });
-    setSelectedAssister(null);
-    setIsSubmittingPlayerAction(false);
+    setPlayerAction(initialPlayerActionFlow);
     setShowAIReorgModal(false);
     setShowGeneralEventModal(false);
     setShowIncidenceInput(false);
     setIncidenceText('');
   };
 
-  // ABRIR EL MODAL ÚNICO DE JUGADOR
-  const handleOpenPlayerModal = (player: PitchPlayer) => {
+  // GESTIÓN DEL PANEL SUPERPUESTO DE ACCIONES (ÚNICA FUNCIÓN DE APERTURA Y CIERRE)
+  const handleOpenPlayerActionPanel = (player: PitchPlayer) => {
     if (isSuspended || matchStatus === 'FINISHED') return;
-    setPlayerModal({
+    setPlayerAction({
       visible: true,
       player,
-      step: 'ACTION_MENU',
+      action: null,
+      step: 'MENU',
+      assister: null,
+      substitute: null,
+      isSubmitting: false,
     });
-    setSelectedAssister(null);
   };
 
-  const handleClosePlayerModal = () => {
-    setPlayerModal({ visible: false, player: null, step: 'ACTION_MENU' });
-    setSelectedAssister(null);
-    setIsSubmittingPlayerAction(false);
+  const closePlayerActionPanel = () => {
+    setPlayerAction(initialPlayerActionFlow);
   };
 
-  // KNOWN ISSUE: El flujo de registro de gol propio desde la camiseta de un jugador produce un error de desmontaje/removeChild y queda pendiente de corrección.
+  // ACCIÓN 1: FLUJO DE SELECCIÓN DE ASISTENCIA Y CONFIRMACIÓN DE GOL PROPIO
+  const handleSelectAssistPlayer = (assister: PitchPlayer | null) => {
+    setPlayerAction(prev => ({
+      ...prev,
+      assister,
+      step: 'CONFIRM',
+    }));
+  };
+
   const handleConfirmGoal = () => {
-    if (isSubmittingPlayerAction || !playerModal.player || isSuspended) return;
+    if (playerAction.isSubmitting || !playerAction.player || isSuspended) return;
 
     try {
-      setIsSubmittingPlayerAction(true);
+      setPlayerAction(prev => ({ ...prev, isSubmitting: true }));
       const minTxt = getMinuteText();
-      const scorer = playerModal.player;
-
-      setHomeScore(prev => prev + 1);
+      const scorer = playerAction.player;
+      const assister = playerAction.assister;
 
       const scorerId = scorer.id || scorer.dorsal;
-      const assistId = selectedAssister ? (selectedAssister.id || selectedAssister.dorsal) : null;
+      const assistId = assister ? (assister.id || assister.dorsal) : null;
 
+      // 1. Actualizar Marcador
+      setHomeScore(prev => prev + 1);
+
+      // 2. Actualizar Estadísticas
       setPlayerStats(prev => {
         const currentScorerStats = prev[scorerId] || { yellowCards: 0, isRedCarded: false, isInjured: false, goals: 0, assists: 0 };
         const updated = {
@@ -260,7 +281,7 @@ export function DelegadoPartidoEnVivo() {
           }
         };
 
-        if (assistId && selectedAssister) {
+        if (assistId && assister) {
           const currentAssistStats = prev[assistId] || { yellowCards: 0, isRedCarded: false, isInjured: false, goals: 0, assists: 0 };
           updated[assistId] = {
             ...currentAssistStats,
@@ -271,10 +292,11 @@ export function DelegadoPartidoEnVivo() {
         return updated;
       });
 
-      const descTxt = selectedAssister 
-        ? `#${scorer.dorsal} ${scorer.name} (Asistencia: #${selectedAssister.dorsal} ${selectedAssister.name})`
+      const descTxt = assister 
+        ? `#${scorer.dorsal} ${scorer.name} (Asistencia: #${assister.dorsal} ${assister.name})`
         : `#${scorer.dorsal} ${scorer.name}`;
 
+      // 3. Registrar Evento en Timeline
       setEvents(prev => [
         {
           id: `ev-${Date.now()}`,
@@ -288,23 +310,22 @@ export function DelegadoPartidoEnVivo() {
         ...prev,
       ]);
     } finally {
-      handleClosePlayerModal();
+      closePlayerActionPanel();
     }
   };
 
-  // ACCIÓN 2: REGISTRAR TARJETA AMARILLA (O 2ª AMARILLA -> EXPULSIÓN AUTOMÁTICA)
+  // ACCIÓN 2: TARJETA AMARILLA (O 2ª AMARILLA -> EXPULSIÓN AUTOMÁTICA)
   const handleConfirmYellowCard = () => {
-    if (isSubmittingPlayerAction || !playerModal.player || isSuspended) return;
+    if (playerAction.isSubmitting || !playerAction.player || isSuspended) return;
 
     try {
-      setIsSubmittingPlayerAction(true);
+      setPlayerAction(prev => ({ ...prev, isSubmitting: true }));
       const minTxt = getMinuteText();
-      const player = playerModal.player;
+      const player = playerAction.player;
       const pId = player.id || player.dorsal;
       const currentStats = getPStats(pId);
 
       if (currentStats.yellowCards === 0) {
-        // 1ª Amarilla -> Se mantiene en campo
         setPlayerStats(prev => ({
           ...prev,
           [pId]: { ...currentStats, yellowCards: 1 }
@@ -323,34 +344,33 @@ export function DelegadoPartidoEnVivo() {
           ...prev,
         ]);
       } else {
-        // 2ª Amarilla -> Expulsión automática (se retira del campo)
         processExpulsion(player, true);
       }
     } finally {
-      handleClosePlayerModal();
+      closePlayerActionPanel();
     }
   };
 
-  // ACCIÓN 3: REGISTRAR TARJETA ROJA DIRECTA
+  // ACCIÓN 3: TARJETA ROJA DIRECTA
   const handleConfirmRedCard = () => {
-    if (isSubmittingPlayerAction || !playerModal.player || isSuspended) return;
+    if (playerAction.isSubmitting || !playerAction.player || isSuspended) return;
 
     try {
-      setIsSubmittingPlayerAction(true);
-      processExpulsion(playerModal.player, false);
+      setPlayerAction(prev => ({ ...prev, isSubmitting: true }));
+      processExpulsion(playerAction.player, false);
     } finally {
-      handleClosePlayerModal();
+      closePlayerActionPanel();
     }
   };
 
-  // ACCIÓN 4: REGISTRAR LESIÓN
+  // ACCIÓN 4: LESIÓN
   const handleConfirmInjury = () => {
-    if (isSubmittingPlayerAction || !playerModal.player || isSuspended) return;
+    if (playerAction.isSubmitting || !playerAction.player || isSuspended) return;
 
     try {
-      setIsSubmittingPlayerAction(true);
+      setPlayerAction(prev => ({ ...prev, isSubmitting: true }));
       const minTxt = getMinuteText();
-      const player = playerModal.player;
+      const player = playerAction.player;
       const pId = player.id || player.dorsal;
 
       setPlayerStats(prev => ({
@@ -371,27 +391,27 @@ export function DelegadoPartidoEnVivo() {
         ...prev,
       ]);
     } finally {
-      handleClosePlayerModal();
+      closePlayerActionPanel();
     }
   };
 
-  // ACCIÓN 5: CONFIRMAR SUSTITUCIÓN
-  const handleConfirmSub = (benchPlayer: PitchPlayer) => {
-    if (isSubmittingPlayerAction || !playerModal.player || isSuspended) return;
+  // ACCIÓN 5: SUSTITUCIÓN
+  const handleConfirmSub = (substitutePlayer: PitchPlayer) => {
+    if (playerAction.isSubmitting || !playerAction.player || isSuspended) return;
 
     try {
-      setIsSubmittingPlayerAction(true);
+      setPlayerAction(prev => ({ ...prev, isSubmitting: true }));
       const minTxt = getMinuteText();
-      const subOutPlayer = playerModal.player;
+      const subOutPlayer = playerAction.player;
 
       setPitchPlayers(prev => prev.map(p => p.dorsal === subOutPlayer.dorsal ? {
-        ...benchPlayer,
+        ...substitutePlayer,
         xPercent: subOutPlayer.xPercent,
         yPercent: subOutPlayer.yPercent,
         role: subOutPlayer.role,
       } : p));
 
-      setBenchPlayers(prev => prev.map(b => b.dorsal === benchPlayer.dorsal ? {
+      setBenchPlayers(prev => prev.map(b => b.dorsal === substitutePlayer.dorsal ? {
         ...subOutPlayer,
         xPercent: 0,
         yPercent: 0,
@@ -403,14 +423,14 @@ export function DelegadoPartidoEnVivo() {
           minute: minTxt,
           type: 'CAMBIO',
           title: 'Sustitución',
-          desc: `Entra #${benchPlayer.dorsal} ${benchPlayer.name} ⇆ Sale #${subOutPlayer.dorsal} ${subOutPlayer.name}`,
+          desc: `Entra #${substitutePlayer.dorsal} ${substitutePlayer.name} ⇆ Sale #${subOutPlayer.dorsal} ${subOutPlayer.name}`,
           icon: 'swap-horizontal',
           color: colors.skyGlow,
         },
         ...prev,
       ]);
     } finally {
-      handleClosePlayerModal();
+      closePlayerActionPanel();
     }
   };
 
@@ -602,178 +622,187 @@ export function DelegadoPartidoEnVivo() {
   const timerBtnProps = getTimerControlProps();
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, isDesktop && styles.contentDesktop]} showsVerticalScrollIndicator={false}>
-      {/* CABECERA */}
-      <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={20} color={colors.white} />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.titleTxt}>PARTIDO EN VIVO</Text>
-          <Text style={styles.subtitleTxt}>Liga Preferente · Cadete B vs Torrent CF</Text>
-        </View>
-        <TouchableOpacity style={styles.resetDemoBtn} onPress={resetDemo}>
-          <Ionicons name="refresh" size={14} color="#94A3B8" />
-          <Text style={styles.resetDemoBtnTxt}>Reiniciar demo</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* AVISO DE SUSPENSIÓN REGLAMENTARIA */}
-      {isSuspended && (
-        <View style={styles.suspensionBanner}>
-          <Ionicons name="warning" size={24} color="#EF4444" />
+    <View style={styles.mainWrapper}>
+      <ScrollView style={styles.container} contentContainerStyle={[styles.content, isDesktop && styles.contentDesktop]} showsVerticalScrollIndicator={false}>
+        {/* CABECERA */}
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={20} color={colors.white} />
+          </TouchableOpacity>
           <View style={{ flex: 1 }}>
-            <Text style={styles.suspensionTitle}>🚨 PARTIDO SUSPENDIDO</Text>
-            <Text style={styles.suspensionDesc}>El equipo no dispone del número mínimo reglamentario de jugadores.</Text>
+            <Text style={styles.titleTxt}>PARTIDO EN VIVO</Text>
+            <Text style={styles.subtitleTxt}>Liga Preferente · Cadete B vs Torrent CF</Text>
           </View>
-        </View>
-      )}
-
-      {/* MARCADOR SUPERIOR */}
-      <View style={styles.scoreboardCard}>
-        <View style={styles.liveBadgeRow}>
-          <View style={[styles.liveRedDot, { backgroundColor: badgeInfo.color }]} />
-          <Text style={[styles.liveBadgeTxt, { color: badgeInfo.color }]}>
-            {badgeInfo.label}
-          </Text>
+          <TouchableOpacity style={styles.resetDemoBtn} onPress={resetDemo}>
+            <Ionicons name="refresh" size={14} color="#94A3B8" />
+            <Text style={styles.resetDemoBtnTxt}>Reiniciar demo</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.scoreRow}>
-          <View style={styles.teamScoreBox}>
-            <Text style={styles.teamScoreName}>Cadete B</Text>
-            <Text style={styles.scoreDigit}>{homeScore}</Text>
+        {/* AVISO DE SUSPENSIÓN REGLAMENTARIA */}
+        {isSuspended && (
+          <View style={styles.suspensionBanner}>
+            <Ionicons name="warning" size={24} color="#EF4444" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.suspensionTitle}>🚨 PARTIDO SUSPENDIDO</Text>
+              <Text style={styles.suspensionDesc}>El equipo no dispone del número mínimo reglamentario de jugadores.</Text>
+            </View>
           </View>
+        )}
 
-          <View style={styles.timerBox}>
-            <Text style={styles.timerTxt}>{formatTimer(matchSeconds)}</Text>
-            <Text style={styles.timerSubTxt}>
-              {matchStatus === 'BEFORE_START' ? 'Sin comenzar' : `Minuto ${getMinuteText()}`}
+        {/* MARCADOR SUPERIOR */}
+        <View style={styles.scoreboardCard}>
+          <View style={styles.liveBadgeRow}>
+            <View style={[styles.liveRedDot, { backgroundColor: badgeInfo.color }]} />
+            <Text style={[styles.liveBadgeTxt, { color: badgeInfo.color }]}>
+              {badgeInfo.label}
             </Text>
+          </View>
 
-            {timerBtnProps && (
-              <TouchableOpacity 
-                key="timer-control-btn-stable"
-                style={[styles.timerControlBtn, { backgroundColor: timerBtnProps.bgColor }]} 
-                onPress={timerBtnProps.onPress}
-                disabled={timerBtnProps.disabled}
-                activeOpacity={0.8}
-              >
-                <Ionicons name={timerBtnProps.icon as any} size={14} color={colors.navyDark} />
-                <Text style={styles.timerControlBtnTxt}>{timerBtnProps.label}</Text>
+          <View style={styles.scoreRow}>
+            <View style={styles.teamScoreBox}>
+              <Text style={styles.teamScoreName}>Cadete B</Text>
+              <Text style={styles.scoreDigit}>{homeScore}</Text>
+            </View>
+
+            <View style={styles.timerBox}>
+              <Text style={styles.timerTxt}>{formatTimer(matchSeconds)}</Text>
+              <Text style={styles.timerSubTxt}>
+                {matchStatus === 'BEFORE_START' ? 'Sin comenzar' : `Minuto ${getMinuteText()}`}
+              </Text>
+
+              {timerBtnProps && (
+                <TouchableOpacity 
+                  key="timer-control-btn-stable"
+                  style={[styles.timerControlBtn, { backgroundColor: timerBtnProps.bgColor }]} 
+                  onPress={timerBtnProps.onPress}
+                  disabled={timerBtnProps.disabled}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name={timerBtnProps.icon as any} size={14} color={colors.navyDark} />
+                  <Text style={styles.timerControlBtnTxt}>{timerBtnProps.label}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={styles.teamScoreBox}>
+              <Text style={styles.teamScoreName}>Torrent CF</Text>
+              <Text style={styles.scoreDigit}>{awayScore}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* LAYOUT PRINCIPAL */}
+        <View style={isDesktop ? styles.desktopGrid : styles.mobileStack}>
+          <View style={isDesktop ? styles.mainColDesktop : { width: '100%' }}>
+            {/* BOTÓN DE REORGANIZACIÓN IA TRAS EXPULSIÓN */}
+            {pitchPlayers.length < 11 && !isSuspended && matchStatus !== 'FINISHED' && (
+              <TouchableOpacity style={styles.aiReorgTriggerBtn} onPress={() => setShowAIReorgModal(true)}>
+                <Text style={{ fontSize: 18 }}>🧠</Text>
+                <Text style={styles.aiReorgTriggerTxt}>Generar reorganización táctica IA ({pitchPlayers.length} jugadores)</Text>
               </TouchableOpacity>
             )}
+
+            {/* CAMPO TÁCTICO */}
+            <TacticalPitch 
+              systemName={systemName} 
+              starters={pitchPlayers} 
+              onPlayerPress={(p) => handleOpenPlayerActionPanel(p)} 
+            />
           </View>
 
-          <View style={styles.teamScoreBox}>
-            <Text style={styles.teamScoreName}>Torrent CF</Text>
-            <Text style={styles.scoreDigit}>{awayScore}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* LAYOUT PRINCIPAL */}
-      <View style={isDesktop ? styles.desktopGrid : styles.mobileStack}>
-        <View style={isDesktop ? styles.mainColDesktop : { width: '100%' }}>
-          {/* BOTÓN DE REORGANIZACIÓN IA TRAS EXPULSIÓN */}
-          {pitchPlayers.length < 11 && !isSuspended && matchStatus !== 'FINISHED' && (
-            <TouchableOpacity style={styles.aiReorgTriggerBtn} onPress={() => setShowAIReorgModal(true)}>
-              <Text style={{ fontSize: 18 }}>🧠</Text>
-              <Text style={styles.aiReorgTriggerTxt}>Generar reorganización táctica IA ({pitchPlayers.length} jugadores)</Text>
+          <View style={isDesktop ? styles.sidebarColDesktop : { width: '100%' }}>
+            {/* BOTÓN ÚNICO DE EVENTOS GENERALES */}
+            <TouchableOpacity 
+              style={[styles.generalEventTriggerBtn, (isSuspended || matchStatus === 'FINISHED') && { opacity: 0.5 }]}
+              disabled={isSuspended || matchStatus === 'FINISHED'}
+              onPress={() => setShowGeneralEventModal(true)}
+            >
+              <Ionicons name="add-circle-outline" size={18} color={colors.navyDark} />
+              <Text style={styles.generalEventTriggerTxt}>+ NUEVO EVENTO GENERAL</Text>
             </TouchableOpacity>
-          )}
 
-          {/* CAMPO TÁCTICO */}
-          <TacticalPitch 
-            systemName={systemName} 
-            starters={pitchPlayers} 
-            onPlayerPress={(p) => handleOpenPlayerModal(p)} 
-          />
-        </View>
-
-        <View style={isDesktop ? styles.sidebarColDesktop : { width: '100%' }}>
-          {/* BOTÓN ÚNICO DE EVENTOS GENERALES */}
-          <TouchableOpacity 
-            style={[styles.generalEventTriggerBtn, (isSuspended || matchStatus === 'FINISHED') && { opacity: 0.5 }]}
-            disabled={isSuspended || matchStatus === 'FINISHED'}
-            onPress={() => setShowGeneralEventModal(true)}
-          >
-            <Ionicons name="add-circle-outline" size={18} color={colors.navyDark} />
-            <Text style={styles.generalEventTriggerTxt}>+ NUEVO EVENTO GENERAL</Text>
-          </TouchableOpacity>
-
-          {/* BANQUILLO */}
-          <View style={styles.sectionHeaderRow}>
-            <Ionicons name="people-outline" size={20} color={colors.skyPrimary} />
-            <Text style={styles.sectionTitleTxt}>BANQUILLO Y SUPLENTES ({benchPlayers.length})</Text>
-          </View>
-          <View style={styles.benchCard}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.benchScrollContent}>
-              {benchPlayers.map((player) => (
-                <View key={`bench-${player.dorsal}`} style={styles.benchJerseyWrapper}>
-                  <TacticalJersey 
-                    dorsal={player.dorsal} 
-                    name={player.name} 
-                    isGoalkeeper={player.isGoalkeeper} 
-                    onPress={() => handleOpenPlayerModal(player)} 
-                    scale={0.9} 
-                  />
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* TIMELINE */}
-          <View style={styles.sectionHeaderRow}>
-            <Ionicons name="time-outline" size={20} color={colors.skyGlow} />
-            <Text style={styles.sectionTitleTxt}>LÍNEA TEMPORAL DE ACCIONES</Text>
-          </View>
-          <View style={styles.timelineCard}>
-            {events.length === 0 ? (
-              <Text style={styles.emptyTimelineTxt}>Sin eventos registrados. Empezar partido.</Text>
-            ) : (
-              events.map((ev) => (
-                <View key={`ev-${ev.id}`} style={styles.timelineItem}>
-                  <Text style={styles.timelineTime}>{ev.minute}</Text>
-                  <Ionicons name={ev.icon as any} size={16} color={ev.color} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.timelineTitle}>{ev.title}</Text>
-                    <Text style={styles.timelineDesc}>{ev.desc}</Text>
+            {/* BANQUILLO */}
+            <View style={styles.sectionHeaderRow}>
+              <Ionicons name="people-outline" size={20} color={colors.skyPrimary} />
+              <Text style={styles.sectionTitleTxt}>BANQUILLO Y SUPLENTES ({benchPlayers.length})</Text>
+            </View>
+            <View style={styles.benchCard}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.benchScrollContent}>
+                {benchPlayers.map((player) => (
+                  <View key={`bench-${player.dorsal}`} style={styles.benchJerseyWrapper}>
+                    <TacticalJersey 
+                      dorsal={player.dorsal} 
+                      name={player.name} 
+                      isGoalkeeper={player.isGoalkeeper} 
+                      onPress={() => handleOpenPlayerActionPanel(player)} 
+                      scale={0.9} 
+                    />
                   </View>
-                </View>
-              ))
-            )}
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* TIMELINE */}
+            <View style={styles.sectionHeaderRow}>
+              <Ionicons name="time-outline" size={20} color={colors.skyGlow} />
+              <Text style={styles.sectionTitleTxt}>LÍNEA TEMPORAL DE ACCIONES</Text>
+            </View>
+            <View style={styles.timelineCard}>
+              {events.length === 0 ? (
+                <Text style={styles.emptyTimelineTxt}>Sin eventos registrados. Empezar partido.</Text>
+              ) : (
+                events.map((ev) => (
+                  <View key={`ev-${ev.id}`} style={styles.timelineItem}>
+                    <Text style={styles.timelineTime}>{ev.minute}</Text>
+                    <Ionicons name={ev.icon as any} size={16} color={ev.color} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.timelineTitle}>{ev.title}</Text>
+                      <Text style={styles.timelineDesc}>{ev.desc}</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
           </View>
         </View>
-      </View>
+      </ScrollView>
 
-      {/* MODAL ÚNICO CONTROLADO PARA TODAS LAS ACCIONES DEL JUGADOR */}
-      <Modal visible={playerModal.visible} transparent animationType="fade" onRequestClose={handleClosePlayerModal}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContextCard}>
-            
-            {/* CABECERA DEL JUGADOR */}
-            <View style={styles.modalPlayerHeader}>
-              <View style={[styles.modalPlayerBadge, { backgroundColor: playerModal.player?.isGoalkeeper ? colors.goalkeeper : colors.skyPrimary }]}>
-                <Text style={styles.modalPlayerBadgeTxt}>#{playerModal.player?.dorsal}</Text>
+      {/* ========================================================================= */}
+      {/* NUEVO PANEL DE ACCIONES DE JUGADORES (RENDERIZADO DENTRO DEL ÁRBOL REACT) */}
+      {/* ========================================================================= */}
+      {playerAction.visible && (
+        <View style={styles.overlayContainer}>
+          <TouchableOpacity 
+            style={styles.overlayBackdrop} 
+            activeOpacity={1} 
+            onPress={() => !playerAction.isSubmitting && closePlayerActionPanel()} 
+          />
+          
+          <View style={styles.panelCard}>
+            {/* CABECERA DE DORSAL Y JUGADOR */}
+            <View style={styles.panelPlayerHeader}>
+              <View style={[styles.panelPlayerBadge, { backgroundColor: playerAction.player?.isGoalkeeper ? colors.goalkeeper : colors.skyPrimary }]}>
+                <Text style={styles.panelPlayerBadgeTxt}>#{playerAction.player?.dorsal}</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.modalPlayerName}>{playerModal.player?.name}</Text>
-                <Text style={styles.modalPlayerRole}>Posición: {playerModal.player?.role}</Text>
+                <Text style={styles.panelPlayerName}>{playerAction.player?.name}</Text>
+                <Text style={styles.panelPlayerRole}>Posición: {playerAction.player?.role}</Text>
               </View>
-              <TouchableOpacity style={styles.modalCloseIconBtn} onPress={handleClosePlayerModal}>
+              <TouchableOpacity style={styles.panelCloseIconBtn} onPress={() => !playerAction.isSubmitting && closePlayerActionPanel()}>
                 <Ionicons name="close" size={20} color={colors.white} />
               </TouchableOpacity>
             </View>
 
-            {/* PASO 1: MENÚ DE SELECCIÓN DE ACCIONES */}
-            {playerModal.step === 'ACTION_MENU' && (
+            {/* PASO 1: MENÚ DE ACCIONES */}
+            {playerAction.step === 'MENU' && (
               <>
-                <Text style={styles.modalMenuSectionTitle}>SELECCIONAR ACCIÓN DEL JUGADOR</Text>
+                <Text style={styles.panelSectionTitle}>SELECCIONAR ACCIÓN DEL JUGADOR</Text>
                 <View style={styles.contextOptionsGrid}>
                   {/* ⚽ GOL */}
                   <TouchableOpacity 
                     style={styles.contextTileBtn} 
-                    onPress={() => setPlayerModal(prev => ({ ...prev, step: 'GOAL_DETAILS' }))}
+                    onPress={() => setPlayerAction(prev => ({ ...prev, action: 'GOAL', step: 'SELECT_ASSIST', assister: null }))}
                   >
                     <Text style={{ fontSize: 20 }}>⚽</Text>
                     <Text style={styles.contextTileTxt}>Gol</Text>
@@ -781,8 +810,8 @@ export function DelegadoPartidoEnVivo() {
 
                   {/* 🟨 TARJETA AMARILLA */}
                   <TouchableOpacity 
-                    style={[styles.contextTileBtn, isSubmittingPlayerAction && { opacity: 0.5 }]} 
-                    disabled={isSubmittingPlayerAction}
+                    style={[styles.contextTileBtn, playerAction.isSubmitting && { opacity: 0.5 }]} 
+                    disabled={playerAction.isSubmitting}
                     onPress={handleConfirmYellowCard}
                   >
                     <Text style={{ fontSize: 20 }}>🟨</Text>
@@ -791,8 +820,8 @@ export function DelegadoPartidoEnVivo() {
 
                   {/* 🟥 TARJETA ROJA DIRECTA */}
                   <TouchableOpacity 
-                    style={[styles.contextTileBtn, isSubmittingPlayerAction && { opacity: 0.5 }]} 
-                    disabled={isSubmittingPlayerAction}
+                    style={[styles.contextTileBtn, playerAction.isSubmitting && { opacity: 0.5 }]} 
+                    disabled={playerAction.isSubmitting}
                     onPress={handleConfirmRedCard}
                   >
                     <Text style={{ fontSize: 20 }}>🟥</Text>
@@ -802,7 +831,7 @@ export function DelegadoPartidoEnVivo() {
                   {/* 🔁 SUSTITUCIÓN */}
                   <TouchableOpacity 
                     style={styles.contextTileBtn} 
-                    onPress={() => setPlayerModal(prev => ({ ...prev, step: 'SUB_DETAILS' }))}
+                    onPress={() => setPlayerAction(prev => ({ ...prev, action: 'SUBSTITUTION', step: 'SELECT_SUBSTITUTE', substitute: null }))}
                   >
                     <Text style={{ fontSize: 20 }}>🔁</Text>
                     <Text style={styles.contextTileTxt}>Sustitución</Text>
@@ -810,8 +839,8 @@ export function DelegadoPartidoEnVivo() {
 
                   {/* 🤕 LESIÓN */}
                   <TouchableOpacity 
-                    style={[styles.contextTileBtn, isSubmittingPlayerAction && { opacity: 0.5 }]} 
-                    disabled={isSubmittingPlayerAction}
+                    style={[styles.contextTileBtn, playerAction.isSubmitting && { opacity: 0.5 }]} 
+                    disabled={playerAction.isSubmitting}
                     onPress={handleConfirmInjury}
                   >
                     <Text style={{ fontSize: 20 }}>🤕</Text>
@@ -819,32 +848,33 @@ export function DelegadoPartidoEnVivo() {
                   </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity style={styles.modalCancelFullBtn} onPress={handleClosePlayerModal}>
-                  <Text style={styles.modalCancelFullTxt}>Cancelar</Text>
+                <TouchableOpacity style={styles.panelCancelFullBtn} onPress={closePlayerActionPanel}>
+                  <Text style={styles.panelCancelFullTxt}>Cancelar</Text>
                 </TouchableOpacity>
               </>
             )}
 
-            {/* PASO 2: DETALLES DE GOL (ASISTENCIA) */}
-            {playerModal.step === 'GOAL_DETAILS' && (
+            {/* PASO 2: SELECCIÓN DE ASISTENCIA */}
+            {playerAction.step === 'SELECT_ASSIST' && (
               <>
-                <Text style={styles.modalTitle}>⚽ REGISTRAR GOL</Text>
-                <Text style={styles.modalSectionSubHeader}>SELECCIONAR ASISTENCIA (OPCIONAL):</Text>
+                <Text style={styles.panelTitle}>⚽ REGISTRAR GOL</Text>
+                <Text style={styles.panelSubHeader}>SELECCIONAR ASISTENCIA (OPCIONAL):</Text>
 
-                <ScrollView style={{ maxHeight: 150, marginVertical: 8 }}>
+                <ScrollView style={{ maxHeight: 180, marginVertical: 8 }}>
                   <TouchableOpacity 
-                    style={[styles.playerPickRow, selectedAssister === null && styles.playerPickRowSelected]}
-                    onPress={() => setSelectedAssister(null)}
+                    key="assist-none"
+                    style={styles.playerPickRow}
+                    onPress={() => handleSelectAssistPlayer(null)}
                   >
                     <Text style={styles.playerPickDorsal}>-</Text>
                     <Text style={styles.playerPickName}>Sin asistencia (Acción individual / Penalti)</Text>
                   </TouchableOpacity>
 
-                  {pitchPlayers.filter(p => p.dorsal !== playerModal.player?.dorsal).map(p => (
+                  {pitchPlayers.filter(p => p.dorsal !== playerAction.player?.dorsal).map(p => (
                     <TouchableOpacity 
                       key={`assist-${p.dorsal}`}
-                      style={[styles.playerPickRow, selectedAssister?.dorsal === p.dorsal && styles.playerPickRowSelected]}
-                      onPress={() => setSelectedAssister(p)}
+                      style={styles.playerPickRow}
+                      onPress={() => handleSelectAssistPlayer(p)}
                     >
                       <Text style={styles.playerPickDorsal}>#{p.dorsal}</Text>
                       <Text style={styles.playerPickName}>{p.name} ({p.role})</Text>
@@ -852,29 +882,52 @@ export function DelegadoPartidoEnVivo() {
                   ))}
                 </ScrollView>
 
-                <View style={{ gap: 8, marginTop: 8 }}>
+                <TouchableOpacity style={styles.panelCancelBtn} onPress={() => setPlayerAction(prev => ({ ...prev, step: 'MENU' }))}>
+                  <Text style={styles.panelCancelBtnTxt}>Volver al menú</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {/* PASO 3: CONFIRMACIÓN DE GOL */}
+            {playerAction.step === 'CONFIRM' && playerAction.action === 'GOAL' && (
+              <>
+                <Text style={styles.panelTitle}>⚽ CONFIRMAR GOL DE CADETE B</Text>
+                
+                <View style={styles.scorerSummaryBox}>
+                  <Text style={styles.scorerSummaryTxt}>
+                    GOLEADOR: #{playerAction.player?.dorsal} {playerAction.player?.name}
+                  </Text>
+                  <Text style={[styles.scorerSummaryTxt, { color: colors.skyGlow, marginTop: 4 }]}>
+                    ASISTENCIA: {playerAction.assister ? `#${playerAction.assister.dorsal} ${playerAction.assister.name}` : 'Sin asistencia (Acción individual)'}
+                  </Text>
+                </View>
+
+                <View style={{ gap: 8, marginTop: 12 }}>
                   <TouchableOpacity 
-                    style={[styles.confirmGoalBtn, isSubmittingPlayerAction && { opacity: 0.5 }]} 
-                    disabled={isSubmittingPlayerAction} 
+                    style={[styles.confirmGoalBtn, playerAction.isSubmitting && { opacity: 0.5 }]} 
+                    disabled={playerAction.isSubmitting} 
                     onPress={handleConfirmGoal}
                   >
                     <Text style={styles.confirmGoalBtnTxt}>
-                      {isSubmittingPlayerAction ? 'Registrando...' : 'Confirmar Gol de Cadete B'}
+                      {playerAction.isSubmitting ? 'Registrando gol...' : 'Confirmar Gol de Cadete B'}
                     </Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setPlayerModal(prev => ({ ...prev, step: 'ACTION_MENU' }))}>
-                    <Text style={styles.modalCancelBtnTxt}>Volver al menú</Text>
+                  <TouchableOpacity 
+                    style={styles.panelCancelBtn} 
+                    onPress={() => setPlayerAction(prev => ({ ...prev, step: 'SELECT_ASSIST' }))}
+                  >
+                    <Text style={styles.panelCancelBtnTxt}>Cambiar asistencia</Text>
                   </TouchableOpacity>
                 </View>
               </>
             )}
 
-            {/* PASO 3: DETALLES DE SUSTITUCIÓN */}
-            {playerModal.step === 'SUB_DETAILS' && (
+            {/* PASO 4: SELECCIÓN DE SUPLENTE PARA SUSTITUCIÓN */}
+            {playerAction.step === 'SELECT_SUBSTITUTE' && (
               <>
-                <Text style={styles.modalTitle}>🔁 REALIZAR SUSTITUCIÓN</Text>
-                <Text style={styles.modalSectionSubHeader}>ENTRA DEL BANQUILLO:</Text>
+                <Text style={styles.panelTitle}>🔁 REALIZAR SUSTITUCIÓN</Text>
+                <Text style={styles.panelSubHeader}>ENTRA DEL BANQUILLO:</Text>
 
                 <ScrollView style={{ maxHeight: 180, marginVertical: 10 }}>
                   {benchPlayers.map(b => (
@@ -885,22 +938,25 @@ export function DelegadoPartidoEnVivo() {
                   ))}
                 </ScrollView>
 
-                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setPlayerModal(prev => ({ ...prev, step: 'ACTION_MENU' }))}>
-                  <Text style={styles.modalCancelBtnTxt}>Volver al menú</Text>
+                <TouchableOpacity style={styles.panelCancelBtn} onPress={() => setPlayerAction(prev => ({ ...prev, step: 'MENU' }))}>
+                  <Text style={styles.panelCancelBtnTxt}>Volver al menú</Text>
                 </TouchableOpacity>
               </>
             )}
 
           </View>
         </View>
-      </Modal>
+      )}
 
-      {/* MODAL EVENTOS GENERALES */}
-      <Modal visible={showGeneralEventModal} transparent animationType="fade" onRequestClose={() => setShowGeneralEventModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>⚡ NUEVO EVENTO GENERAL</Text>
-            <Text style={styles.modalSubTxt}>Selecciona la acción del partido:</Text>
+      {/* ========================================================================= */}
+      {/* PANEL SUPERPUESTO PARA EVENTOS GENERALES (DENTRO DEL ÁRBOL REACT) */}
+      {/* ========================================================================= */}
+      {showGeneralEventModal && (
+        <View style={styles.overlayContainer}>
+          <TouchableOpacity style={styles.overlayBackdrop} activeOpacity={1} onPress={() => setShowGeneralEventModal(false)} />
+          <View style={styles.panelCard}>
+            <Text style={styles.panelTitle}>⚡ NUEVO EVENTO GENERAL</Text>
+            <Text style={styles.panelSubTxt}>Selecciona la acción del partido:</Text>
 
             {!showIncidenceInput ? (
               <View style={{ gap: 8, marginVertical: 12 }}>
@@ -942,7 +998,7 @@ export function DelegadoPartidoEnVivo() {
               </View>
             ) : (
               <View style={{ marginVertical: 10, gap: 10 }}>
-                <Text style={styles.modalSectionSubHeader}>DESCRIPCIÓN DE LA INCIDENCIA:</Text>
+                <Text style={styles.panelSubHeader}>DESCRIPCIÓN DE LA INCIDENCIA:</Text>
                 <TextInput 
                   style={styles.incidenceTextInput}
                   placeholder="Ej: Balón pinchado / Protesta banquillo..."
@@ -956,17 +1012,20 @@ export function DelegadoPartidoEnVivo() {
               </View>
             )}
 
-            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => { setShowGeneralEventModal(false); setShowIncidenceInput(false); }}>
-              <Text style={styles.modalCancelBtnTxt}>Cancelar</Text>
+            <TouchableOpacity style={styles.panelCancelBtn} onPress={() => { setShowGeneralEventModal(false); setShowIncidenceInput(false); }}>
+              <Text style={styles.panelCancelBtnTxt}>Cancelar</Text>
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      )}
 
-      {/* MODAL PROPUESTAS DE REORGANIZACIÓN IA */}
-      <Modal visible={showAIReorgModal} transparent animationType="slide" onRequestClose={() => setShowAIReorgModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalAICard}>
+      {/* ========================================================================= */}
+      {/* PANEL SUPERPUESTO PARA REORGANIZACIÓN IA (DENTRO DEL ÁRBOL REACT) */}
+      {/* ========================================================================= */}
+      {showAIReorgModal && (
+        <View style={styles.overlayContainer}>
+          <TouchableOpacity style={styles.overlayBackdrop} activeOpacity={1} onPress={() => setShowAIReorgModal(false)} />
+          <View style={styles.panelAICard}>
             <Text style={styles.aiModalTitle}>🧠 PROPUESTAS DE REORGANIZACIÓN IA</Text>
             <Text style={styles.aiModalSub}>Dispones de {pitchPlayers.length} jugadores en campo.</Text>
 
@@ -982,17 +1041,18 @@ export function DelegadoPartidoEnVivo() {
               ))}
             </View>
 
-            <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowAIReorgModal(false)}>
-              <Text style={styles.modalCancelBtnTxt}>Cerrar</Text>
+            <TouchableOpacity style={styles.panelCancelBtn} onPress={() => setShowAIReorgModal(false)}>
+              <Text style={styles.panelCancelBtnTxt}>Cerrar</Text>
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
-    </ScrollView>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  mainWrapper: { flex: 1, backgroundColor: colors.navyDark, position: 'relative' },
   container: { flex: 1, backgroundColor: colors.navyDark },
   content: { padding: 20, paddingBottom: 40 },
   contentDesktop: { maxWidth: 1100, alignSelf: 'center', width: '100%' },
@@ -1050,45 +1110,74 @@ const styles = StyleSheet.create({
   timelineDesc: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
   emptyTimelineTxt: { color: colors.textMuted, fontSize: 12, fontStyle: 'italic', textAlign: 'center', paddingVertical: 10 },
 
-  // MODALES
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContextCard: { width: '100%', maxWidth: 420, backgroundColor: colors.navyDeep, borderRadius: 24, padding: 20, borderWidth: 1.5, borderColor: colors.skyPrimary },
-  modalPlayerHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.1)' },
-  modalPlayerBadge: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  modalPlayerBadgeTxt: { color: colors.navyDark, fontSize: 16, fontWeight: '900' },
-  modalPlayerName: { color: colors.white, fontSize: 17, fontWeight: '900' },
-  modalPlayerRole: { color: colors.skyGlow, fontSize: 12, fontWeight: '700', marginTop: 1 },
-  modalCloseIconBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255, 255, 255, 0.1)', justifyContent: 'center', alignItems: 'center' },
+  // OVERLAYS NATIVOS ESTABLES (SIN MODAL NI PORTAL)
+  overlayContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9999,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  overlayBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.82)',
+  },
+  panelCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: colors.navyDeep,
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1.5,
+    borderColor: colors.skyPrimary,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  panelPlayerHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.1)' },
+  panelPlayerBadge: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  panelPlayerBadgeTxt: { color: colors.navyDark, fontSize: 16, fontWeight: '900' },
+  panelPlayerName: { color: colors.white, fontSize: 17, fontWeight: '900' },
+  panelPlayerRole: { color: colors.skyGlow, fontSize: 12, fontWeight: '700', marginTop: 1 },
+  panelCloseIconBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255, 255, 255, 0.1)', justifyContent: 'center', alignItems: 'center' },
 
-  modalMenuSectionTitle: { color: colors.textMuted, fontSize: 11, fontWeight: '900', letterSpacing: 1, textAlign: 'center', marginBottom: 14 },
+  panelSectionTitle: { color: colors.textMuted, fontSize: 11, fontWeight: '900', letterSpacing: 1, textAlign: 'center', marginBottom: 14 },
   contextOptionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', marginBottom: 16 },
   contextTileBtn: { width: '48%', flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(2, 8, 20, 0.8)', paddingVertical: 14, paddingHorizontal: 12, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' },
   contextTileTxt: { color: colors.white, fontSize: 13, fontWeight: '800' },
-  modalCancelFullBtn: { backgroundColor: 'rgba(255, 255, 255, 0.08)', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
-  modalCancelFullTxt: { color: colors.white, fontSize: 13, fontWeight: '800' },
+  panelCancelFullBtn: { backgroundColor: 'rgba(255, 255, 255, 0.08)', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+  panelCancelFullTxt: { color: colors.white, fontSize: 13, fontWeight: '800' },
 
-  modalCard: { width: '100%', maxWidth: 420, backgroundColor: colors.navyDeep, borderRadius: 24, padding: 20, borderWidth: 1.5, borderColor: colors.emeraldGlow },
-  modalTitle: { color: colors.white, fontSize: 16, fontWeight: '900', textAlign: 'center', marginBottom: 6 },
-  modalSubTxt: { color: colors.textMuted, fontSize: 12, textAlign: 'center', marginBottom: 10 },
-  scorerSummaryBox: { backgroundColor: 'rgba(52, 211, 153, 0.15)', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.emeraldGlow, marginBottom: 12 },
-  scorerSummaryTxt: { color: colors.emeraldGlow, fontSize: 12, fontWeight: '900', textAlign: 'center' },
-  modalSectionSubHeader: { color: colors.skyGlow, fontSize: 11, fontWeight: '900', letterSpacing: 0.5, marginBottom: 6 },
-  playerPickRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 10, backgroundColor: 'rgba(255, 255, 255, 0.05)', marginBottom: 6 },
-  playerPickRowSelected: { backgroundColor: 'rgba(16, 185, 129, 0.25)', borderWidth: 1, borderColor: colors.emeraldGlow },
+  panelTitle: { color: colors.white, fontSize: 16, fontWeight: '900', textAlign: 'center', marginBottom: 6 },
+  panelSubTxt: { color: colors.textMuted, fontSize: 12, textAlign: 'center', marginBottom: 10 },
+  scorerSummaryBox: { backgroundColor: 'rgba(52, 211, 153, 0.15)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.emeraldGlow, marginBottom: 12 },
+  scorerSummaryTxt: { color: colors.emeraldGlow, fontSize: 13, fontWeight: '900', textAlign: 'center' },
+  panelSubHeader: { color: colors.skyGlow, fontSize: 11, fontWeight: '900', letterSpacing: 0.5, marginBottom: 6 },
+  playerPickRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: 'rgba(255, 255, 255, 0.05)', marginBottom: 6 },
   playerPickDorsal: { color: colors.skyPrimary, fontSize: 13, fontWeight: '900' },
   playerPickName: { color: colors.white, fontSize: 13, fontWeight: '700' },
   confirmGoalBtn: { backgroundColor: colors.emeraldGlow, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
   confirmGoalBtnTxt: { color: colors.navyDark, fontSize: 13, fontWeight: '900' },
-  modalCancelBtn: { backgroundColor: 'rgba(255, 255, 255, 0.1)', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
-  modalCancelBtnTxt: { color: colors.white, fontSize: 12, fontWeight: '800' },
+  panelCancelBtn: { backgroundColor: 'rgba(255, 255, 255, 0.1)', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+  panelCancelBtnTxt: { color: colors.white, fontSize: 12, fontWeight: '800' },
 
   // EVENTOS GENERALES
   generalOptionTile: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(2, 8, 20, 0.8)', paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' },
   generalOptionTileTxt: { color: colors.white, fontSize: 13, fontWeight: '800' },
   incidenceTextInput: { backgroundColor: 'rgba(255, 255, 255, 0.08)', color: colors.white, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border, fontSize: 13 },
 
-  // MODAL IA
-  modalAICard: { width: '100%', maxWidth: 440, backgroundColor: '#071A3D', borderRadius: 24, padding: 20, borderWidth: 1.5, borderColor: colors.purpleAI },
+  // IA
+  panelAICard: { width: '100%', maxWidth: 440, backgroundColor: '#071A3D', borderRadius: 24, padding: 20, borderWidth: 1.5, borderColor: colors.purpleAI },
   aiModalTitle: { color: '#F0ABFC', fontSize: 16, fontWeight: '900', textAlign: 'center', marginBottom: 4 },
   aiModalSub: { color: colors.textMuted, fontSize: 12, textAlign: 'center', marginBottom: 10 },
   aiProposalCard: { backgroundColor: 'rgba(2, 8, 20, 0.85)', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.4)', gap: 6 },
