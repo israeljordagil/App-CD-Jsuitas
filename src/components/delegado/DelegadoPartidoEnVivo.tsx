@@ -568,6 +568,27 @@ export function DelegadoPartidoEnVivo({
     setRestSeconds(restDurationSecs);
     setMatchPhase('HALF_TIME');
 
+    // CERRAR TRAMO DE 1ª PARTE Y CONSERVAR TIEMPO ACUMULADO DE CADA JUGADOR EN CAMPO
+    setPlayerMatchStates(prev => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach(pId => {
+        const player = updated[pId];
+        if (player.status === 'FIELD' && player.currentStintStartSecond !== null) {
+          const stintDuration = Math.max(0, firstHalfLimitSecs - player.currentStintStartSecond);
+          const updatedStints = player.stints.map(s =>
+            s.exitedAtSecond === null ? { ...s, exitedAtSecond: firstHalfLimitSecs } : s
+          );
+          updated[pId] = {
+            ...player,
+            playedSeconds: player.playedSeconds + stintDuration,
+            currentStintStartSecond: null,
+            stints: updatedStints,
+          };
+        }
+      });
+      return updated;
+    });
+
     saveTimerSnapshot({
       matchId: 'cadete-b-live-1',
       category: matchCategory,
@@ -614,13 +635,20 @@ export function DelegadoPartidoEnVivo({
     setAddedTimeSeconds(0);
     setMatchPhase('SECOND_HALF');
 
+    // ABRIR TRAMO DE 2ª PARTE PARA JUGADORES EN CAMPO CONSERVANDO playedSeconds PREVIO
     setPlayerMatchStates(prev => {
       const updated = { ...prev };
       Object.keys(updated).forEach(pId => {
-        if (updated[pId].status === 'FIELD') {
+        const player = updated[pId];
+        if (player.status === 'FIELD' && !player.isInjured && !player.isRedCarded) {
+          const updatedStints = [
+            ...player.stints,
+            { enteredAtSecond: firstHalfLimitSecs, exitedAtSecond: null },
+          ];
           updated[pId] = {
-            ...updated[pId],
+            ...player,
             currentStintStartSecond: firstHalfLimitSecs,
+            stints: updatedStints,
           };
         }
       });
