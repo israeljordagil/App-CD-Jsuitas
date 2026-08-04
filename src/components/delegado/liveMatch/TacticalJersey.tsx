@@ -9,6 +9,7 @@ export interface TacticalJerseyProps {
   yellowCardCount?: number;
   isRedCarded?: boolean;
   isInjured?: boolean;
+  isCaptain?: boolean;
   timeText?: string;
   onPress?: () => void;
   scale?: number;
@@ -22,10 +23,12 @@ export function TacticalJersey({
   yellowCardCount = 0,
   isRedCarded = false,
   isInjured = false,
+  isCaptain = false,
   timeText,
   onPress,
   scale = 1,
 }: TacticalJerseyProps) {
+
 
   // PRIMERA EQUIPACIÓN OFICIAL CD JESUITAS (PARTIDO COMO LOCAL)
   // Jugador Campo: Cuerpo Celeste (#38BDF8), Mangas Celestes (#38BDF8), Cuello Azul Marino (#071A3D), Puños Azul Marino (#071A3D), Dorsal Azul Marino (#071A3D)
@@ -63,10 +66,12 @@ export function TacticalJersey({
         )}
 
 
-        {/* MANGA IZQUIERDA CON PUÑO AZUL MARINO */}
+        {/* MANGA IZQUIERDA CON BRAZALETE DE CAPITÁN Y PUÑO AZUL MARINO */}
         <View style={[styles.sleeveLeft, { backgroundColor: sleeveColor }]}>
+          {isCaptain && <View style={styles.captainArmband} />}
           <View style={[styles.sleeveCuff, { backgroundColor: cuffColor }]} />
         </View>
+
         
         {/* MANGA DERECHA CON PUÑO AZUL MARINO */}
         <View style={[styles.sleeveRight, { backgroundColor: sleeveColor }]}>
@@ -146,6 +151,19 @@ const styles = StyleSheet.create({
     right: 0,
     height: 4,
   },
+  captainArmband: {
+    position: 'absolute',
+    top: 9,
+    left: 0,
+    right: 0,
+    height: 5,
+    backgroundColor: '#071A3D',
+    borderTopWidth: 0.8,
+    borderBottomWidth: 0.8,
+    borderColor: '#FFFFFF',
+  },
+
+
   jerseyBody: {
     width: 38,
     height: 46,

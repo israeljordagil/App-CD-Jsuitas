@@ -12,10 +12,12 @@ export interface PitchPlayer {
   yellowCardCount?: number;
   isRedCarded?: boolean;
   isInjured?: boolean;
+  isCaptain?: boolean;
   timeText?: string;
   xPercent: number; // Porcentaje X (0-100)
   yPercent: number; // Porcentaje Y (0-100)
 }
+
 
 const STARTERS_14231: PitchPlayer[] = [
   // DELANTERO (#9 ALEJANDRO)
@@ -23,8 +25,9 @@ const STARTERS_14231: PitchPlayer[] = [
 
   // MEDIAPUNTAS Y EXTREMOS (#11 DAVID, #10 MARCOS, #7 IVÁN)
   { id: '11', dorsal: '11', name: 'DAVID', role: 'EI', xPercent: 18, yPercent: 34 },
-  { id: '10', dorsal: '10', name: 'MARCOS', role: 'MP', xPercent: 50, yPercent: 33 },
+  { id: '10', dorsal: '10', name: 'MARCOS', role: 'MP', isCaptain: true, xPercent: 50, yPercent: 33 },
   { id: '7', dorsal: '7', name: 'IVÁN', role: 'ED', xPercent: 82, yPercent: 34 },
+
 
   // DOBLE PIVOTE (#8 PABLO, #6 JAVI)
   { id: '8', dorsal: '8', name: 'PABLO', role: 'MC', xPercent: 35, yPercent: 52 },
@@ -100,9 +103,11 @@ export function TacticalPitch({
               yellowCardCount={player.yellowCardCount}
               isRedCarded={player.isRedCarded}
               isInjured={player.isInjured}
+              isCaptain={player.isCaptain}
               timeText={player.timeText}
               onPress={() => onPlayerPress && onPlayerPress(player)}
             />
+
           </View>
         ))}
       </View>

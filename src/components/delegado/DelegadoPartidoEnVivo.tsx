@@ -46,19 +46,22 @@ const INITIAL_STARTERS_14231: PitchPlayer[] = [
   { id: '8', dorsal: '8', name: 'PABLO', role: 'MC', xPercent: 35, yPercent: 52 },
   { id: '6', dorsal: '6', name: 'JAVI', role: 'MC', xPercent: 65, yPercent: 52 },
   { id: '11', dorsal: '11', name: 'DAVID', role: 'EI', xPercent: 18, yPercent: 34 },
-  { id: '10', dorsal: '10', name: 'MARCOS', role: 'MP', xPercent: 50, yPercent: 33 },
+  { id: '10', dorsal: '10', name: 'MARCOS', role: 'MP', isCaptain: true, xPercent: 50, yPercent: 33 },
   { id: '7', dorsal: '7', name: 'IVÁN', role: 'ED', xPercent: 82, yPercent: 34 },
   { id: '9', dorsal: '9', name: 'ALEJANDRO', role: 'DC', xPercent: 50, yPercent: 14 },
 ];
+
 
 const INITIAL_BENCH: PitchPlayer[] = [
   { id: '13', dorsal: '13', name: 'ÁLVARO G.', isGoalkeeper: true, role: 'POR', xPercent: 0, yPercent: 0 },
   { id: '12', dorsal: '12', name: 'DIEGO', role: 'DFC', xPercent: 0, yPercent: 0 },
   { id: '14', dorsal: '14', name: 'SERGIO', role: 'MC', xPercent: 0, yPercent: 0 },
   { id: '15', dorsal: '15', name: 'ADRIÁN', role: 'MC', xPercent: 0, yPercent: 0 },
-  { id: '16', dorsal: '16', name: 'IAN', role: 'DC', xPercent: 0, yPercent: 0 },
-  { id: '17', dorsal: '17', name: 'ÁLEX', role: 'DC', xPercent: 0, yPercent: 0 },
+  { id: '16', dorsal: '16', name: 'IAN', role: 'EI', xPercent: 0, yPercent: 0 },
+  { id: '17', dorsal: '17', name: 'ÁLEX', role: 'MC', xPercent: 0, yPercent: 0 },
 ];
+
+
 
 
 const buildInitialPlayerStates = (): Record<string, PlayerMatchState> => {
