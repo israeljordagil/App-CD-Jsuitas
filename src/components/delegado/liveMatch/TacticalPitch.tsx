@@ -9,6 +9,10 @@ export interface PitchPlayer {
   name: string;
   role?: string;
   isGoalkeeper?: boolean;
+  yellowCardCount?: number;
+  isRedCarded?: boolean;
+  isInjured?: boolean;
+  timeText?: string;
   xPercent: number; // Porcentaje X (0-100)
   yPercent: number; // Porcentaje Y (0-100)
 }
@@ -93,6 +97,10 @@ export function TacticalPitch({
               dorsal={player.dorsal}
               name={player.name}
               isGoalkeeper={player.isGoalkeeper}
+              yellowCardCount={player.yellowCardCount}
+              isRedCarded={player.isRedCarded}
+              isInjured={player.isInjured}
+              timeText={player.timeText}
               onPress={() => onPlayerPress && onPlayerPress(player)}
             />
           </View>
@@ -101,6 +109,7 @@ export function TacticalPitch({
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {

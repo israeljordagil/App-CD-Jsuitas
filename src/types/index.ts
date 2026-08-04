@@ -12,3 +12,6 @@ export interface Match {
   opponent: string;
   date: Date;
 }
+
+export * from './liveMatch';
+

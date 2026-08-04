@@ -6,6 +6,10 @@ export interface TacticalJerseyProps {
   name: string;
   isGoalkeeper?: boolean;
   isAway?: boolean;
+  yellowCardCount?: number;
+  isRedCarded?: boolean;
+  isInjured?: boolean;
+  timeText?: string;
   onPress?: () => void;
   scale?: number;
 }
@@ -15,9 +19,14 @@ export function TacticalJersey({
   name,
   isGoalkeeper = false,
   isAway = false,
+  yellowCardCount = 0,
+  isRedCarded = false,
+  isInjured = false,
+  timeText,
   onPress,
   scale = 1,
 }: TacticalJerseyProps) {
+
   // PRIMERA EQUIPACIÓN OFICIAL CD JESUITAS (PARTIDO COMO LOCAL)
   // Jugador Campo: Cuerpo Celeste (#38BDF8), Mangas Celestes (#38BDF8), Cuello Azul Marino (#071A3D), Puños Azul Marino (#071A3D), Dorsal Azul Marino (#071A3D)
   // Portero Local: Cuerpo Granate (#800020), Mangas Granate (#800020), Cuello Azul Marino (#071A3D), Puños Azul Marino (#071A3D), Dorsal Naranja (#FF6600)
@@ -36,6 +45,24 @@ export function TacticalJersey({
     >
       {/* CAMISETA REAL DE FÚTBOL (CUERPO + MANGAS UNIDAS + PUÑOS AZUL MARINO + CUELLO AZUL MARINO) */}
       <View style={styles.jerseyWrapper}>
+        {/* INDICADOR DE TARJETA AMARILLA PEQUEÑO EN LA ESQUINA SUPERIOR DERECHA */}
+        {yellowCardCount === 1 && !isRedCarded && (
+          <View style={styles.yellowCardBadge} />
+        )}
+
+        {/* INDICADOR DE TARJETA ROJA EN LA ESQUINA SUPERIOR DERECHA */}
+        {isRedCarded && (
+          <View style={styles.redCardBadge} />
+        )}
+
+        {/* INDICADOR DE LESIÓN */}
+        {isInjured && (
+          <View style={styles.injuryBadge}>
+            <Text style={styles.injuryBadgeTxt}>+</Text>
+          </View>
+        )}
+
+
         {/* MANGA IZQUIERDA CON PUÑO AZUL MARINO */}
         <View style={[styles.sleeveLeft, { backgroundColor: sleeveColor }]}>
           <View style={[styles.sleeveCuff, { backgroundColor: cuffColor }]} />
@@ -56,12 +83,18 @@ export function TacticalJersey({
         </View>
       </View>
 
-      {/* PLACA INFERIOR CON EL NOMBRE DEL JUGADOR (DEBAJO DE LA CAMISETA) */}
+      {/* PLACA INFERIOR CON EL NOMBRE Y TIEMPO DEL JUGADOR */}
       <View style={styles.nameBadge}>
         <Text style={styles.nameTxt} numberOfLines={1}>
           {name.toUpperCase()}
         </Text>
+        {Boolean(timeText) && (
+          <Text style={styles.timeTxt}>
+            {timeText}
+          </Text>
+        )}
       </View>
+
     </TouchableOpacity>
   );
 }
@@ -155,6 +188,70 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 0.3,
   },
+  timeTxt: {
+    color: '#38BDF8',
+    fontSize: 9,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginTop: 1,
+    letterSpacing: 0.2,
+  },
+
+  yellowCardBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -3,
+    width: 9,
+    height: 13,
+    backgroundColor: '#F59E0B',
+    borderRadius: 2,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    zIndex: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4,
+    shadowRadius: 1,
+    elevation: 3,
+  },
+  injuryBadge: {
+    position: 'absolute',
+    top: -2,
+    left: -3,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    zIndex: 20,
+  },
+  injuryBadgeTxt: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '900',
+    lineHeight: 11,
+  },
+  redCardBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -3,
+    width: 9,
+    height: 13,
+    backgroundColor: '#EF4444',
+    borderRadius: 2,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    zIndex: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.4,
+    shadowRadius: 1,
+    elevation: 3,
+  },
 });
+
 
 

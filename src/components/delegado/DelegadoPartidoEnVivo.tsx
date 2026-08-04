@@ -4,6 +4,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { TacticalPitch, PitchPlayer } from './liveMatch/TacticalPitch';
 import { TacticalJersey } from './liveMatch/TacticalJersey';
+import { PlayerMatchState, PlayerCard, PlayerInjury } from '../../types/liveMatch';
+import {
+  createInitialPlayerState,
+  calculatePlayerPlayedSeconds,
+  formatPlayerTimer,
+  reorganizePitchAfterExpulsion,
+  transitionPlayerToField,
+  transitionPlayerToBench,
+  recordGoal,
+  recordAssist,
+  recordYellowCard,
+  recordRedCard,
+  recordInjury,
+} from '../../utils/liveMatchState';
+
+
 
 const colors = {
   navyDark: '#020814',
@@ -37,12 +53,43 @@ const INITIAL_STARTERS_14231: PitchPlayer[] = [
 
 const INITIAL_BENCH: PitchPlayer[] = [
   { id: '13', dorsal: '13', name: 'ÁLVARO G.', isGoalkeeper: true, role: 'POR', xPercent: 0, yPercent: 0 },
-  { id: '12', dorsal: '12', name: 'DIEGO', role: 'DEF', xPercent: 0, yPercent: 0 },
-  { id: '14', dorsal: '14', name: 'SERGIO', role: 'MED', xPercent: 0, yPercent: 0 },
-  { id: '15', dorsal: '15', name: 'ADRIÁN', role: 'MED', xPercent: 0, yPercent: 0 },
-  { id: '16', dorsal: '16', name: 'IAN', role: 'DEL', xPercent: 0, yPercent: 0 },
-  { id: '17', dorsal: '17', name: 'ÁLEX', role: 'DEL', xPercent: 0, yPercent: 0 },
+  { id: '12', dorsal: '12', name: 'DIEGO', role: 'DFC', xPercent: 0, yPercent: 0 },
+  { id: '14', dorsal: '14', name: 'SERGIO', role: 'MC', xPercent: 0, yPercent: 0 },
+  { id: '15', dorsal: '15', name: 'ADRIÁN', role: 'MC', xPercent: 0, yPercent: 0 },
+  { id: '16', dorsal: '16', name: 'IAN', role: 'DC', xPercent: 0, yPercent: 0 },
+  { id: '17', dorsal: '17', name: 'ÁLEX', role: 'DC', xPercent: 0, yPercent: 0 },
 ];
+
+
+const buildInitialPlayerStates = (): Record<string, PlayerMatchState> => {
+  const map: Record<string, PlayerMatchState> = {};
+  INITIAL_STARTERS_14231.forEach((p) => {
+    const id = p.id || p.dorsal;
+    map[id] = createInitialPlayerState({
+      playerId: id,
+      dorsal: p.dorsal,
+      name: p.name,
+      isGoalkeeper: p.isGoalkeeper,
+      role: p.role,
+      isStarter: true,
+      xPercent: p.xPercent,
+      yPercent: p.yPercent,
+    });
+  });
+  INITIAL_BENCH.forEach((b) => {
+    const id = b.id || b.dorsal;
+    map[id] = createInitialPlayerState({
+      playerId: id,
+      dorsal: b.dorsal,
+      name: b.name,
+      isGoalkeeper: b.isGoalkeeper,
+      role: b.role,
+      isStarter: false,
+    });
+  });
+  return map;
+};
+
 
 interface PlayerStats {
   yellowCards: number;
@@ -54,8 +101,9 @@ interface PlayerStats {
 
 export type MatchStatus = 'BEFORE_START' | 'IN_PROGRESS' | 'PAUSED' | 'FINISHED';
 
-export type PlayerActionType = 'GOAL' | 'YELLOW_CARD' | 'RED_CARD' | 'SUBSTITUTION' | 'INJURY';
-export type PlayerActionStep = 'MENU' | 'SELECT_ASSIST' | 'SELECT_SUBSTITUTE' | 'CONFIRM';
+export type PlayerActionType = 'GOAL' | 'PENALTY' | 'YELLOW_CARD' | 'RED_CARD' | 'SUBSTITUTION' | 'INJURY';
+export type PlayerActionStep = 'MENU' | 'SELECT_ASSIST' | 'PENALTY_MENU' | 'SELECT_SUBSTITUTE' | 'CONFIRM';
+
 
 export interface PlayerActionFlow {
   visible: boolean;
@@ -92,10 +140,12 @@ export function DelegadoPartidoEnVivo() {
   const [systemName, setSystemName] = useState('1-4-2-3-1');
   const [isSuspended, setIsSuspended] = useState(false);
 
-  // 3. JUGADORES Y ESTADÍSTICAS
+  // 3. JUGADORES Y ESTADÍSTICAS PERSISTENTES DE PARTIDO (FASE 2 - BLOQUE 1)
   const [pitchPlayers, setPitchPlayers] = useState<PitchPlayer[]>(INITIAL_STARTERS_14231);
   const [benchPlayers, setBenchPlayers] = useState<PitchPlayer[]>(INITIAL_BENCH);
   const [playerStats, setPlayerStats] = useState<Record<string, PlayerStats>>({});
+  const [playerMatchStates, setPlayerMatchStates] = useState<Record<string, PlayerMatchState>>(buildInitialPlayerStates);
+
 
   // 4. TIMELINE DE EVENTOS CON ID ÚNICO Y CLAVE ESTABLE
   const [events, setEvents] = useState<any[]>([]);
@@ -131,8 +181,19 @@ export function DelegadoPartidoEnVivo() {
   const getMinuteText = () => `${Math.floor(matchSeconds / 60)}'`;
 
   const getPStats = (id: string): PlayerStats => {
+    const pState = playerMatchStates[id];
+    if (pState) {
+      return {
+        yellowCards: pState.yellowCards,
+        isRedCarded: pState.isRedCarded,
+        isInjured: pState.isInjured,
+        goals: pState.goals.length,
+        assists: pState.assistsCount,
+      };
+    }
     return playerStats[id] || { yellowCards: 0, isRedCarded: false, isInjured: false, goals: 0, assists: 0 };
   };
+
 
   // CONTROL DEL CRONÓMETRO (START, PAUSE, RESUME, FINISH)
   const handleStartMatch = () => {
@@ -220,6 +281,7 @@ export function DelegadoPartidoEnVivo() {
     setPitchPlayers(INITIAL_STARTERS_14231);
     setBenchPlayers(INITIAL_BENCH);
     setPlayerStats({});
+    setPlayerMatchStates(buildInitialPlayerStates());
     setEvents([]);
     setPlayerAction(initialPlayerActionFlow);
     setShowAIReorgModal(false);
@@ -227,6 +289,7 @@ export function DelegadoPartidoEnVivo() {
     setShowIncidenceInput(false);
     setIncidenceText('');
   };
+
 
   // GESTIÓN DEL PANEL SUPERPUESTO DE ACCIONES (ÚNICA FUNCIÓN DE APERTURA Y CIERRE)
   const handleOpenPlayerActionPanel = (player: PitchPlayer) => {
@@ -270,7 +333,23 @@ export function DelegadoPartidoEnVivo() {
       // 1. Actualizar Marcador
       setHomeScore(prev => prev + 1);
 
-      // 2. Actualizar Estadísticas
+      // 2. Actualizar Estadísticas y Estado Persistente (Fase 2 - Bloque 1)
+      setPlayerMatchStates(prev => {
+        const updated = { ...prev };
+        if (updated[scorerId]) {
+          updated[scorerId] = recordGoal(updated[scorerId], {
+            id: `goal-${Date.now()}`,
+            minute: Math.floor(matchSeconds / 60),
+            second: matchSeconds,
+            assistedByPlayerId: assistId || undefined,
+          });
+        }
+        if (assistId && updated[assistId]) {
+          updated[assistId] = recordAssist(updated[assistId]);
+        }
+        return updated;
+      });
+
       setPlayerStats(prev => {
         const currentScorerStats = prev[scorerId] || { yellowCards: 0, isRedCarded: false, isInjured: false, goals: 0, assists: 0 };
         const updated = {
@@ -291,6 +370,7 @@ export function DelegadoPartidoEnVivo() {
 
         return updated;
       });
+
 
       const descTxt = assister 
         ? `#${scorer.dorsal} ${scorer.name} (Asistencia: #${assister.dorsal} ${assister.name})`
@@ -314,6 +394,85 @@ export function DelegadoPartidoEnVivo() {
     }
   };
 
+  // ACCIÓN 1.B: PENALTI MARCADO O FALLADO
+  const handleConfirmPenaltyScored = () => {
+    if (playerAction.isSubmitting || !playerAction.player || isSuspended) return;
+
+    try {
+      setPlayerAction(prev => ({ ...prev, isSubmitting: true }));
+      const minTxt = getMinuteText();
+      const scorer = playerAction.player;
+      const scorerId = scorer.id || scorer.dorsal;
+
+      setHomeScore(prev => prev + 1);
+
+      setPlayerMatchStates(prev => {
+        const updated = { ...prev };
+        if (updated[scorerId]) {
+          updated[scorerId] = recordGoal(updated[scorerId], {
+            id: `pen-goal-${Date.now()}`,
+            minute: Math.floor(matchSeconds / 60),
+            second: matchSeconds,
+            isPenalty: true,
+          });
+        }
+        return updated;
+      });
+
+      setPlayerStats(prev => {
+        const currentStats = prev[scorerId] || { yellowCards: 0, isRedCarded: false, isInjured: false, goals: 0, assists: 0 };
+        return {
+          ...prev,
+          [scorerId]: {
+            ...currentStats,
+            goals: currentStats.goals + 1,
+          },
+        };
+      });
+
+      setEvents(prev => [
+        {
+          id: `ev-${Date.now()}`,
+          minute: minTxt,
+          type: 'PENALTI_GOL',
+          title: '¡Gol de penalti!',
+          desc: `#${scorer.dorsal} ${scorer.name}`,
+          icon: 'football',
+          color: colors.emeraldGlow,
+        },
+        ...prev,
+      ]);
+    } finally {
+      closePlayerActionPanel();
+    }
+  };
+
+  const handleConfirmPenaltyMissed = () => {
+    if (playerAction.isSubmitting || !playerAction.player || isSuspended) return;
+
+    try {
+      setPlayerAction(prev => ({ ...prev, isSubmitting: true }));
+      const minTxt = getMinuteText();
+      const player = playerAction.player;
+
+      setEvents(prev => [
+        {
+          id: `ev-${Date.now()}`,
+          minute: minTxt,
+          type: 'PENALTI_FALLADO',
+          title: 'Penalti fallado',
+          desc: `#${player.dorsal} ${player.name}`,
+          icon: 'close-circle',
+          color: colors.redCard,
+        },
+        ...prev,
+      ]);
+    } finally {
+      closePlayerActionPanel();
+    }
+  };
+
+
   // ACCIÓN 2: TARJETA AMARILLA (O 2ª AMARILLA -> EXPULSIÓN AUTOMÁTICA)
   const handleConfirmYellowCard = () => {
     if (playerAction.isSubmitting || !playerAction.player || isSuspended) return;
@@ -325,7 +484,20 @@ export function DelegadoPartidoEnVivo() {
       const pId = player.id || player.dorsal;
       const currentStats = getPStats(pId);
 
+      const card: PlayerCard = {
+        id: `card-${Date.now()}`,
+        type: 'YELLOW',
+        minute: Math.floor(matchSeconds / 60),
+        second: matchSeconds,
+      };
+
+      setPlayerMatchStates(prev => {
+        if (!prev[pId]) return prev;
+        return { ...prev, [pId]: recordYellowCard(prev[pId], card) };
+      });
+
       if (currentStats.yellowCards === 0) {
+
         setPlayerStats(prev => ({
           ...prev,
           [pId]: { ...currentStats, yellowCards: 1 }
@@ -363,39 +535,9 @@ export function DelegadoPartidoEnVivo() {
     }
   };
 
-  // ACCIÓN 4: LESIÓN
-  const handleConfirmInjury = () => {
-    if (playerAction.isSubmitting || !playerAction.player || isSuspended) return;
 
-    try {
-      setPlayerAction(prev => ({ ...prev, isSubmitting: true }));
-      const minTxt = getMinuteText();
-      const player = playerAction.player;
-      const pId = player.id || player.dorsal;
 
-      setPlayerStats(prev => ({
-        ...prev,
-        [pId]: { ...getPStats(pId), isInjured: true }
-      }));
-
-      setEvents(prev => [
-        {
-          id: `ev-${Date.now()}`,
-          minute: minTxt,
-          type: 'LESION',
-          title: 'Atención médica / Lesión',
-          desc: `#${player.dorsal} ${player.name} (${player.role})`,
-          icon: 'medkit',
-          color: colors.redCard,
-        },
-        ...prev,
-      ]);
-    } finally {
-      closePlayerActionPanel();
-    }
-  };
-
-  // ACCIÓN 5: SUSTITUCIÓN
+  // ACCIÓN 5: SUSTITUCIÓN Y LESIÓN
   const handleConfirmSub = (substitutePlayer: PitchPlayer) => {
     if (playerAction.isSubmitting || !playerAction.player || isSuspended) return;
 
@@ -403,6 +545,43 @@ export function DelegadoPartidoEnVivo() {
       setPlayerAction(prev => ({ ...prev, isSubmitting: true }));
       const minTxt = getMinuteText();
       const subOutPlayer = playerAction.player;
+
+      const subOutId = subOutPlayer.id || subOutPlayer.dorsal;
+      const subInId = substitutePlayer.id || substitutePlayer.dorsal;
+      const isInjurySub = playerAction.action === 'INJURY';
+
+      setPlayerMatchStates(prev => {
+        const updated = { ...prev };
+        if (updated[subOutId]) {
+          if (isInjurySub) {
+            const injury: PlayerInjury = {
+              id: `inj-${Date.now()}`,
+              minute: Math.floor(matchSeconds / 60),
+              second: matchSeconds,
+              isOutForMatch: true,
+            };
+            updated[subOutId] = recordInjury(updated[subOutId], injury, matchSeconds);
+          } else {
+            updated[subOutId] = transitionPlayerToBench(updated[subOutId], matchSeconds);
+          }
+        }
+        if (updated[subInId]) {
+          updated[subInId] = transitionPlayerToField(
+            updated[subInId],
+            matchSeconds,
+            { xPercent: subOutPlayer.xPercent, yPercent: subOutPlayer.yPercent },
+            subOutPlayer.role
+          );
+        }
+        return updated;
+      });
+
+      if (isInjurySub) {
+        setPlayerStats(prev => ({
+          ...prev,
+          [subOutId]: { ...getPStats(subOutId), isInjured: true }
+        }));
+      }
 
       setPitchPlayers(prev => prev.map(p => p.dorsal === subOutPlayer.dorsal ? {
         ...substitutePlayer,
@@ -417,35 +596,91 @@ export function DelegadoPartidoEnVivo() {
         yPercent: 0,
       } : b));
 
-      setEvents(prev => [
-        {
-          id: `ev-${Date.now()}`,
-          minute: minTxt,
-          type: 'CAMBIO',
-          title: 'Sustitución',
-          desc: `Entra #${substitutePlayer.dorsal} ${substitutePlayer.name} ⇆ Sale #${subOutPlayer.dorsal} ${subOutPlayer.name}`,
-          icon: 'swap-horizontal',
-          color: colors.skyGlow,
-        },
-        ...prev,
-      ]);
+      const subDesc = `Entra #${substitutePlayer.dorsal} ${substitutePlayer.name} ⇆ Sale #${subOutPlayer.dorsal} ${subOutPlayer.name}`;
+
+      if (isInjurySub) {
+        setEvents(prev => [
+          {
+            id: `ev-inj-${Date.now()}`,
+            minute: minTxt,
+            type: 'LESION',
+            title: 'Lesión y Sustitución',
+            desc: `Lesionado #${subOutPlayer.dorsal} ${subOutPlayer.name} · ${subDesc}`,
+            icon: 'medkit',
+            color: colors.redCard,
+          },
+          ...prev,
+        ]);
+      } else {
+        setEvents(prev => [
+          {
+            id: `ev-sub-${Date.now()}`,
+            minute: minTxt,
+            type: 'CAMBIO',
+            title: 'Sustitución',
+            desc: subDesc,
+            icon: 'swap-horizontal',
+            color: colors.skyGlow,
+          },
+          ...prev,
+        ]);
+      }
     } finally {
       closePlayerActionPanel();
     }
   };
+
 
   // PROCESAR EXPULSIÓN Y SUSPENSIÓN REGLAMENTARIA
   const processExpulsion = (player: PitchPlayer, isSecondYellow: boolean) => {
     const minTxt = getMinuteText();
     const pId = player.id || player.dorsal;
 
+    const card: PlayerCard = {
+      id: `card-${Date.now()}`,
+      type: 'RED',
+      minute: Math.floor(matchSeconds / 60),
+      second: matchSeconds,
+      reason: isSecondYellow ? 'Doble amarilla' : 'Roja directa',
+    };
+
+    setPlayerMatchStates(prev => {
+      if (!prev[pId]) return prev;
+      return { ...prev, [pId]: recordRedCard(prev[pId], card, matchSeconds) };
+    });
+
     setPlayerStats(prev => ({
       ...prev,
       [pId]: { ...getPStats(pId), isRedCarded: true }
     }));
 
-    const nextPitch = pitchPlayers.filter(p => p.dorsal !== player.dorsal);
-    setPitchPlayers(nextPitch);
+
+    // RECOLOCACIÓN MÍNIMA Y DETERMINISTA TRAS EXPULSIÓN (INCIDENCIA 2)
+    const { updatedPitch, relocatedPlayerDorsal } = reorganizePitchAfterExpulsion(pitchPlayers, player.dorsal);
+
+    if (relocatedPlayerDorsal && playerMatchStates[relocatedPlayerDorsal]) {
+      const relocatedPlayer = updatedPitch.find(p => p.dorsal === relocatedPlayerDorsal);
+      if (relocatedPlayer) {
+        setPlayerMatchStates(prev => {
+          const targetState = prev[relocatedPlayerDorsal];
+          if (!targetState) return prev;
+          return {
+            ...prev,
+            [relocatedPlayerDorsal]: {
+              ...targetState,
+              tacticalRole: relocatedPlayer.role,
+              coordinates: { xPercent: relocatedPlayer.xPercent, yPercent: relocatedPlayer.yPercent },
+            },
+          };
+        });
+      }
+    }
+
+    setPitchPlayers(updatedPitch);
+
+    const descTxt = relocatedPlayerDorsal
+      ? `#${player.dorsal} ${player.name} expulsado · #${relocatedPlayerDorsal} cubre la posición`
+      : `#${player.dorsal} ${player.name} (${player.role})`;
 
     setEvents(prev => [
       {
@@ -453,14 +688,15 @@ export function DelegadoPartidoEnVivo() {
         minute: minTxt,
         type: 'ROJA',
         title: isSecondYellow ? '2ª Amarilla → Expulsión' : 'Tarjeta roja directa',
-        desc: `#${player.dorsal} ${player.name} (${player.role})`,
+        desc: descTxt,
         icon: 'square',
         color: colors.redCard,
       },
       ...prev,
     ]);
 
-    if (nextPitch.length < 7) {
+    if (updatedPitch.length < 7) {
+
       setIsSuspended(true);
       setMatchStatus('FINISHED');
       setEvents(prev => [
@@ -703,12 +939,28 @@ export function DelegadoPartidoEnVivo() {
               </TouchableOpacity>
             )}
 
-            {/* CAMPO TÁCTICO */}
+            {/* CAMPO TÁCTICO CON TIEMPOS INDIVIDUALES VISIBLES */}
             <TacticalPitch 
               systemName={systemName} 
-              starters={pitchPlayers} 
+              starters={pitchPlayers.map(p => {
+                const pId = p.id || p.dorsal;
+                const pState = playerMatchStates[pId];
+                const stats = getPStats(pId);
+                const playedSecs = pState
+                  ? calculatePlayerPlayedSeconds(pState, matchSeconds)
+                  : 0;
+                return {
+                  ...p,
+                  yellowCardCount: stats.yellowCards,
+                  isRedCarded: stats.isRedCarded,
+                  isInjured: stats.isInjured,
+                  timeText: formatPlayerTimer(playedSecs),
+                };
+              })} 
               onPlayerPress={(p) => handleOpenPlayerActionPanel(p)} 
             />
+
+
           </View>
 
           <View style={isDesktop ? styles.sidebarColDesktop : { width: '100%' }}>
@@ -722,26 +974,41 @@ export function DelegadoPartidoEnVivo() {
               <Text style={styles.generalEventTriggerTxt}>+ NUEVO EVENTO GENERAL</Text>
             </TouchableOpacity>
 
-            {/* BANQUILLO */}
+            {/* BANQUILLO CON TIEMPOS ACUMULADOS VISIBLES */}
             <View style={styles.sectionHeaderRow}>
+
               <Ionicons name="people-outline" size={20} color={colors.skyPrimary} />
               <Text style={styles.sectionTitleTxt}>BANQUILLO Y SUPLENTES ({benchPlayers.length})</Text>
             </View>
             <View style={styles.benchCard}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.benchScrollContent}>
-                {benchPlayers.map((player) => (
-                  <View key={`bench-${player.dorsal}`} style={styles.benchJerseyWrapper}>
-                    <TacticalJersey 
-                      dorsal={player.dorsal} 
-                      name={player.name} 
-                      isGoalkeeper={player.isGoalkeeper} 
-                      onPress={() => handleOpenPlayerActionPanel(player)} 
-                      scale={0.9} 
-                    />
-                  </View>
-                ))}
+                {benchPlayers.map((player) => {
+                  const pId = player.id || player.dorsal;
+                  const pState = playerMatchStates[pId];
+                  const stats = getPStats(pId);
+                  const playedSecs = pState
+                    ? calculatePlayerPlayedSeconds(pState, matchSeconds)
+                    : 0;
+                  return (
+                    <View key={`bench-${player.dorsal}`} style={styles.benchJerseyWrapper}>
+                      <TacticalJersey 
+                        dorsal={player.dorsal} 
+                        name={player.name} 
+                        isGoalkeeper={player.isGoalkeeper} 
+                        yellowCardCount={stats.yellowCards}
+                        isRedCarded={stats.isRedCarded}
+                        isInjured={stats.isInjured}
+                        timeText={formatPlayerTimer(playedSecs)}
+                        onPress={() => handleOpenPlayerActionPanel(player)} 
+                        scale={0.9} 
+                      />
+                    </View>
+                  );
+                })}
               </ScrollView>
             </View>
+
+
 
             {/* TIMELINE */}
             <View style={styles.sectionHeaderRow}>
@@ -794,12 +1061,12 @@ export function DelegadoPartidoEnVivo() {
               </TouchableOpacity>
             </View>
 
-            {/* PASO 1: MENÚ DE ACCIONES */}
+            {/* PASO 1: MENÚ DE ACCIONES (MATRIZ 2x3 EQUILIBRADA) */}
             {playerAction.step === 'MENU' && (
               <>
                 <Text style={styles.panelSectionTitle}>SELECCIONAR ACCIÓN DEL JUGADOR</Text>
                 <View style={styles.contextOptionsGrid}>
-                  {/* ⚽ GOL */}
+                  {/* FILA 1: GOL | PENALTI */}
                   <TouchableOpacity 
                     style={styles.contextTileBtn} 
                     onPress={() => setPlayerAction(prev => ({ ...prev, action: 'GOAL', step: 'SELECT_ASSIST', assister: null }))}
@@ -808,43 +1075,48 @@ export function DelegadoPartidoEnVivo() {
                     <Text style={styles.contextTileTxt}>Gol</Text>
                   </TouchableOpacity>
 
-                  {/* 🟨 TARJETA AMARILLA */}
+                  <TouchableOpacity 
+                    style={styles.contextTileBtn} 
+                    onPress={() => setPlayerAction(prev => ({ ...prev, action: 'PENALTY', step: 'PENALTY_MENU' }))}
+                  >
+                    <Text style={{ fontSize: 20 }}>🎯</Text>
+                    <Text style={styles.contextTileTxt}>Penalti</Text>
+                  </TouchableOpacity>
+
+                  {/* FILA 2: AMARILLA | ROJA */}
                   <TouchableOpacity 
                     style={[styles.contextTileBtn, playerAction.isSubmitting && { opacity: 0.5 }]} 
                     disabled={playerAction.isSubmitting}
                     onPress={handleConfirmYellowCard}
                   >
                     <Text style={{ fontSize: 20 }}>🟨</Text>
-                    <Text style={styles.contextTileTxt}>T. Amarilla</Text>
+                    <Text style={styles.contextTileTxt}>Amarilla</Text>
                   </TouchableOpacity>
 
-                  {/* 🟥 TARJETA ROJA DIRECTA */}
                   <TouchableOpacity 
                     style={[styles.contextTileBtn, playerAction.isSubmitting && { opacity: 0.5 }]} 
                     disabled={playerAction.isSubmitting}
                     onPress={handleConfirmRedCard}
                   >
                     <Text style={{ fontSize: 20 }}>🟥</Text>
-                    <Text style={styles.contextTileTxt}>T. Roja</Text>
+                    <Text style={styles.contextTileTxt}>Roja</Text>
                   </TouchableOpacity>
 
-                  {/* 🔁 SUSTITUCIÓN */}
+                  {/* FILA 3: LESIÓN | SUSTITUCIÓN */}
+                  <TouchableOpacity 
+                    style={styles.contextTileBtn} 
+                    onPress={() => setPlayerAction(prev => ({ ...prev, action: 'INJURY', step: 'SELECT_SUBSTITUTE', substitute: null }))}
+                  >
+                    <Text style={{ fontSize: 20 }}>🤕</Text>
+                    <Text style={styles.contextTileTxt}>Lesión</Text>
+                  </TouchableOpacity>
+
                   <TouchableOpacity 
                     style={styles.contextTileBtn} 
                     onPress={() => setPlayerAction(prev => ({ ...prev, action: 'SUBSTITUTION', step: 'SELECT_SUBSTITUTE', substitute: null }))}
                   >
                     <Text style={{ fontSize: 20 }}>🔁</Text>
                     <Text style={styles.contextTileTxt}>Sustitución</Text>
-                  </TouchableOpacity>
-
-                  {/* 🤕 LESIÓN */}
-                  <TouchableOpacity 
-                    style={[styles.contextTileBtn, playerAction.isSubmitting && { opacity: 0.5 }]} 
-                    disabled={playerAction.isSubmitting}
-                    onPress={handleConfirmInjury}
-                  >
-                    <Text style={{ fontSize: 20 }}>🤕</Text>
-                    <Text style={styles.contextTileTxt}>Lesión</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -853,6 +1125,39 @@ export function DelegadoPartidoEnVivo() {
                 </TouchableOpacity>
               </>
             )}
+
+            {/* SUBMENÚ DE PENALTI (MARCADO O FALLADO) */}
+            {playerAction.step === 'PENALTY_MENU' && (
+              <>
+                <Text style={styles.panelTitle}>🎯 LANZAMIENTO DE PENALTI</Text>
+                <Text style={styles.panelSubTxt}>
+                  Selecciona el resultado del penalti para #{playerAction.player?.dorsal} {playerAction.player?.name}:
+                </Text>
+
+                <View style={{ gap: 10, marginVertical: 12 }}>
+                  <TouchableOpacity 
+                    style={[styles.confirmGoalBtn, playerAction.isSubmitting && { opacity: 0.5 }]} 
+                    disabled={playerAction.isSubmitting}
+                    onPress={handleConfirmPenaltyScored}
+                  >
+                    <Text style={styles.confirmGoalBtnTxt}>⚽ Penalti marcado</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[styles.panelCancelBtn, { backgroundColor: 'rgba(239, 68, 68, 0.2)', borderWidth: 1, borderColor: colors.redCard }, playerAction.isSubmitting && { opacity: 0.5 }]} 
+                    disabled={playerAction.isSubmitting}
+                    onPress={handleConfirmPenaltyMissed}
+                  >
+                    <Text style={[styles.panelCancelBtnTxt, { color: '#FF8888' }]}>❌ Penalti fallado</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity style={styles.panelCancelFullBtn} onPress={() => setPlayerAction(prev => ({ ...prev, step: 'MENU' }))}>
+                  <Text style={styles.panelCancelFullTxt}>Volver al menú</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
 
             {/* PASO 2: SELECCIÓN DE ASISTENCIA */}
             {playerAction.step === 'SELECT_ASSIST' && (
@@ -930,13 +1235,20 @@ export function DelegadoPartidoEnVivo() {
                 <Text style={styles.panelSubHeader}>ENTRA DEL BANQUILLO:</Text>
 
                 <ScrollView style={{ maxHeight: 180, marginVertical: 10 }}>
-                  {benchPlayers.map(b => (
-                    <TouchableOpacity key={`sub-${b.dorsal}`} style={styles.playerPickRow} onPress={() => handleConfirmSub(b)}>
-                      <Text style={styles.playerPickDorsal}>#{b.dorsal}</Text>
-                      <Text style={styles.playerPickName}>{b.name} ({b.role})</Text>
-                    </TouchableOpacity>
-                  ))}
+                  {benchPlayers
+                    .filter(b => {
+                      const pId = b.id || b.dorsal;
+                      const pState = playerMatchStates[pId];
+                      return pState ? (pState.status === 'BENCH' && !pState.isInjured && !pState.isRedCarded) : true;
+                    })
+                    .map(b => (
+                      <TouchableOpacity key={`sub-${b.dorsal}`} style={styles.playerPickRow} onPress={() => handleConfirmSub(b)}>
+                        <Text style={styles.playerPickDorsal}>#{b.dorsal}</Text>
+                        <Text style={styles.playerPickName}>{b.name} ({b.role})</Text>
+                      </TouchableOpacity>
+                    ))}
                 </ScrollView>
+
 
                 <TouchableOpacity style={styles.panelCancelBtn} onPress={() => setPlayerAction(prev => ({ ...prev, step: 'MENU' }))}>
                   <Text style={styles.panelCancelBtnTxt}>Volver al menú</Text>
