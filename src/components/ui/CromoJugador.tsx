@@ -18,6 +18,7 @@ export interface CromoJugadorProps {
   photo?: string;
   avatarUrl?: string;
   hideGamification?: boolean;
+  variant?: 'compact' | 'detail';
 }
 
 export const CromoJugador: React.FC<CromoJugadorProps> = ({
@@ -32,8 +33,31 @@ export const CromoJugador: React.FC<CromoJugadorProps> = ({
   streakWeeks = 4,
   photo = '👦',
   hideGamification = false,
+  variant = 'detail',
 }) => {
   const xpPct = Math.min(100, Math.max(0, (currentXp / nextLevelXp) * 100));
+
+  if (variant === 'compact') {
+    return (
+      <View style={styles.compactCardContainer}>
+        <LinearGradient
+          colors={['#1E293B', '#0B224F', '#071A3D']}
+          style={styles.compactCardGradient}
+        >
+          <View style={styles.compactBorderHighlight} />
+          <Text style={styles.compactShield}>🛡️</Text>
+          <View style={styles.compactAvatarCircle}>
+            <Text style={{ fontSize: 20 }}>{photo}</Text>
+          </View>
+          {dorsal && (
+            <View style={styles.compactDorsalBadge}>
+              <Text style={styles.compactDorsalTxt}>#{dorsal}</Text>
+            </View>
+          )}
+        </LinearGradient>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.cardContainer}>
@@ -57,6 +81,7 @@ export const CromoJugador: React.FC<CromoJugadorProps> = ({
             </View>
           )}
         </View>
+
 
         {/* AVATAR / FOTO Y DORSAL */}
         <View style={styles.heroSection}>
@@ -314,4 +339,65 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+  compactCardContainer: {
+    width: 52,
+    height: 64,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: '#4FC3F7',
+    shadowColor: '#4FC3F7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  compactCardGradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    padding: 2,
+  },
+  compactBorderHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#4FC3F7',
+  },
+  compactShield: {
+    position: 'absolute',
+    top: 2,
+    left: 3,
+    fontSize: 10,
+  },
+  compactAvatarCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#0B224F',
+    borderWidth: 1,
+    borderColor: '#4FC3F7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  compactDorsalBadge: {
+    position: 'absolute',
+    bottom: 2,
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 5,
+    borderWidth: 0.5,
+    borderColor: '#071A3D',
+  },
+  compactDorsalTxt: {
+    color: '#071A3D',
+    fontSize: 9,
+    fontWeight: '900',
+  },
 });
+
