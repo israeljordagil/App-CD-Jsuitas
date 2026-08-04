@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, TextInput, AppState, AppStateStatus } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, AppState, AppStateStatus, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+
+// IMPORTS DE COMPONENTES INTERNOS Y UTILIDADES
 import { TacticalPitch, PitchPlayer } from './liveMatch/TacticalPitch';
 import { TacticalJersey } from './liveMatch/TacticalJersey';
 import { PlayerMatchState, PlayerCard, PlayerInjury } from '../../types/liveMatch';
@@ -9,13 +11,11 @@ import {
   createInitialPlayerState,
   calculatePlayerPlayedSeconds,
   formatPlayerTimer,
-  reorganizePitchAfterExpulsion,
   transitionPlayerToField,
   transitionPlayerToBench,
   recordGoal,
   recordAssist,
   recordYellowCard,
-  recordRedCard,
   recordInjury,
 } from '../../utils/liveMatchState';
 
@@ -29,10 +29,9 @@ const colors = {
   white: '#FFFFFF',
   textMuted: '#94A3B8',
   border: 'rgba(255, 255, 255, 0.08)',
-  goalkeeper: '#F59E0B',
   yellowCard: '#F59E0B',
   redCard: '#EF4444',
-  purpleAI: '#A855F7',
+  accentBlue: '#2563EB',
 };
 
 const INITIAL_STARTERS_14231: PitchPlayer[] = [
@@ -87,7 +86,7 @@ const buildInitialPlayerStates = (): Record<string, PlayerMatchState> => {
   return map;
 };
 
-interface PlayerStats {
+export interface PlayerStats {
   yellowCards: number;
   isRedCarded: boolean;
   isInjured: boolean;
@@ -95,48 +94,59 @@ interface PlayerStats {
   assists: number;
 }
 
-export type MatchStatus = 'BEFORE_START' | 'IN_PROGRESS' | 'PAUSED' | 'FINISHED';
+// =============================================================================
+// MÁQUINA DE ESTADOS Y CONFIGURACIÓN DE FASES DEL PARTIDO
+// =============================================================================
 
-export type PlayerActionType = 'GOAL' | 'PENALTY' | 'YELLOW_CARD' | 'RED_CARD' | 'SUBSTITUTION' | 'INJURY';
-export type PlayerActionStep = 'MENU' | 'SELECT_ASSIST' | 'PENALTY_MENU' | 'SELECT_SUBSTITUTE' | 'CONFIRM';
+export type MatchPhase = 
+  | 'BEFORE_START'
+  | 'FIRST_HALF'
+  | 'FIRST_HALF_ADDED'
+  | 'HALF_TIME'
+  | 'SECOND_HALF'
+  | 'SECOND_HALF_ADDED'
+  | 'FINISHED'
+  | 'PAUSED';
 
-export interface PlayerActionFlow {
-  visible: boolean;
-  player: PitchPlayer | null;
-  action: PlayerActionType | null;
-  step: PlayerActionStep;
-  assister: PitchPlayer | null;
-  substitute: PitchPlayer | null;
-  isSubmitting: boolean;
+export interface CategoryTimeConfig {
+  halves: number;
+  halfDurationMinutes: number;
+  restDurationMinutes: number;
 }
 
-const initialPlayerActionFlow: PlayerActionFlow = {
-  visible: false,
-  player: null,
-  action: null,
-  step: 'MENU',
-  assister: null,
-  substitute: null,
-  isSubmitting: false,
+// TABLA DE CONFIGURACIÓN OFICIAL DE TIEMPOS POR CATEGORÍA
+export const CATEGORY_TIME_CONFIGS: Record<string, CategoryTimeConfig> = {
+  'Querubín': { halves: 3, halfDurationMinutes: 12, restDurationMinutes: 1 },
+  'Prebenjamín': { halves: 2, halfDurationMinutes: 25, restDurationMinutes: 5 },
+  'Benjamín': { halves: 2, halfDurationMinutes: 25, restDurationMinutes: 5 },
+  'Alevín': { halves: 2, halfDurationMinutes: 30, restDurationMinutes: 5 },
+  'Infantil': { halves: 2, halfDurationMinutes: 35, restDurationMinutes: 10 },
+  'Cadete': { halves: 2, halfDurationMinutes: 40, restDurationMinutes: 10 },
+  'Juvenil': { halves: 2, halfDurationMinutes: 45, restDurationMinutes: 15 },
 };
 
-const TIMER_SNAPSHOT_KEY = '@cd_jesuitas_live_match_timer_snapshot';
-const REGULATION_HALFTIME_SECONDS = 35 * 60; // 35:00 (Infantiles / Categorías base reglamentarias)
-
-export interface TimerSnapshot {
+// SNAPSHOT COMPLETO DE PERSISTENCIA LOCAL MULTIPLATAFORMA
+interface TimerSnapshot {
   matchId: string;
-  status: MatchStatus;
-  accumulatedSeconds: number;
+  category: string;
+  matchPhase: MatchPhase;
+  currentPeriod: 1 | 2;
+  regulationAccumulatedSeconds: number;
   runningSinceTimestamp: number | null;
   isRunning: boolean;
+  addedTimeSeconds: number;
+  addedTimeRunningSinceTimestamp: number | null;
+  halfTimeStartedAtTimestamp: number | null;
+  configuredRestSeconds: number;
   savedAt: number;
 }
 
+const TIMER_SNAPSHOT_KEY = '@cd_jesuitas_live_match_timer_snapshot';
+
 const saveTimerSnapshot = (snapshot: TimerSnapshot) => {
   try {
-    const jsonVal = JSON.stringify(snapshot);
     if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem(TIMER_SNAPSHOT_KEY, jsonVal);
+      window.localStorage.setItem(TIMER_SNAPSHOT_KEY, JSON.stringify(snapshot));
     }
   } catch (e) {
     // Silent catch
@@ -157,46 +167,127 @@ const loadTimerSnapshot = (): TimerSnapshot | null => {
   return null;
 };
 
-export function DelegadoPartidoEnVivo() {
+// TIPOS DE EVENTOS Y ACCIONES DE JUGADOR
+type ActionStep = 'MENU' | 'ASSIST_SELECT' | 'CONFIRM' | 'SUB_SELECT';
+
+interface PlayerActionFlow {
+  visible: boolean;
+  player: PitchPlayer | null;
+  action: 'GOAL' | 'PENALTY_SCORED' | 'PENALTY_MISSED' | 'YELLOW' | 'RED' | 'SUB' | 'INJURY' | null;
+  step: ActionStep;
+  assister: PitchPlayer | null;
+  substitute: PitchPlayer | null;
+  isSubmitting: boolean;
+}
+
+const initialPlayerActionFlow: PlayerActionFlow = {
+  visible: false,
+  player: null,
+  action: null,
+  step: 'MENU',
+  assister: null,
+  substitute: null,
+  isSubmitting: false,
+};
+
+export interface DelegadoPartidoEnVivoProps {
+  category?: string;
+}
+
+export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEnVivoProps) {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 900;
 
-  // 1. ESTADO CENTRAL DEL CRONÓMETRO (BEFORE_START | IN_PROGRESS | PAUSED | FINISHED)
-  const [matchStatus, setMatchStatus] = useState<MatchStatus>('BEFORE_START');
-  const [matchSeconds, setMatchSeconds] = useState(0);
+  // DEDUCCIÓN DINÁMICA DE LA CONFIGURACIÓN DE TIEMPO SEGÚN LA CATEGORÍA DEL ENCUENTRO
+  const matchCategory = category && CATEGORY_TIME_CONFIGS[category] ? category : 'Cadete';
+  const timeConfig = CATEGORY_TIME_CONFIGS[matchCategory];
 
-  // REFERENCIAS DE TIEMPO ABSOLUTO (SISTEMA DE RELOJ DE PARED REAL MULTIPLATAFORMA)
+  const firstHalfLimitSecs = timeConfig.halfDurationMinutes * 60; // Cadete: 40 min = 2400 s
+  const secondHalfLimitSecs = timeConfig.halfDurationMinutes * 2 * 60; // Cadete: 80 min = 4800 s
+  const restDurationSecs = timeConfig.restDurationMinutes * 60; // Cadete: 10 min = 600 s
+
+  // =========================================================================
+  // 1. MÁQUINA DE ESTADOS Y CRONÓMETRO ABSOLUTO BASADO EN Date.now()
+  // =========================================================================
+  const [matchPhase, setMatchPhase] = useState<MatchPhase>('BEFORE_START');
+  const [currentPeriod, setCurrentPeriod] = useState<1 | 2>(1);
+  const [matchSeconds, setMatchSeconds] = useState(0); // Tiempo reglamentario acumulado
+  const [addedTimeSeconds, setAddedTimeSeconds] = useState(0); // Tiempo añadido independiente
+  const [restSeconds, setRestSeconds] = useState(restDurationSecs); // Cuenta atrás del descanso
+
+  // REFERENCIAS DE TIEMPO ABSOLUTO (FUENTE ÚNICA DE VERDAD MULTIPLATAFORMA)
   const stintStartTimestampRef = useRef<number | null>(null);
   const accumulatedMatchSecondsRef = useRef<number>(0);
 
-  // Helper determinista que calcula el tiempo transcurrido exacto según Date.now() del sistema
-  const calculateCurrentMatchSeconds = useCallback(() => {
-    if (stintStartTimestampRef.current === null) {
-      return accumulatedMatchSecondsRef.current;
+  const addedTimeStartTimestampRef = useRef<number | null>(null);
+  const accumulatedAddedTimeSecondsRef = useRef<number>(0);
+
+  const halfTimeStartedAtTimestampRef = useRef<number | null>(null);
+
+  // MODALES DE CONFIRMACIÓN Y NAVEGACIÓN
+  const [showEarlySecondHalfConfirmModal, setShowEarlySecondHalfConfirmModal] = useState(false);
+
+  // HELPER DETERMINISTA DE CÁLCULO DE TIEMPO REGULATORIO Y AÑADIDO CON Date.now()
+  const calculateRegulationSeconds = useCallback(() => {
+    let base = accumulatedMatchSecondsRef.current;
+    if (stintStartTimestampRef.current !== null) {
+      const elapsed = Math.floor((Date.now() - stintStartTimestampRef.current) / 1000);
+      base = Math.max(0, base + elapsed);
     }
-    const elapsedSinceStintStart = Math.floor((Date.now() - stintStartTimestampRef.current) / 1000);
-    return Math.max(0, accumulatedMatchSecondsRef.current + elapsedSinceStintStart);
+    const maxLimit = currentPeriod === 1 ? firstHalfLimitSecs : secondHalfLimitSecs;
+    return Math.min(base, maxLimit);
+  }, [currentPeriod, firstHalfLimitSecs, secondHalfLimitSecs]);
+
+  const calculateAddedSeconds = useCallback(() => {
+    let base = accumulatedAddedTimeSecondsRef.current;
+    if (addedTimeStartTimestampRef.current !== null) {
+      const elapsed = Math.floor((Date.now() - addedTimeStartTimestampRef.current) / 1000);
+      base = Math.max(0, base + elapsed);
+    }
+    return base;
   }, []);
 
-  // RECUPERACIÓN AUTOMÁTICA DE SNAPSHOT AL REMONTAR EL COMPONENTE
+  const calculateRestSeconds = useCallback(() => {
+    if (halfTimeStartedAtTimestampRef.current === null) return restDurationSecs;
+    const elapsed = Math.floor((Date.now() - halfTimeStartedAtTimestampRef.current) / 1000);
+    return Math.max(0, restDurationSecs - elapsed);
+  }, [restDurationSecs]);
+
+  // RECUPERACIÓN AUTOMÁTICA DESDE SNAPSHOT AL MONTAR
   useEffect(() => {
     const snapshot = loadTimerSnapshot();
     if (snapshot) {
-      if (snapshot.status === 'IN_PROGRESS' && snapshot.runningSinceTimestamp !== null) {
-        accumulatedMatchSecondsRef.current = snapshot.accumulatedSeconds;
-        stintStartTimestampRef.current = snapshot.runningSinceTimestamp;
-        const current = Math.max(0, snapshot.accumulatedSeconds + Math.floor((Date.now() - snapshot.runningSinceTimestamp) / 1000));
-        setMatchSeconds(current);
-        setMatchStatus('IN_PROGRESS');
-      } else if (snapshot.status === 'PAUSED') {
-        accumulatedMatchSecondsRef.current = snapshot.accumulatedSeconds;
-        stintStartTimestampRef.current = null;
-        setMatchSeconds(snapshot.accumulatedSeconds);
-        setMatchStatus('PAUSED');
+      setMatchPhase(snapshot.matchPhase);
+      setCurrentPeriod(snapshot.currentPeriod);
+      accumulatedMatchSecondsRef.current = snapshot.regulationAccumulatedSeconds;
+      stintStartTimestampRef.current = snapshot.runningSinceTimestamp;
+      accumulatedAddedTimeSecondsRef.current = snapshot.addedTimeSeconds;
+      addedTimeStartTimestampRef.current = snapshot.addedTimeRunningSinceTimestamp;
+      halfTimeStartedAtTimestampRef.current = snapshot.halfTimeStartedAtTimestamp;
+
+      const now = Date.now();
+      const maxLimit = snapshot.currentPeriod === 1 ? firstHalfLimitSecs : secondHalfLimitSecs;
+
+      if (snapshot.matchPhase === 'FIRST_HALF' || snapshot.matchPhase === 'SECOND_HALF') {
+        const reg = Math.min(
+          snapshot.regulationAccumulatedSeconds + (snapshot.runningSinceTimestamp ? Math.floor((now - snapshot.runningSinceTimestamp) / 1000) : 0),
+          maxLimit
+        );
+        setMatchSeconds(reg);
+      } else if (snapshot.matchPhase === 'FIRST_HALF_ADDED' || snapshot.matchPhase === 'SECOND_HALF_ADDED') {
+        setMatchSeconds(maxLimit);
+        const add = snapshot.addedTimeSeconds + (snapshot.addedTimeRunningSinceTimestamp ? Math.floor((now - snapshot.addedTimeRunningSinceTimestamp) / 1000) : 0);
+        setAddedTimeSeconds(add);
+      } else if (snapshot.matchPhase === 'HALF_TIME') {
+        setMatchSeconds(firstHalfLimitSecs);
+        if (snapshot.halfTimeStartedAtTimestamp) {
+          const restElapsed = Math.floor((now - snapshot.halfTimeStartedAtTimestamp) / 1000);
+          setRestSeconds(Math.max(0, restDurationSecs - restElapsed));
+        }
       }
     }
-  }, []);
+  }, [firstHalfLimitSecs, secondHalfLimitSecs, restDurationSecs]);
 
   // 2. MARCADOR Y REGLAMENTO
   const [homeScore, setHomeScore] = useState(0);
@@ -204,98 +295,143 @@ export function DelegadoPartidoEnVivo() {
   const [systemName, setSystemName] = useState('1-4-2-3-1');
   const [isSuspended, setIsSuspended] = useState(false);
 
-  // 3. JUGADORES Y ESTADÍSTICAS PERSISTENTES DE PARTIDO (FASE 2 - BLOQUE 1)
+  // 3. JUGADORES Y ESTADÍSTICAS PERSISTENTES DE PARTIDO
   const [pitchPlayers, setPitchPlayers] = useState<PitchPlayer[]>(INITIAL_STARTERS_14231);
   const [benchPlayers, setBenchPlayers] = useState<PitchPlayer[]>(INITIAL_BENCH);
   const [playerStats, setPlayerStats] = useState<Record<string, PlayerStats>>({});
   const [playerMatchStates, setPlayerMatchStates] = useState<Record<string, PlayerMatchState>>(buildInitialPlayerStates);
 
-  // 4. TIMELINE DE EVENTOS CON ID ÚNICO Y CLAVE ESTABLE
+  // 4. TIMELINE DE EVENTOS CON ID ÚNICO
   const [events, setEvents] = useState<any[]>([]);
 
-  // 5. MÁQUINA DE ESTADOS ÚNICA PARA EL PANEL DE ACCIONES DE JUGADOR (RENDERIZADO DENTRO DEL ÁRBOL NORMAL SIN MODAL NI PORTAL)
+  // 5. PANEL DE ACCIONES DE JUGADOR & OVERLAYS
   const [playerAction, setPlayerAction] = useState<PlayerActionFlow>(initialPlayerActionFlow);
-
-  // Overlays independientes para Eventos Generales e IA (Renderizados en árbol normal sin Modal ni Portal)
   const [showAIReorgModal, setShowAIReorgModal] = useState(false);
   const [showGeneralEventModal, setShowGeneralEventModal] = useState(false);
   const [showIncidenceInput, setShowIncidenceInput] = useState(false);
   const [incidenceText, setIncidenceText] = useState('');
 
-  // CRONÓMETRO ABSOLUTO BASADO EN RELOJ REAL DEL SISTEMA (iOS / iPadOS / Android / Web)
-  useEffect(() => {
-    if (matchStatus !== 'IN_PROGRESS' || isSuspended) return;
+  // =========================================================================
+  // REFRESH EN TIEMPO REAL CON RECUPERACIÓN DEFENSIVA ANTE BLOQUEO / PERDIDA DE FOCO
+  // =========================================================================
+  const updateAllClocks = useCallback(() => {
+    if (isSuspended) return;
 
-    const updateTime = () => {
-      const current = calculateCurrentMatchSeconds();
-      setMatchSeconds(current);
+    const now = Date.now();
+
+    // A. Actualizar Tiempo Reglamentario
+    if (matchPhase === 'FIRST_HALF' || matchPhase === 'SECOND_HALF') {
+      const regSecs = calculateRegulationSeconds();
+      setMatchSeconds(regSecs);
+
+      // Transición automática al tiempo añadido al alcanzar el tiempo reglamentario dinámico de la categoría
+      const maxLimit = currentPeriod === 1 ? firstHalfLimitSecs : secondHalfLimitSecs;
+      if (regSecs >= maxLimit) {
+        accumulatedMatchSecondsRef.current = maxLimit;
+        stintStartTimestampRef.current = null;
+        addedTimeStartTimestampRef.current = now;
+        accumulatedAddedTimeSecondsRef.current = 0;
+        setAddedTimeSeconds(0);
+        setMatchPhase(currentPeriod === 1 ? 'FIRST_HALF_ADDED' : 'SECOND_HALF_ADDED');
+      }
+    }
+
+    // B. Actualizar Tiempo Añadido
+    if (matchPhase === 'FIRST_HALF_ADDED' || matchPhase === 'SECOND_HALF_ADDED') {
+      setAddedTimeSeconds(calculateAddedSeconds());
+    }
+
+    // C. Actualizar Cuenta Atrás del Descanso
+    if (matchPhase === 'HALF_TIME') {
+      setRestSeconds(calculateRestSeconds());
+    }
+  }, [matchPhase, currentPeriod, isSuspended, calculateRegulationSeconds, calculateAddedSeconds, calculateRestSeconds, firstHalfLimitSecs, secondHalfLimitSecs]);
+
+  useEffect(() => {
+    if (matchPhase === 'BEFORE_START' || matchPhase === 'FINISHED' || matchPhase === 'PAUSED' || isSuspended) return;
+
+    // Ticker continuo a 4Hz (250ms) para garantizar fluidez absoluta
+    updateAllClocks();
+    const intervalId = setInterval(updateAllClocks, 250);
+
+    // PERSISTENCIA EN EVENTOS DE SEGUNDO PLANO Y VISIBILIDAD
+    const handleBackgroundSave = () => {
+      saveTimerSnapshot({
+        matchId: 'cadete-b-live-1',
+        category: matchCategory,
+        matchPhase,
+        currentPeriod,
+        regulationAccumulatedSeconds: accumulatedMatchSecondsRef.current,
+        runningSinceTimestamp: stintStartTimestampRef.current,
+        isRunning: stintStartTimestampRef.current !== null,
+        addedTimeSeconds: accumulatedAddedTimeSecondsRef.current,
+        addedTimeRunningSinceTimestamp: addedTimeStartTimestampRef.current,
+        halfTimeStartedAtTimestamp: halfTimeStartedAtTimestampRef.current,
+        configuredRestSeconds: restDurationSecs,
+        savedAt: Date.now(),
+      });
     };
 
-    updateTime();
-
-    // 1. Ticker continuo para refresco visual fluido en primer plano
-    const intervalId = setInterval(updateTime, 500);
-
-    // 2. Listener de AppState para React Native (bloqueo/desbloqueo de pantalla e inactividad en iOS, iPadOS y Android)
-    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
-      if (nextAppState === 'active') {
-        updateTime();
-      } else if (nextAppState === 'background' || nextAppState === 'inactive') {
-        saveTimerSnapshot({
-          matchId: 'cadete-b-live-1',
-          status: 'IN_PROGRESS',
-          accumulatedSeconds: accumulatedMatchSecondsRef.current,
-          runningSinceTimestamp: stintStartTimestampRef.current,
-          isRunning: true,
-          savedAt: Date.now(),
-        });
+    // Listeners defensivos para AppState (RN), visibilitychange (Web), window focus y pageshow
+    const appStateSub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        updateAllClocks();
+      } else if (nextState === 'background' || nextState === 'inactive') {
+        handleBackgroundSave();
       }
     });
 
-    // 3. Listener de visibilitychange para navegadores web (React Native Web)
     const handleVisibilityChange = () => {
       if (typeof document !== 'undefined') {
         if (document.visibilityState === 'visible') {
-          updateTime();
+          updateAllClocks();
         } else if (document.visibilityState === 'hidden') {
-          saveTimerSnapshot({
-            matchId: 'cadete-b-live-1',
-            status: 'IN_PROGRESS',
-            accumulatedSeconds: accumulatedMatchSecondsRef.current,
-            runningSinceTimestamp: stintStartTimestampRef.current,
-            isRunning: true,
-            savedAt: Date.now(),
-          });
+          handleBackgroundSave();
         }
       }
     };
 
+    const handleFocus = () => updateAllClocks();
+
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', handleFocus);
+      window.addEventListener('pageshow', handleFocus);
     }
 
     return () => {
       clearInterval(intervalId);
-      subscription?.remove();
+      appStateSub?.remove();
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', handleFocus);
+        window.removeEventListener('pageshow', handleFocus);
+      }
     };
-  }, [matchStatus, isSuspended, calculateCurrentMatchSeconds]);
+  }, [matchPhase, currentPeriod, isSuspended, updateAllClocks, matchCategory, restDurationSecs]);
 
+  // FORMATO DE TIEMPOS
   const formatTimer = (totalSecs: number) => {
     const mins = Math.floor(totalSecs / 60);
     const secs = totalSecs % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const regulationSeconds = Math.min(matchSeconds, REGULATION_HALFTIME_SECONDS);
-  const extraTimeSeconds = Math.max(0, matchSeconds - REGULATION_HALFTIME_SECONDS);
-
   const getMinuteText = () => {
-    if (extraTimeSeconds > 0) {
-      const extraMins = Math.floor(extraTimeSeconds / 60);
-      return `35' (+${extraMins}' añ.)`;
+    if (matchPhase === 'FIRST_HALF_ADDED') {
+      const addedMins = Math.floor(addedTimeSeconds / 60);
+      return `${timeConfig.halfDurationMinutes}' (+${addedMins}' añ.)`;
+    }
+    if (matchPhase === 'SECOND_HALF_ADDED') {
+      const addedMins = Math.floor(addedTimeSeconds / 60);
+      return `${timeConfig.halfDurationMinutes * 2}' (+${addedMins}' añ.)`;
+    }
+    if (matchPhase === 'HALF_TIME') {
+      return 'Descanso';
     }
     return `${Math.floor(matchSeconds / 60)}'`;
   };
@@ -311,23 +447,33 @@ export function DelegadoPartidoEnVivo() {
         assists: pState.assistsCount,
       };
     }
-    return playerStats[id] || { yellowCards: 0, isRedCarded: false, isInjured: false, goals: 0, assists: 0 };
+    return (playerStats[id] as PlayerStats) || { yellowCards: 0, isRedCarded: false, isInjured: false, goals: 0, assists: 0 };
   };
 
-  // CONTROL DEL CRONÓMETRO (START, PAUSE, RESUME, FINISH)
+  // =========================================================================
+  // CONTROL GENERAL DEL PARTIDO (START, DESCANSO, SEGUNDA PARTE, FINISH)
+  // =========================================================================
   const handleStartMatch = () => {
-    if (matchStatus !== 'BEFORE_START') return;
+    if (matchPhase !== 'BEFORE_START') return;
 
     accumulatedMatchSecondsRef.current = 0;
     stintStartTimestampRef.current = Date.now();
+    setCurrentPeriod(1);
     setMatchSeconds(0);
-    setMatchStatus('IN_PROGRESS');
+    setMatchPhase('FIRST_HALF');
+
     saveTimerSnapshot({
       matchId: 'cadete-b-live-1',
-      status: 'IN_PROGRESS',
-      accumulatedSeconds: 0,
+      category: matchCategory,
+      matchPhase: 'FIRST_HALF',
+      currentPeriod: 1,
+      regulationAccumulatedSeconds: 0,
       runningSinceTimestamp: stintStartTimestampRef.current,
       isRunning: true,
+      addedTimeSeconds: 0,
+      addedTimeRunningSinceTimestamp: null,
+      halfTimeStartedAtTimestamp: null,
+      configuredRestSeconds: restDurationSecs,
       savedAt: Date.now(),
     });
 
@@ -337,7 +483,7 @@ export function DelegadoPartidoEnVivo() {
         minute: "00'00\"",
         type: 'INICIO',
         title: 'Comienza el partido',
-        desc: '1ª Parte en juego · 0-0',
+        desc: `1ª Parte en juego · Categoría ${matchCategory} · Cadete B vs Torrent CF`,
         icon: 'play',
         color: colors.emeraldGlow,
       },
@@ -345,21 +491,33 @@ export function DelegadoPartidoEnVivo() {
     ]);
   };
 
-  const handlePauseMatch = (reason = 'Pausa manual') => {
-    if (matchStatus !== 'IN_PROGRESS') return;
+  // ACCIÓN DESCANSO (CIERRA 1ª PARTE E INICIA CUENTA ATRÁS DEL DESCANSO)
+  const handleGoToHalfTime = () => {
+    if (matchPhase !== 'FIRST_HALF' && matchPhase !== 'FIRST_HALF_ADDED') return;
 
-    const currentSecs = calculateCurrentMatchSeconds();
-    accumulatedMatchSecondsRef.current = currentSecs;
+    // Conmutar minutos reglamentarios exactos de 1ª parte de la categoría (Cadete: 40:00 = 2400 s)
+    accumulatedMatchSecondsRef.current = firstHalfLimitSecs;
     stintStartTimestampRef.current = null;
-    setMatchSeconds(currentSecs);
-    setMatchStatus('PAUSED');
+    addedTimeStartTimestampRef.current = null;
+
+    const now = Date.now();
+    halfTimeStartedAtTimestampRef.current = now;
+    setRestSeconds(restDurationSecs);
+    setMatchPhase('HALF_TIME');
+
     saveTimerSnapshot({
       matchId: 'cadete-b-live-1',
-      status: 'PAUSED',
-      accumulatedSeconds: currentSecs,
+      category: matchCategory,
+      matchPhase: 'HALF_TIME',
+      currentPeriod: 1,
+      regulationAccumulatedSeconds: firstHalfLimitSecs,
       runningSinceTimestamp: null,
       isRunning: false,
-      savedAt: Date.now(),
+      addedTimeSeconds: accumulatedAddedTimeSecondsRef.current,
+      addedTimeRunningSinceTimestamp: null,
+      halfTimeStartedAtTimestamp: now,
+      configuredRestSeconds: restDurationSecs,
+      savedAt: now,
     });
 
     const minTxt = getMinuteText();
@@ -367,9 +525,9 @@ export function DelegadoPartidoEnVivo() {
       {
         id: `ev-${Date.now()}`,
         minute: minTxt,
-        type: 'PAUSA',
-        title: 'Partido pausado',
-        desc: reason,
+        type: 'DESCANSO',
+        title: 'Final de la 1ª Parte · Descanso',
+        desc: `Tiempo de descanso configurado: ${timeConfig.restDurationMinutes} min`,
         icon: 'pause',
         color: colors.yellowCard,
       },
@@ -377,28 +535,59 @@ export function DelegadoPartidoEnVivo() {
     ]);
   };
 
-  const handleResumeMatch = () => {
-    if (matchStatus !== 'PAUSED') return;
+  // INICIO DE LA SEGUNDA PARTE (DESDE EL MINUTO REGLAMENTARIO DE LA CATEGORÍA Y REANUDANDO JUGADORES EN FIELD)
+  const executeStartSecondHalf = () => {
+    setShowEarlySecondHalfConfirmModal(false);
 
-    stintStartTimestampRef.current = Date.now();
-    setMatchStatus('IN_PROGRESS');
-    saveTimerSnapshot({
-      matchId: 'cadete-b-live-1',
-      status: 'IN_PROGRESS',
-      accumulatedSeconds: accumulatedMatchSecondsRef.current,
-      runningSinceTimestamp: stintStartTimestampRef.current,
-      isRunning: true,
-      savedAt: Date.now(),
+    const now = Date.now();
+    setCurrentPeriod(2);
+    accumulatedMatchSecondsRef.current = firstHalfLimitSecs; // Cadete: Empezar en 40:00
+    stintStartTimestampRef.current = now;
+
+    accumulatedAddedTimeSecondsRef.current = 0;
+    addedTimeStartTimestampRef.current = null;
+    halfTimeStartedAtTimestampRef.current = null;
+
+    setMatchSeconds(firstHalfLimitSecs);
+    setAddedTimeSeconds(0);
+    setMatchPhase('SECOND_HALF');
+
+    // Reanudar stint de todos los jugadores actualmente en el campo (FIELD) con el segundo de inicio reglamentario
+    setPlayerMatchStates(prev => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach(pId => {
+        if (updated[pId].status === 'FIELD') {
+          updated[pId] = {
+            ...updated[pId],
+            currentStintStartSecond: firstHalfLimitSecs,
+          };
+        }
+      });
+      return updated;
     });
 
-    const minTxt = getMinuteText();
+    saveTimerSnapshot({
+      matchId: 'cadete-b-live-1',
+      category: matchCategory,
+      matchPhase: 'SECOND_HALF',
+      currentPeriod: 2,
+      regulationAccumulatedSeconds: firstHalfLimitSecs,
+      runningSinceTimestamp: now,
+      isRunning: true,
+      addedTimeSeconds: 0,
+      addedTimeRunningSinceTimestamp: null,
+      halfTimeStartedAtTimestamp: null,
+      configuredRestSeconds: restDurationSecs,
+      savedAt: now,
+    });
+
     setEvents(prev => [
       {
         id: `ev-${Date.now()}`,
-        minute: minTxt,
-        type: 'REANUDACION',
-        title: 'Partido reanudado',
-        desc: 'El cronómetro continúa en juego',
+        minute: `${timeConfig.halfDurationMinutes}'00"`,
+        type: 'SEGUNDA_PARTE',
+        title: 'Inicio de la Segunda Parte',
+        desc: `Segunda parte en juego · Cronómetro desde ${timeConfig.halfDurationMinutes}:00`,
         icon: 'play-forward',
         color: colors.skyPrimary,
       },
@@ -406,20 +595,32 @@ export function DelegadoPartidoEnVivo() {
     ]);
   };
 
-  const handleFinishMatch = () => {
+  const handleStartSecondHalfPress = () => {
+    if (matchPhase !== 'HALF_TIME') return;
 
-    const currentSecs = calculateCurrentMatchSeconds();
-    accumulatedMatchSecondsRef.current = currentSecs;
+    if (restSeconds > 0) {
+      setShowEarlySecondHalfConfirmModal(true);
+    } else {
+      executeStartSecondHalf();
+    }
+  };
+
+  // FINALIZAR PARTIDO DEFINITIVAMENTE
+  const handleFinishMatch = () => {
+    const finalSecs = calculateRegulationSeconds();
+    accumulatedMatchSecondsRef.current = finalSecs;
     stintStartTimestampRef.current = null;
-    setMatchSeconds(currentSecs);
-    setMatchStatus('FINISHED');
+    addedTimeStartTimestampRef.current = null;
+
+    setMatchPhase('FINISHED');
     const minTxt = getMinuteText();
+
     setEvents(prev => [
       {
         id: `ev-${Date.now()}`,
         minute: minTxt,
         type: 'FIN',
-        title: '🏁 Fin del partido',
+        title: '🏁 Final del partido',
         desc: `Resultado final: Cadete B ${homeScore} - ${awayScore} Torrent CF`,
         icon: 'checkmark-done-circle',
         color: colors.skyGlow,
@@ -429,12 +630,19 @@ export function DelegadoPartidoEnVivo() {
     setShowGeneralEventModal(false);
   };
 
-  // REINICIAR SISTEMA COMPLETO
+  // REINICIAR COMPLETO PARA DEMOS
   const resetDemo = () => {
     accumulatedMatchSecondsRef.current = 0;
     stintStartTimestampRef.current = null;
-    setMatchStatus('BEFORE_START');
+    accumulatedAddedTimeSecondsRef.current = 0;
+    addedTimeStartTimestampRef.current = null;
+    halfTimeStartedAtTimestampRef.current = null;
+
+    setMatchPhase('BEFORE_START');
+    setCurrentPeriod(1);
     setMatchSeconds(0);
+    setAddedTimeSeconds(0);
+    setRestSeconds(restDurationSecs);
     setHomeScore(0);
     setAwayScore(0);
     setSystemName('1-4-2-3-1');
@@ -449,13 +657,14 @@ export function DelegadoPartidoEnVivo() {
     setShowGeneralEventModal(false);
     setShowIncidenceInput(false);
     setIncidenceText('');
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem(TIMER_SNAPSHOT_KEY);
+    }
   };
 
-
-
-  // GESTIÓN DEL PANEL SUPERPUESTO DE ACCIONES (ÚNICA FUNCIÓN DE APERTURA Y CIERRE)
+  // GESTIÓN DE ACCIONES DE JUGADORES
   const handleOpenPlayerActionPanel = (player: PitchPlayer) => {
-    if (isSuspended || matchStatus === 'FINISHED') return;
+    if (isSuspended || matchPhase === 'FINISHED') return;
     setPlayerAction({
       visible: true,
       player,
@@ -471,7 +680,6 @@ export function DelegadoPartidoEnVivo() {
     setPlayerAction(initialPlayerActionFlow);
   };
 
-  // ACCIÓN 1: FLUJO DE SELECCIÓN DE ASISTENCIA Y CONFIRMACIÓN DE GOL PROPIO
   const handleSelectAssistPlayer = (assister: PitchPlayer | null) => {
     setPlayerAction(prev => ({
       ...prev,
@@ -492,10 +700,8 @@ export function DelegadoPartidoEnVivo() {
       const scorerId = scorer.id || scorer.dorsal;
       const assistId = assister ? (assister.id || assister.dorsal) : null;
 
-      // 1. Actualizar Marcador
       setHomeScore(prev => prev + 1);
 
-      // 2. Actualizar Estadísticas y Estado Persistente (Fase 2 - Bloque 1)
       setPlayerMatchStates(prev => {
         const updated = { ...prev };
         if (updated[scorerId]) {
@@ -513,8 +719,8 @@ export function DelegadoPartidoEnVivo() {
       });
 
       setPlayerStats(prev => {
-        const currentScorerStats = prev[scorerId] || { yellowCards: 0, isRedCarded: false, isInjured: false, goals: 0, assists: 0 };
-        const updated = {
+        const currentScorerStats = (prev[scorerId] as PlayerStats) || { yellowCards: 0, isRedCarded: false, isInjured: false, goals: 0, assists: 0 };
+        const updated: Record<string, PlayerStats> = {
           ...prev,
           [scorerId]: {
             ...currentScorerStats,
@@ -523,7 +729,7 @@ export function DelegadoPartidoEnVivo() {
         };
 
         if (assistId && assister) {
-          const currentAssistStats = prev[assistId] || { yellowCards: 0, isRedCarded: false, isInjured: false, goals: 0, assists: 0 };
+          const currentAssistStats = (prev[assistId] as PlayerStats) || { yellowCards: 0, isRedCarded: false, isInjured: false, goals: 0, assists: 0 };
           updated[assistId] = {
             ...currentAssistStats,
             assists: currentAssistStats.assists + 1,
@@ -533,12 +739,10 @@ export function DelegadoPartidoEnVivo() {
         return updated;
       });
 
-
       const descTxt = assister 
         ? `#${scorer.dorsal} ${scorer.name} (Asistencia: #${assister.dorsal} ${assister.name})`
         : `#${scorer.dorsal} ${scorer.name}`;
 
-      // 3. Registrar Evento en Timeline
       setEvents(prev => [
         {
           id: `ev-${Date.now()}`,
@@ -556,7 +760,6 @@ export function DelegadoPartidoEnVivo() {
     }
   };
 
-  // ACCIÓN 1.B: PENALTI MARCADO O FALLADO
   const handleConfirmPenaltyScored = () => {
     if (playerAction.isSubmitting || !playerAction.player || isSuspended) return;
 
@@ -582,7 +785,7 @@ export function DelegadoPartidoEnVivo() {
       });
 
       setPlayerStats(prev => {
-        const currentStats = prev[scorerId] || { yellowCards: 0, isRedCarded: false, isInjured: false, goals: 0, assists: 0 };
+        const currentStats = (prev[scorerId] as PlayerStats) || { yellowCards: 0, isRedCarded: false, isInjured: false, goals: 0, assists: 0 };
         return {
           ...prev,
           [scorerId]: {
@@ -634,8 +837,50 @@ export function DelegadoPartidoEnVivo() {
     }
   };
 
+  const processExpulsion = (player: PitchPlayer, isSecondYellow: boolean) => {
+    const minTxt = getMinuteText();
+    const pId = player.id || player.dorsal;
 
-  // ACCIÓN 2: TARJETA AMARILLA (O 2ª AMARILLA -> EXPULSIÓN AUTOMÁTICA)
+    setPlayerMatchStates(prev => {
+      if (!prev[pId]) return prev;
+      return {
+        ...prev,
+        [pId]: {
+          ...prev[pId],
+          isRedCarded: true,
+          status: 'BENCH',
+          currentStintStartSecond: null,
+        }
+      };
+    });
+
+    setPlayerStats(prev => ({
+      ...prev,
+      [pId]: { ...getPStats(pId), isRedCarded: true }
+    }));
+
+    setPitchPlayers(prev => {
+      const remainingStarters = prev.filter(p => p.dorsal !== player.dorsal);
+      if (remainingStarters.length < 7) {
+        setIsSuspended(true);
+      }
+      return remainingStarters;
+    });
+
+    setEvents(prev => [
+      {
+        id: `ev-${Date.now()}`,
+        minute: minTxt,
+        type: 'ROJA',
+        title: isSecondYellow ? '2ª Amarilla y Expulsión' : 'Tarjeta Roja Directa',
+        desc: `#${player.dorsal} ${player.name} (${player.role})`,
+        icon: 'square',
+        color: colors.redCard,
+      },
+      ...prev,
+    ]);
+  };
+
   const handleConfirmYellowCard = () => {
     if (playerAction.isSubmitting || !playerAction.player || isSuspended) return;
 
@@ -659,7 +904,6 @@ export function DelegadoPartidoEnVivo() {
       });
 
       if (currentStats.yellowCards === 0) {
-
         setPlayerStats(prev => ({
           ...prev,
           [pId]: { ...currentStats, yellowCards: 1 }
@@ -685,7 +929,6 @@ export function DelegadoPartidoEnVivo() {
     }
   };
 
-  // ACCIÓN 3: TARJETA ROJA DIRECTA
   const handleConfirmRedCard = () => {
     if (playerAction.isSubmitting || !playerAction.player || isSuspended) return;
 
@@ -697,9 +940,6 @@ export function DelegadoPartidoEnVivo() {
     }
   };
 
-
-
-  // ACCIÓN 5: SUSTITUCIÓN Y LESIÓN
   const handleConfirmSub = (substitutePlayer: PitchPlayer) => {
     if (playerAction.isSubmitting || !playerAction.player || isSuspended) return;
 
@@ -752,272 +992,48 @@ export function DelegadoPartidoEnVivo() {
         role: subOutPlayer.role,
       } : p));
 
-      setBenchPlayers(prev => prev.map(b => b.dorsal === substitutePlayer.dorsal ? {
-        ...subOutPlayer,
-        xPercent: 0,
-        yPercent: 0,
-      } : b));
+      setBenchPlayers(prev => prev.map(b => b.dorsal === substitutePlayer.dorsal ? subOutPlayer : b));
 
-      const subDesc = `Entra #${substitutePlayer.dorsal} ${substitutePlayer.name} ⇆ Sale #${subOutPlayer.dorsal} ${subOutPlayer.name}`;
-
-      if (isInjurySub) {
-        setEvents(prev => [
-          {
-            id: `ev-inj-${Date.now()}`,
-            minute: minTxt,
-            type: 'LESION',
-            title: 'Lesión y Sustitución',
-            desc: `Lesionado #${subOutPlayer.dorsal} ${subOutPlayer.name} · ${subDesc}`,
-            icon: 'medkit',
-            color: colors.redCard,
-          },
-          ...prev,
-        ]);
-      } else {
-        setEvents(prev => [
-          {
-            id: `ev-sub-${Date.now()}`,
-            minute: minTxt,
-            type: 'CAMBIO',
-            title: 'Sustitución',
-            desc: subDesc,
-            icon: 'swap-horizontal',
-            color: colors.skyGlow,
-          },
-          ...prev,
-        ]);
-      }
+      setEvents(prev => [
+        {
+          id: `ev-${Date.now()}`,
+          minute: minTxt,
+          type: isInjurySub ? 'LESIÓN' : 'SUSTITUCIÓN',
+          title: isInjurySub ? 'Sustitución por lesión' : 'Sustitución',
+          desc: `Sale #${subOutPlayer.dorsal} ${subOutPlayer.name} ➔ Entra #${substitutePlayer.dorsal} ${substitutePlayer.name}`,
+          icon: isInjurySub ? 'medical' : 'swap-horizontal',
+          color: isInjurySub ? colors.redCard : colors.skyPrimary,
+        },
+        ...prev,
+      ]);
     } finally {
       closePlayerActionPanel();
     }
   };
 
-
-  // PROCESAR EXPULSIÓN Y SUSPENSIÓN REGLAMENTARIA
-  const processExpulsion = (player: PitchPlayer, isSecondYellow: boolean) => {
-    const minTxt = getMinuteText();
-    const pId = player.id || player.dorsal;
-
-    const card: PlayerCard = {
-      id: `card-${Date.now()}`,
-      type: 'RED',
-      minute: Math.floor(matchSeconds / 60),
-      second: matchSeconds,
-      reason: isSecondYellow ? 'Doble amarilla' : 'Roja directa',
-    };
-
-    setPlayerMatchStates(prev => {
-      if (!prev[pId]) return prev;
-      return { ...prev, [pId]: recordRedCard(prev[pId], card, matchSeconds) };
-    });
-
-    setPlayerStats(prev => ({
-      ...prev,
-      [pId]: { ...getPStats(pId), isRedCarded: true }
-    }));
-
-
-    // RECOLOCACIÓN MÍNIMA Y DETERMINISTA TRAS EXPULSIÓN (INCIDENCIA 2)
-    const { updatedPitch, relocatedPlayerDorsal } = reorganizePitchAfterExpulsion(pitchPlayers, player.dorsal);
-
-    if (relocatedPlayerDorsal && playerMatchStates[relocatedPlayerDorsal]) {
-      const relocatedPlayer = updatedPitch.find(p => p.dorsal === relocatedPlayerDorsal);
-      if (relocatedPlayer) {
-        setPlayerMatchStates(prev => {
-          const targetState = prev[relocatedPlayerDorsal];
-          if (!targetState) return prev;
-          return {
-            ...prev,
-            [relocatedPlayerDorsal]: {
-              ...targetState,
-              tacticalRole: relocatedPlayer.role,
-              coordinates: { xPercent: relocatedPlayer.xPercent, yPercent: relocatedPlayer.yPercent },
-            },
-          };
-        });
-      }
-    }
-
-    setPitchPlayers(updatedPitch);
-
-    const descTxt = relocatedPlayerDorsal
-      ? `#${player.dorsal} ${player.name} expulsado · #${relocatedPlayerDorsal} cubre la posición`
-      : `#${player.dorsal} ${player.name} (${player.role})`;
-
-    setEvents(prev => [
-      {
-        id: `ev-${Date.now()}`,
-        minute: minTxt,
-        type: 'ROJA',
-        title: isSecondYellow ? '2ª Amarilla → Expulsión' : 'Tarjeta roja directa',
-        desc: descTxt,
-        icon: 'square',
-        color: colors.redCard,
-      },
-      ...prev,
-    ]);
-
-    if (updatedPitch.length < 7) {
-
-      setIsSuspended(true);
-      setMatchStatus('FINISHED');
-      setEvents(prev => [
-        {
-          id: `ev-${Date.now() + 1}`,
-          minute: minTxt,
-          type: 'SUSPENSION',
-          title: '🚨 PARTIDO SUSPENDIDO',
-          desc: 'El equipo no dispone del número mínimo reglamentario de jugadores.',
-          icon: 'alert-circle',
-          color: colors.redCard,
-        },
-        ...prev,
-      ]);
-    }
-  };
-
-  // EVENTOS GENERALES
-  const handleConfirmAwayGoal = () => {
-    if (isSuspended) return;
-    const minTxt = getMinuteText();
-    setAwayScore(prev => prev + 1);
-    setEvents(prev => [
-      {
-        id: `ev-${Date.now()}`,
-        minute: minTxt,
-        type: 'GOL_RIVAL',
-        title: 'Gol de Torrent CF',
-        desc: 'Gol del equipo visitante',
-        icon: 'football',
-        color: colors.redCard,
-      },
-      ...prev,
-    ]);
-    setShowGeneralEventModal(false);
-  };
-
-  const handleGeneralHydration = () => {
-    const minTxt = getMinuteText();
-    setEvents(prev => [
-      {
-        id: `ev-${Date.now()}`,
-        minute: minTxt,
-        type: 'HIDRATACION',
-        title: '🥤 Pausa de hidratación',
-        desc: 'Pausa oficial acordada por el árbitro',
-        icon: 'water',
-        color: colors.skyPrimary,
-      },
-      ...prev,
-    ]);
-    setShowGeneralEventModal(false);
-  };
-
-  const handleGeneralBreak = () => {
-    handlePauseMatch('Descanso del partido');
-    setShowGeneralEventModal(false);
-  };
-
-  const handleGeneralResume = () => {
-    handleResumeMatch();
-    setShowGeneralEventModal(false);
-  };
-
-  const handleAddIncidence = () => {
-    if (!incidenceText.trim()) return;
-    const minTxt = getMinuteText();
-    setEvents(prev => [
-      {
-        id: `ev-${Date.now()}`,
-        minute: minTxt,
-        type: 'INCIDENCIA',
-        title: '⚠️ Incidencia registrada',
-        desc: incidenceText.trim(),
-        icon: 'warning',
-        color: colors.yellowCard,
-      },
-      ...prev,
-    ]);
-    setIncidenceText('');
-    setShowIncidenceInput(false);
-    setShowGeneralEventModal(false);
-  };
-
-  // IA TÁCTICA
-  const getAITacticalProposals = () => {
-    const count = pitchPlayers.length;
-    if (count === 10) return [{ name: '4-4-1', desc: 'Defensiva compacta con 1 delantero referencia' }, { name: '4-3-2', desc: 'Presión alta con doble mediapunta' }, { name: '5-3-1', desc: 'Bloque bajo con 5 defensas' }];
-    if (count === 9) return [{ name: '4-3-1', desc: 'Estructura sólida 4 defensas y 3 medios' }, { name: '3-4-1', desc: 'Banda activa' }];
-    return [{ name: '3-3-1', desc: 'Cierre central y velocidad en punta' }];
-  };
-
-  const applyAIProposal = (proposal: { name: string; desc: string }) => {
-    const minTxt = getMinuteText();
-    setSystemName(`${proposal.name} (IA)`);
-    setEvents(prev => [
-      {
-        id: `ev-${Date.now()}`,
-        minute: minTxt,
-        type: 'IA',
-        title: '🧠 Reorganización IA aplicada',
-        desc: `Esquema táctico ${proposal.name} adaptado`,
-        icon: 'git-compare',
-        color: colors.purpleAI,
-      },
-      ...prev,
-    ]);
-    setShowAIReorgModal(false);
-  };
-
-  // HELPER PARA BADGE
-  const getBadgeInfo = () => {
-    switch (matchStatus) {
+  // ETIQUETA E INFO DE BADGE DEL ENCUENTRO
+  const getMatchBadgeInfo = () => {
+    switch (matchPhase) {
       case 'BEFORE_START':
-        return { label: 'ANTES DEL INICIO', color: colors.skyPrimary };
-      case 'IN_PROGRESS':
-        return { label: '1ª PARTE · EN JUEGO', color: colors.redCard };
+        return { label: 'SIN COMENZAR', color: colors.textMuted };
+      case 'FIRST_HALF':
+        return { label: '1ª PARTE EN JUEGO', color: colors.emeraldGlow };
+      case 'FIRST_HALF_ADDED':
+        return { label: '1ª PARTE (AÑADIDO)', color: colors.yellowCard };
+      case 'HALF_TIME':
+        return { label: 'DESCANSO', color: colors.yellowCard };
+      case 'SECOND_HALF':
+        return { label: '2ª PARTE EN JUEGO', color: colors.emeraldGlow };
+      case 'SECOND_HALF_ADDED':
+        return { label: '2ª PARTE (AÑADIDO)', color: colors.yellowCard };
+      case 'FINISHED':
+        return { label: 'PARTIDO FINALIZADO', color: colors.skyGlow };
       case 'PAUSED':
         return { label: 'PARTIDO PAUSADO', color: colors.yellowCard };
-      case 'FINISHED':
-        return { label: isSuspended ? 'SUSPENDIDO' : 'PARTIDO FINALIZADO', color: colors.textMuted };
     }
   };
 
-  const badgeInfo = getBadgeInfo();
-
-  // HELPER PARA BOTÓN DE CONTROL DEL CRONÓMETRO
-  const getTimerControlProps = () => {
-    if (matchStatus === 'BEFORE_START') {
-      return {
-        onPress: handleStartMatch,
-        bgColor: colors.emeraldGlow,
-        icon: 'play',
-        label: 'Empezar partido',
-        disabled: false,
-      };
-    }
-    if (matchStatus === 'IN_PROGRESS') {
-      return {
-        onPress: () => handlePauseMatch('Pausa manual'),
-        bgColor: colors.yellowCard,
-        icon: 'pause',
-        label: 'Pausar partido',
-        disabled: false,
-      };
-    }
-    if (matchStatus === 'PAUSED') {
-      return {
-        onPress: handleResumeMatch,
-        bgColor: colors.skyPrimary,
-        icon: 'play-forward',
-        label: 'Reanudar partido',
-        disabled: false,
-      };
-    }
-    return null;
-  };
-
-  const timerBtnProps = getTimerControlProps();
+  const badgeInfo = getMatchBadgeInfo();
 
   return (
     <View style={styles.mainWrapper}>
@@ -1029,7 +1045,7 @@ export function DelegadoPartidoEnVivo() {
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={styles.titleTxt}>PARTIDO EN VIVO</Text>
-            <Text style={styles.subtitleTxt}>Liga Preferente · Cadete B vs Torrent CF</Text>
+            <Text style={styles.subtitleTxt}>Liga Preferente {matchCategory} · Cadete B vs Torrent CF ({timeConfig.halfDurationMinutes} min/parte)</Text>
           </View>
           <TouchableOpacity style={styles.resetDemoBtn} onPress={resetDemo}>
             <Ionicons name="refresh" size={14} color="#94A3B8" />
@@ -1048,7 +1064,7 @@ export function DelegadoPartidoEnVivo() {
           </View>
         )}
 
-        {/* MARCADOR SUPERIOR */}
+        {/* MARCADOR SUPERIOR CON RELOJ ABSOLUTO Y DESCANSO */}
         <View style={styles.scoreboardCard}>
           <View style={styles.liveBadgeRow}>
             <View style={[styles.liveRedDot, { backgroundColor: badgeInfo.color }]} />
@@ -1064,26 +1080,54 @@ export function DelegadoPartidoEnVivo() {
             </View>
 
             <View style={styles.timerBox}>
-              <Text style={styles.timerTxt}>{formatTimer(regulationSeconds)}</Text>
-              {extraTimeSeconds > 0 && (
-                <View style={styles.extraTimeBadge}>
-                  <Text style={styles.extraTimeBadgeTxt}>+{formatTimer(extraTimeSeconds)} AÑADIDO</Text>
+              {matchPhase === 'HALF_TIME' ? (
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={styles.restLabelTxt}>DESCANSO RESTANTE</Text>
+                  <Text style={styles.restTimerTxt}>{formatTimer(restSeconds)}</Text>
+                  {restSeconds === 0 && (
+                    <Text style={styles.restFinishedTxt}>Descanso finalizado</Text>
+                  )}
                 </View>
+              ) : (
+                <>
+                  <Text style={styles.timerTxt}>{formatTimer(matchSeconds)}</Text>
+                  {addedTimeSeconds > 0 && (
+                    <View style={styles.extraTimeBadge}>
+                      <Text style={styles.extraTimeBadgeTxt}>+{formatTimer(addedTimeSeconds)} AÑADIDO</Text>
+                    </View>
+                  )}
+                  <Text style={styles.timerSubTxt}>
+                    {matchPhase === 'BEFORE_START' ? 'Sin comenzar' : `Minuto ${getMinuteText()}`}
+                  </Text>
+                </>
               )}
-              <Text style={styles.timerSubTxt}>
-                {matchStatus === 'BEFORE_START' ? 'Sin comenzar' : `Minuto ${getMinuteText()}`}
-              </Text>
 
-              {timerBtnProps && (
-                <TouchableOpacity 
-                  key="timer-control-btn-stable"
-                  style={[styles.timerControlBtn, { backgroundColor: timerBtnProps.bgColor }]} 
-                  onPress={timerBtnProps.onPress}
-                  disabled={timerBtnProps.disabled}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name={timerBtnProps.icon as any} size={14} color={colors.navyDark} />
-                  <Text style={styles.timerControlBtnTxt}>{timerBtnProps.label}</Text>
+              {/* BOTONES PRINCIPALES DE CONTROL DE FASE */}
+              {matchPhase === 'BEFORE_START' && (
+                <TouchableOpacity style={[styles.timerControlBtn, { backgroundColor: colors.emeraldGlow }]} onPress={handleStartMatch} activeOpacity={0.8}>
+                  <Ionicons name="play" size={14} color={colors.navyDark} />
+                  <Text style={styles.timerControlBtnTxt}>Iniciar Partido</Text>
+                </TouchableOpacity>
+              )}
+
+              {(matchPhase === 'FIRST_HALF' || matchPhase === 'FIRST_HALF_ADDED') && (
+                <TouchableOpacity style={[styles.timerControlBtn, { backgroundColor: colors.yellowCard }]} onPress={handleGoToHalfTime} activeOpacity={0.8}>
+                  <Ionicons name="pause" size={14} color={colors.navyDark} />
+                  <Text style={styles.timerControlBtnTxt}>Descanso</Text>
+                </TouchableOpacity>
+              )}
+
+              {matchPhase === 'HALF_TIME' && (
+                <TouchableOpacity style={[styles.timerControlBtn, { backgroundColor: colors.skyPrimary }]} onPress={handleStartSecondHalfPress} activeOpacity={0.8}>
+                  <Ionicons name="play-forward" size={14} color={colors.navyDark} />
+                  <Text style={styles.timerControlBtnTxt}>Iniciar segunda parte</Text>
+                </TouchableOpacity>
+              )}
+
+              {(matchPhase === 'SECOND_HALF' || matchPhase === 'SECOND_HALF_ADDED') && (
+                <TouchableOpacity style={[styles.timerControlBtn, { backgroundColor: colors.skyGlow }]} onPress={handleFinishMatch} activeOpacity={0.8}>
+                  <Ionicons name="checkmark-done-circle" size={14} color={colors.navyDark} />
+                  <Text style={styles.timerControlBtnTxt}>Finalizar Partido</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -1099,7 +1143,7 @@ export function DelegadoPartidoEnVivo() {
         <View style={isDesktop ? styles.desktopGrid : styles.mobileStack}>
           <View style={isDesktop ? styles.mainColDesktop : { width: '100%' }}>
             {/* BOTÓN DE REORGANIZACIÓN IA TRAS EXPULSIÓN */}
-            {pitchPlayers.length < 11 && !isSuspended && matchStatus !== 'FINISHED' && (
+            {pitchPlayers.length < 11 && !isSuspended && matchPhase !== 'FINISHED' && (
               <TouchableOpacity style={styles.aiReorgTriggerBtn} onPress={() => setShowAIReorgModal(true)}>
                 <Text style={{ fontSize: 18 }}>🧠</Text>
                 <Text style={styles.aiReorgTriggerTxt}>Generar reorganización táctica IA ({pitchPlayers.length} jugadores)</Text>
@@ -1124,17 +1168,15 @@ export function DelegadoPartidoEnVivo() {
                   timeText: formatPlayerTimer(playedSecs),
                 };
               })} 
-              onPlayerPress={(p) => handleOpenPlayerActionPanel(p)} 
+              onPlayerPress={(p: PitchPlayer) => handleOpenPlayerActionPanel(p)} 
             />
-
-
           </View>
 
           <View style={isDesktop ? styles.sidebarColDesktop : { width: '100%' }}>
             {/* BOTÓN ÚNICO DE EVENTOS GENERALES */}
             <TouchableOpacity 
-              style={[styles.generalEventTriggerBtn, (isSuspended || matchStatus === 'FINISHED') && { opacity: 0.5 }]}
-              disabled={isSuspended || matchStatus === 'FINISHED'}
+              style={[styles.generalEventTriggerBtn, (isSuspended || matchPhase === 'FINISHED') && { opacity: 0.5 }]}
+              disabled={isSuspended || matchPhase === 'FINISHED'}
               onPress={() => setShowGeneralEventModal(true)}
             >
               <Ionicons name="add-circle-outline" size={18} color={colors.navyDark} />
@@ -1143,7 +1185,6 @@ export function DelegadoPartidoEnVivo() {
 
             {/* BANQUILLO CON TIEMPOS ACUMULADOS VISIBLES */}
             <View style={styles.sectionHeaderRow}>
-
               <Ionicons name="people-outline" size={20} color={colors.skyPrimary} />
               <Text style={styles.sectionTitleTxt}>BANQUILLO Y SUPLENTES ({benchPlayers.length})</Text>
             </View>
@@ -1175,8 +1216,6 @@ export function DelegadoPartidoEnVivo() {
               </ScrollView>
             </View>
 
-
-
             {/* TIMELINE */}
             <View style={styles.sectionHeaderRow}>
               <Ionicons name="time-outline" size={20} color={colors.skyGlow} />
@@ -1200,470 +1239,243 @@ export function DelegadoPartidoEnVivo() {
             </View>
           </View>
         </View>
-      </ScrollView>
 
-      {/* ========================================================================= */}
-      {/* NUEVO PANEL DE ACCIONES DE JUGADORES (RENDERIZADO DENTRO DEL ÁRBOL REACT) */}
-      {/* ========================================================================= */}
-      {playerAction.visible && (
-        <View style={styles.overlayContainer}>
-          <TouchableOpacity 
-            style={styles.overlayBackdrop} 
-            activeOpacity={1} 
-            onPress={() => !playerAction.isSubmitting && closePlayerActionPanel()} 
-          />
-          
-          <View style={styles.panelCard}>
-            {/* CABECERA DE DORSAL Y JUGADOR */}
-            <View style={styles.panelPlayerHeader}>
-              <View style={[styles.panelPlayerBadge, { backgroundColor: playerAction.player?.isGoalkeeper ? colors.goalkeeper : colors.skyPrimary }]}>
-                <Text style={styles.panelPlayerBadgeTxt}>#{playerAction.player?.dorsal}</Text>
+        {/* MODAL DE CONFIRMACIÓN DE INICIO DE 2ª PARTE SI EL DESCANSO AÚN NO HA FINALIZADO */}
+        <Modal visible={showEarlySecondHalfConfirmModal} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.confirmBox}>
+              <Ionicons name="time-outline" size={32} color={colors.yellowCard} />
+              <Text style={styles.confirmBoxTitle}>Descanso no finalizado</Text>
+              <Text style={styles.confirmBoxDesc}>
+                El tiempo de descanso configurado para {matchCategory} ({timeConfig.restDurationMinutes} min) aún no ha terminado (quedan {formatTimer(restSeconds)}). ¿Deseas iniciar la segunda parte ahora?
+              </Text>
+              <View style={styles.confirmBtnRow}>
+                <TouchableOpacity style={styles.confirmBtnCancel} onPress={() => setShowEarlySecondHalfConfirmModal(false)}>
+                  <Text style={styles.confirmBtnCancelTxt}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.confirmBtnOk} onPress={executeStartSecondHalf}>
+                  <Text style={styles.confirmBtnOkTxt}>Iniciar segunda parte</Text>
+                </TouchableOpacity>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.panelPlayerName}>{playerAction.player?.name}</Text>
-                <Text style={styles.panelPlayerRole}>Posición: {playerAction.player?.role}</Text>
+            </View>
+          </View>
+        </Modal>
+
+        {/* PANEL DE ACCIONES DE JUGADOR */}
+        {playerAction.visible && playerAction.player && (
+          <View style={styles.actionPanelCard}>
+            <View style={styles.actionPanelHeader}>
+              <View style={styles.actionPlayerInfo}>
+                <Text style={styles.actionDorsalTxt}>#{playerAction.player.dorsal}</Text>
+                <View>
+                  <Text style={styles.actionPlayerName}>{playerAction.player.name}</Text>
+                  <Text style={styles.actionPlayerRole}>{playerAction.player.role}</Text>
+                </View>
               </View>
-              <TouchableOpacity style={styles.panelCloseIconBtn} onPress={() => !playerAction.isSubmitting && closePlayerActionPanel()}>
+              <TouchableOpacity onPress={closePlayerActionPanel}>
                 <Ionicons name="close" size={20} color={colors.white} />
               </TouchableOpacity>
             </View>
 
-            {/* PASO 1: MENÚ DE ACCIONES (MATRIZ 2x3 EQUILIBRADA) */}
             {playerAction.step === 'MENU' && (
-              <>
-                <Text style={styles.panelSectionTitle}>SELECCIONAR ACCIÓN DEL JUGADOR</Text>
-                <View style={styles.contextOptionsGrid}>
-                  {/* FILA 1: GOL | PENALTI */}
-                  <TouchableOpacity 
-                    style={styles.contextTileBtn} 
-                    onPress={() => setPlayerAction(prev => ({ ...prev, action: 'GOAL', step: 'SELECT_ASSIST', assister: null }))}
-                  >
-                    <Text style={{ fontSize: 20 }}>⚽</Text>
-                    <Text style={styles.contextTileTxt}>Gol</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={styles.contextTileBtn} 
-                    onPress={() => setPlayerAction(prev => ({ ...prev, action: 'PENALTY', step: 'PENALTY_MENU' }))}
-                  >
-                    <Text style={{ fontSize: 20 }}>🎯</Text>
-                    <Text style={styles.contextTileTxt}>Penalti</Text>
-                  </TouchableOpacity>
-
-                  {/* FILA 2: AMARILLA | ROJA */}
-                  <TouchableOpacity 
-                    style={[styles.contextTileBtn, playerAction.isSubmitting && { opacity: 0.5 }]} 
-                    disabled={playerAction.isSubmitting}
-                    onPress={handleConfirmYellowCard}
-                  >
-                    <Text style={{ fontSize: 20 }}>🟨</Text>
-                    <Text style={styles.contextTileTxt}>Amarilla</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={[styles.contextTileBtn, playerAction.isSubmitting && { opacity: 0.5 }]} 
-                    disabled={playerAction.isSubmitting}
-                    onPress={handleConfirmRedCard}
-                  >
-                    <Text style={{ fontSize: 20 }}>🟥</Text>
-                    <Text style={styles.contextTileTxt}>Roja</Text>
-                  </TouchableOpacity>
-
-                  {/* FILA 3: LESIÓN | SUSTITUCIÓN */}
-                  <TouchableOpacity 
-                    style={styles.contextTileBtn} 
-                    onPress={() => setPlayerAction(prev => ({ ...prev, action: 'INJURY', step: 'SELECT_SUBSTITUTE', substitute: null }))}
-                  >
-                    <Text style={{ fontSize: 20 }}>🤕</Text>
-                    <Text style={styles.contextTileTxt}>Lesión</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={styles.contextTileBtn} 
-                    onPress={() => setPlayerAction(prev => ({ ...prev, action: 'SUBSTITUTION', step: 'SELECT_SUBSTITUTE', substitute: null }))}
-                  >
-                    <Text style={{ fontSize: 20 }}>🔁</Text>
-                    <Text style={styles.contextTileTxt}>Sustitución</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity style={styles.panelCancelFullBtn} onPress={closePlayerActionPanel}>
-                  <Text style={styles.panelCancelFullTxt}>Cancelar</Text>
+              <View style={styles.actionMenuGrid}>
+                <TouchableOpacity style={[styles.actionGridBtn, { backgroundColor: colors.emeraldGlow }]} onPress={() => setPlayerAction(prev => ({ ...prev, action: 'GOAL', step: 'ASSIST_SELECT' }))}>
+                  <Ionicons name="football" size={18} color={colors.navyDark} />
+                  <Text style={[styles.actionGridBtnTxt, { color: colors.navyDark }]}>GOL PROPIO</Text>
                 </TouchableOpacity>
-              </>
+
+                <TouchableOpacity style={[styles.actionGridBtn, { backgroundColor: colors.emeraldGlow }]} onPress={() => setPlayerAction(prev => ({ ...prev, action: 'PENALTY_SCORED', step: 'CONFIRM' }))}>
+                  <Ionicons name="football-outline" size={18} color={colors.navyDark} />
+                  <Text style={[styles.actionGridBtnTxt, { color: colors.navyDark }]}>GOL PENALTI</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.actionGridBtn, { backgroundColor: colors.redCard }]} onPress={handleConfirmPenaltyMissed}>
+                  <Ionicons name="close-circle" size={18} color={colors.white} />
+                  <Text style={styles.actionGridBtnTxt}>PENALTI FALLADO</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.actionGridBtn, { backgroundColor: colors.yellowCard }]} onPress={handleConfirmYellowCard}>
+                  <Ionicons name="square" size={18} color={colors.navyDark} />
+                  <Text style={[styles.actionGridBtnTxt, { color: colors.navyDark }]}>TARJETA AMARILLA</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.actionGridBtn, { backgroundColor: colors.redCard }]} onPress={handleConfirmRedCard}>
+                  <Ionicons name="square" size={18} color={colors.white} />
+                  <Text style={styles.actionGridBtnTxt}>ROJA DIRECTA</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.actionGridBtn, { backgroundColor: colors.skyPrimary }]} onPress={() => setPlayerAction(prev => ({ ...prev, action: 'SUB', step: 'SUB_SELECT' }))}>
+                  <Ionicons name="swap-horizontal" size={18} color={colors.navyDark} />
+                  <Text style={[styles.actionGridBtnTxt, { color: colors.navyDark }]}>SUSTITUCIÓN</Text>
+                </TouchableOpacity>
+              </View>
             )}
 
-            {/* SUBMENÚ DE PENALTI (MARCADO O FALLADO) */}
-            {playerAction.step === 'PENALTY_MENU' && (
-              <>
-                <Text style={styles.panelTitle}>🎯 LANZAMIENTO DE PENALTI</Text>
-                <Text style={styles.panelSubTxt}>
-                  Selecciona el resultado del penalti para #{playerAction.player?.dorsal} {playerAction.player?.name}:
-                </Text>
-
-                <View style={{ gap: 10, marginVertical: 12 }}>
-                  <TouchableOpacity 
-                    style={[styles.confirmGoalBtn, playerAction.isSubmitting && { opacity: 0.5 }]} 
-                    disabled={playerAction.isSubmitting}
-                    onPress={handleConfirmPenaltyScored}
-                  >
-                    <Text style={styles.confirmGoalBtnTxt}>⚽ Penalti marcado</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={[styles.panelCancelBtn, { backgroundColor: 'rgba(239, 68, 68, 0.2)', borderWidth: 1, borderColor: colors.redCard }, playerAction.isSubmitting && { opacity: 0.5 }]} 
-                    disabled={playerAction.isSubmitting}
-                    onPress={handleConfirmPenaltyMissed}
-                  >
-                    <Text style={[styles.panelCancelBtnTxt, { color: '#FF8888' }]}>❌ Penalti fallado</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity style={styles.panelCancelFullBtn} onPress={() => setPlayerAction(prev => ({ ...prev, step: 'MENU' }))}>
-                  <Text style={styles.panelCancelFullTxt}>Volver al menú</Text>
+            {playerAction.step === 'ASSIST_SELECT' && (
+              <View style={styles.subSelectWrapper}>
+                <Text style={styles.subSelectTitle}>¿QUIÉN HIZO LA ASISTENCIA?</Text>
+                <TouchableOpacity style={styles.noAssistBtn} onPress={() => handleSelectAssistPlayer(null)}>
+                  <Text style={styles.noAssistBtnTxt}>Sin asistencia directa</Text>
                 </TouchableOpacity>
-              </>
-            )}
-
-
-            {/* PASO 2: SELECCIÓN DE ASISTENCIA */}
-            {playerAction.step === 'SELECT_ASSIST' && (
-              <>
-                <Text style={styles.panelTitle}>⚽ REGISTRAR GOL</Text>
-                <Text style={styles.panelSubHeader}>SELECCIONAR ASISTENCIA (OPCIONAL):</Text>
-
-                <ScrollView style={{ maxHeight: 180, marginVertical: 8 }}>
-                  <TouchableOpacity 
-                    key="assist-none"
-                    style={styles.playerPickRow}
-                    onPress={() => handleSelectAssistPlayer(null)}
-                  >
-                    <Text style={styles.playerPickDorsal}>-</Text>
-                    <Text style={styles.playerPickName}>Sin asistencia (Acción individual / Penalti)</Text>
-                  </TouchableOpacity>
-
-                  {pitchPlayers.filter(p => p.dorsal !== playerAction.player?.dorsal).map(p => (
-                    <TouchableOpacity 
-                      key={`assist-${p.dorsal}`}
-                      style={styles.playerPickRow}
-                      onPress={() => handleSelectAssistPlayer(p)}
-                    >
-                      <Text style={styles.playerPickDorsal}>#{p.dorsal}</Text>
-                      <Text style={styles.playerPickName}>{p.name} ({p.role})</Text>
+                <ScrollView style={{ maxHeight: 160 }}>
+                  {pitchPlayers.filter(p => p.dorsal !== playerAction.player?.dorsal).map(assister => (
+                    <TouchableOpacity key={`ast-${assister.dorsal}`} style={styles.subOptionRow} onPress={() => handleSelectAssistPlayer(assister)}>
+                      <Text style={styles.subOptionDorsal}>#{assister.dorsal}</Text>
+                      <Text style={styles.subOptionName}>{assister.name}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-
-                <TouchableOpacity style={styles.panelCancelBtn} onPress={() => setPlayerAction(prev => ({ ...prev, step: 'MENU' }))}>
-                  <Text style={styles.panelCancelBtnTxt}>Volver al menú</Text>
-                </TouchableOpacity>
-              </>
+              </View>
             )}
 
-            {/* PASO 3: CONFIRMACIÓN DE GOL */}
-            {playerAction.step === 'CONFIRM' && playerAction.action === 'GOAL' && (
-              <>
-                <Text style={styles.panelTitle}>⚽ CONFIRMAR GOL DE CADETE B</Text>
-                
-                <View style={styles.scorerSummaryBox}>
-                  <Text style={styles.scorerSummaryTxt}>
-                    GOLEADOR: #{playerAction.player?.dorsal} {playerAction.player?.name}
-                  </Text>
-                  <Text style={[styles.scorerSummaryTxt, { color: colors.skyGlow, marginTop: 4 }]}>
-                    ASISTENCIA: {playerAction.assister ? `#${playerAction.assister.dorsal} ${playerAction.assister.name}` : 'Sin asistencia (Acción individual)'}
-                  </Text>
-                </View>
-
-                <View style={{ gap: 8, marginTop: 12 }}>
-                  <TouchableOpacity 
-                    style={[styles.confirmGoalBtn, playerAction.isSubmitting && { opacity: 0.5 }]} 
-                    disabled={playerAction.isSubmitting} 
-                    onPress={handleConfirmGoal}
-                  >
-                    <Text style={styles.confirmGoalBtnTxt}>
-                      {playerAction.isSubmitting ? 'Registrando gol...' : 'Confirmar Gol de Cadete B'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={styles.panelCancelBtn} 
-                    onPress={() => setPlayerAction(prev => ({ ...prev, step: 'SELECT_ASSIST' }))}
-                  >
-                    <Text style={styles.panelCancelBtnTxt}>Cambiar asistencia</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-
-            {/* PASO 4: SELECCIÓN DE SUPLENTE PARA SUSTITUCIÓN */}
-            {playerAction.step === 'SELECT_SUBSTITUTE' && (
-              <>
-                <Text style={styles.panelTitle}>🔁 REALIZAR SUSTITUCIÓN</Text>
-                <Text style={styles.panelSubHeader}>ENTRA DEL BANQUILLO:</Text>
-
-                <ScrollView style={{ maxHeight: 180, marginVertical: 10 }}>
-                  {benchPlayers
-                    .filter(b => {
-                      const pId = b.id || b.dorsal;
-                      const pState = playerMatchStates[pId];
-                      return pState ? (pState.status === 'BENCH' && !pState.isInjured && !pState.isRedCarded) : true;
-                    })
-                    .map(b => (
-                      <TouchableOpacity key={`sub-${b.dorsal}`} style={styles.playerPickRow} onPress={() => handleConfirmSub(b)}>
-                        <Text style={styles.playerPickDorsal}>#{b.dorsal}</Text>
-                        <Text style={styles.playerPickName}>{b.name} ({b.role})</Text>
-                      </TouchableOpacity>
-                    ))}
+            {playerAction.step === 'SUB_SELECT' && (
+              <View style={styles.subSelectWrapper}>
+                <Text style={styles.subSelectTitle}>SELECCIONAR JUGADOR DEL BANQUILLO</Text>
+                <ScrollView style={{ maxHeight: 180 }}>
+                  {benchPlayers.map(sub => (
+                    <TouchableOpacity key={`sub-${sub.dorsal}`} style={styles.subOptionRow} onPress={() => handleConfirmSub(sub)}>
+                      <Text style={styles.subOptionDorsal}>#{sub.dorsal}</Text>
+                      <Text style={styles.subOptionName}>{sub.name} ({sub.role})</Text>
+                    </TouchableOpacity>
+                  ))}
                 </ScrollView>
-
-
-                <TouchableOpacity style={styles.panelCancelBtn} onPress={() => setPlayerAction(prev => ({ ...prev, step: 'MENU' }))}>
-                  <Text style={styles.panelCancelBtnTxt}>Volver al menú</Text>
-                </TouchableOpacity>
-              </>
-            )}
-
-          </View>
-        </View>
-      )}
-
-      {/* ========================================================================= */}
-      {/* PANEL SUPERPUESTO PARA EVENTOS GENERALES (DENTRO DEL ÁRBOL REACT) */}
-      {/* ========================================================================= */}
-      {showGeneralEventModal && (
-        <View style={styles.overlayContainer}>
-          <TouchableOpacity style={styles.overlayBackdrop} activeOpacity={1} onPress={() => setShowGeneralEventModal(false)} />
-          <View style={styles.panelCard}>
-            <Text style={styles.panelTitle}>⚡ NUEVO EVENTO GENERAL</Text>
-            <Text style={styles.panelSubTxt}>Selecciona la acción del partido:</Text>
-
-            {!showIncidenceInput ? (
-              <View style={{ gap: 8, marginVertical: 12 }}>
-                {/* ⚽ GOL RIVAL */}
-                <TouchableOpacity style={styles.generalOptionTile} onPress={handleConfirmAwayGoal}>
-                  <Text style={{ fontSize: 18 }}>⚽</Text>
-                  <Text style={styles.generalOptionTileTxt}>Gol rival (Torrent CF)</Text>
-                </TouchableOpacity>
-
-                {/* 🥤 PAUSA HIDRATACIÓN */}
-                <TouchableOpacity style={styles.generalOptionTile} onPress={handleGeneralHydration}>
-                  <Text style={{ fontSize: 18 }}>🥤</Text>
-                  <Text style={styles.generalOptionTileTxt}>Pausa hidratación</Text>
-                </TouchableOpacity>
-
-                {/* ⏸ DESCANSO */}
-                <TouchableOpacity style={styles.generalOptionTile} onPress={handleGeneralBreak}>
-                  <Text style={{ fontSize: 18 }}>⏸</Text>
-                  <Text style={styles.generalOptionTileTxt}>Descanso / Pausa de tiempo</Text>
-                </TouchableOpacity>
-
-                {/* ▶ REANUDACIÓN */}
-                <TouchableOpacity style={styles.generalOptionTile} onPress={handleGeneralResume}>
-                  <Text style={{ fontSize: 18 }}>▶</Text>
-                  <Text style={styles.generalOptionTileTxt}>Reanudación del partido</Text>
-                </TouchableOpacity>
-
-                {/* ⚠️ INCIDENCIA */}
-                <TouchableOpacity style={styles.generalOptionTile} onPress={() => setShowIncidenceInput(true)}>
-                  <Text style={{ fontSize: 18 }}>⚠️</Text>
-                  <Text style={styles.generalOptionTileTxt}>Incidencia / Observación</Text>
-                </TouchableOpacity>
-
-                {/* 🏁 FIN DEL PARTIDO */}
-                <TouchableOpacity style={[styles.generalOptionTile, { borderColor: colors.redCard }]} onPress={handleFinishMatch}>
-                  <Text style={{ fontSize: 18 }}>🏁</Text>
-                  <Text style={[styles.generalOptionTileTxt, { color: colors.redCard }]}>Fin del partido</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={{ marginVertical: 10, gap: 10 }}>
-                <Text style={styles.panelSubHeader}>DESCRIPCIÓN DE LA INCIDENCIA:</Text>
-                <TextInput 
-                  style={styles.incidenceTextInput}
-                  placeholder="Ej: Balón pinchado / Protesta banquillo..."
-                  placeholderTextColor={colors.textMuted}
-                  value={incidenceText}
-                  onChangeText={setIncidenceText}
-                />
-                <TouchableOpacity style={styles.confirmGoalBtn} onPress={handleAddIncidence}>
-                  <Text style={styles.confirmGoalBtnTxt}>Guardar Incidencia</Text>
-                </TouchableOpacity>
               </View>
             )}
 
-            <TouchableOpacity style={styles.panelCancelBtn} onPress={() => { setShowGeneralEventModal(false); setShowIncidenceInput(false); }}>
-              <Text style={styles.panelCancelBtnTxt}>Cancelar</Text>
-            </TouchableOpacity>
+            {playerAction.step === 'CONFIRM' && playerAction.action === 'GOAL' && (
+              <View style={styles.subSelectWrapper}>
+                <Text style={styles.subSelectTitle}>CONFIRMAR GOL</Text>
+                <Text style={styles.confirmGoalDesc}>
+                  Gol de #{playerAction.player.dorsal} {playerAction.player.name}
+                  {playerAction.assister ? ` (Asistencia: #${playerAction.assister.dorsal} ${playerAction.assister.name})` : ''}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                  <TouchableOpacity style={styles.confirmBtnCancel} onPress={closePlayerActionPanel}>
+                    <Text style={styles.confirmBtnCancelTxt}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.confirmBtnOk} onPress={handleConfirmGoal}>
+                    <Text style={styles.confirmBtnOkTxt}>Confirmar Gol</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {playerAction.step === 'CONFIRM' && playerAction.action === 'PENALTY_SCORED' && (
+              <View style={styles.subSelectWrapper}>
+                <Text style={styles.subSelectTitle}>CONFIRMAR GOL DE PENALTI</Text>
+                <Text style={styles.confirmGoalDesc}>Gol de penalti anotado por #{playerAction.player.dorsal} {playerAction.player.name}</Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                  <TouchableOpacity style={styles.confirmBtnCancel} onPress={closePlayerActionPanel}>
+                    <Text style={styles.confirmBtnCancelTxt}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.confirmBtnOk} onPress={handleConfirmPenaltyScored}>
+                    <Text style={styles.confirmBtnOkTxt}>Confirmar Penalti</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </View>
-        </View>
-      )}
-
-      {/* ========================================================================= */}
-      {/* PANEL SUPERPUESTO PARA REORGANIZACIÓN IA (DENTRO DEL ÁRBOL REACT) */}
-      {/* ========================================================================= */}
-      {showAIReorgModal && (
-        <View style={styles.overlayContainer}>
-          <TouchableOpacity style={styles.overlayBackdrop} activeOpacity={1} onPress={() => setShowAIReorgModal(false)} />
-          <View style={styles.panelAICard}>
-            <Text style={styles.aiModalTitle}>🧠 PROPUESTAS DE REORGANIZACIÓN IA</Text>
-            <Text style={styles.aiModalSub}>Dispones de {pitchPlayers.length} jugadores en campo.</Text>
-
-            <View style={{ gap: 10, marginVertical: 14 }}>
-              {getAITacticalProposals().map((prop, i) => (
-                <TouchableOpacity key={`ai-${prop.name}`} style={styles.aiProposalCard} onPress={() => applyAIProposal(prop)}>
-                  <View style={styles.aiPropBadge}>
-                    <Text style={styles.aiPropBadgeTxt}>OPCIÓN {i + 1}</Text>
-                    <Text style={styles.aiPropFormationTxt}>{prop.name}</Text>
-                  </View>
-                  <Text style={styles.aiPropDescTxt}>{prop.desc}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <TouchableOpacity style={styles.panelCancelBtn} onPress={() => setShowAIReorgModal(false)}>
-              <Text style={styles.panelCancelBtnTxt}>Cerrar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
+        )}
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  mainWrapper: { flex: 1, backgroundColor: colors.navyDark, position: 'relative' },
+  mainWrapper: { flex: 1, backgroundColor: colors.navyDark },
   container: { flex: 1, backgroundColor: colors.navyDark },
-  content: { padding: 20, paddingBottom: 40 },
-  contentDesktop: { maxWidth: 1100, alignSelf: 'center', width: '100%' },
+  content: { padding: 16, paddingBottom: 40 },
+  contentDesktop: { maxWidth: 1080, alignSelf: 'center', width: '100%' },
 
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.navyCard, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.navyCard, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
   titleTxt: { color: colors.white, fontSize: 18, fontWeight: '900' },
   subtitleTxt: { color: colors.emeraldGlow, fontSize: 12, fontWeight: '700' },
-  resetDemoBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255, 255, 255, 0.08)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
-  resetDemoBtnTxt: { color: '#94A3B8', fontSize: 11, fontWeight: '700' },
+  resetDemoBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.navyCard, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
+  resetDemoBtnTxt: { color: colors.textMuted, fontSize: 11, fontWeight: '700' },
 
-  suspensionBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(239, 68, 68, 0.18)', padding: 14, borderRadius: 14, borderWidth: 1.5, borderColor: '#EF4444', marginBottom: 16 },
-  suspensionTitle: { color: '#EF4444', fontSize: 14, fontWeight: '900' },
-  suspensionDesc: { color: '#FFFFFF', fontSize: 12, marginTop: 2, lineHeight: 16 },
+  suspensionBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(239, 68, 68, 0.15)', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#EF4444', marginBottom: 14 },
+  suspensionTitle: { color: '#EF4444', fontSize: 13, fontWeight: '900' },
+  suspensionDesc: { color: colors.white, fontSize: 11, marginTop: 2 },
 
-  // MARCADOR SUPERIOR
-  scoreboardCard: { backgroundColor: colors.navyDeep, borderRadius: 20, padding: 18, borderWidth: 1.5, borderColor: colors.emeraldGlow, marginBottom: 20, alignItems: 'center' },
-  liveBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255, 255, 255, 0.08)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, marginBottom: 12 },
-  liveRedDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444' },
-  liveBadgeTxt: { color: '#EF4444', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
-  scoreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', width: '100%' },
-  teamScoreBox: { alignItems: 'center', flex: 1 },
-  teamScoreName: { color: colors.white, fontSize: 15, fontWeight: '900', marginBottom: 4 },
-  scoreDigit: { color: colors.white, fontSize: 38, fontWeight: '900' },
-  timerBox: { alignItems: 'center', paddingHorizontal: 16 },
-  timerTxt: { color: colors.emeraldGlow, fontSize: 30, fontWeight: '900' },
-  timerSubTxt: { color: colors.textMuted, fontSize: 11, fontWeight: '600', marginBottom: 6 },
-  extraTimeBadge: { backgroundColor: 'rgba(245, 158, 11, 0.18)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#F59E0B', marginBottom: 4, marginTop: -2 },
-  extraTimeBadgeTxt: { color: '#F59E0B', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
-  timerControlBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.emeraldGlow, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  scoreboardCard: { backgroundColor: colors.navyDeep, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.border, marginBottom: 16 },
+  liveBadgeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 10 },
+  liveRedDot: { width: 8, height: 8, borderRadius: 4 },
+  liveBadgeTxt: { fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
+
+  scoreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  teamScoreBox: { flex: 1, alignItems: 'center' },
+  teamScoreName: { color: colors.white, fontSize: 13, fontWeight: '800', textAlign: 'center', marginBottom: 4 },
+  scoreDigit: { color: colors.emeraldGlow, fontSize: 32, fontWeight: '900' },
+
+  timerBox: { alignItems: 'center', paddingHorizontal: 10 },
+  timerTxt: { color: colors.white, fontSize: 26, fontWeight: '900' },
+  timerSubTxt: { color: colors.textMuted, fontSize: 10, fontWeight: '700', marginTop: 2 },
+
+  restLabelTxt: { color: colors.yellowCard, fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
+  restTimerTxt: { color: colors.yellowCard, fontSize: 26, fontWeight: '900' },
+  restFinishedTxt: { color: colors.emeraldGlow, fontSize: 10, fontWeight: '800', marginTop: 2 },
+
+  extraTimeBadge: { backgroundColor: 'rgba(245, 158, 11, 0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 2, borderWidth: 1, borderColor: colors.yellowCard },
+  extraTimeBadgeTxt: { color: colors.yellowCard, fontSize: 10, fontWeight: '900' },
+
+  timerControlBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, marginTop: 8 },
   timerControlBtnTxt: { color: colors.navyDark, fontSize: 11, fontWeight: '900' },
 
-  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, marginTop: 4 },
-  sectionTitleTxt: { color: colors.white, fontSize: 13, fontWeight: '900', letterSpacing: 1 },
-
-  // BOTONES DE ACCIÓN
-  aiReorgTriggerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: 'rgba(168, 85, 247, 0.2)', paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, borderColor: colors.purpleAI, marginBottom: 12 },
-  aiReorgTriggerTxt: { color: '#F0ABFC', fontSize: 13, fontWeight: '900' },
-  generalEventTriggerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.emeraldGlow, paddingVertical: 12, borderRadius: 14, marginBottom: 16 },
-  generalEventTriggerTxt: { color: colors.navyDark, fontSize: 13, fontWeight: '900' },
-
-  // LAYOUT RESPONSIVO
+  desktopGrid: { flexDirection: 'row', gap: 16 },
   mobileStack: { gap: 16 },
-  desktopGrid: { flexDirection: 'row', gap: 24 },
-  mainColDesktop: { flex: 1.4 },
+  mainColDesktop: { flex: 1.6 },
   sidebarColDesktop: { flex: 1 },
 
-  // BANQUILLO Y TIMELINE
-  benchCard: { backgroundColor: colors.navyCard, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: colors.border, marginBottom: 20 },
-  benchScrollContent: { flexDirection: 'row', gap: 12, paddingVertical: 4 },
+  aiReorgTriggerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(56, 189, 248, 0.15)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.skyPrimary, marginBottom: 12 },
+  aiReorgTriggerTxt: { color: colors.skyGlow, fontSize: 12, fontWeight: '900' },
+
+  generalEventTriggerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.skyPrimary, padding: 12, borderRadius: 12, marginBottom: 16 },
+  generalEventTriggerTxt: { color: colors.navyDark, fontSize: 13, fontWeight: '900' },
+
+  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8, marginTop: 4 },
+  sectionTitleTxt: { color: colors.white, fontSize: 12, fontWeight: '900', letterSpacing: 0.5 },
+
+  benchCard: { backgroundColor: colors.navyDeep, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: colors.border, marginBottom: 16 },
+  benchScrollContent: { gap: 12, paddingVertical: 4 },
   benchJerseyWrapper: { alignItems: 'center' },
 
-  timelineCard: { backgroundColor: colors.navyCard, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.border, gap: 12, marginBottom: 20 },
-  timelineItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  timelineTime: { color: colors.skyGlow, fontSize: 12, fontWeight: '900', width: 42 },
-  timelineTitle: { color: colors.white, fontSize: 13, fontWeight: '800' },
-  timelineDesc: { color: colors.textMuted, fontSize: 11, fontWeight: '600' },
-  emptyTimelineTxt: { color: colors.textMuted, fontSize: 12, fontStyle: 'italic', textAlign: 'center', paddingVertical: 10 },
+  timelineCard: { backgroundColor: colors.navyDeep, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: colors.border, gap: 10, minHeight: 120 },
+  emptyTimelineTxt: { color: colors.textMuted, fontSize: 12, fontStyle: 'italic', textAlign: 'center', marginTop: 20 },
+  timelineItem: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.navyCard, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border },
+  timelineTime: { color: colors.skyGlow, fontSize: 11, fontWeight: '900', width: 44 },
+  timelineTitle: { color: colors.white, fontSize: 12, fontWeight: '800' },
+  timelineDesc: { color: colors.textMuted, fontSize: 10, marginTop: 1 },
 
-  // OVERLAYS NATIVOS ESTABLES (SIN MODAL NI PORTAL)
-  overlayContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 9999,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  overlayBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.82)',
-  },
-  panelCard: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: colors.navyDeep,
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1.5,
-    borderColor: colors.skyPrimary,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 20,
-  },
-  panelPlayerHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.1)' },
-  panelPlayerBadge: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  panelPlayerBadgeTxt: { color: colors.navyDark, fontSize: 16, fontWeight: '900' },
-  panelPlayerName: { color: colors.white, fontSize: 17, fontWeight: '900' },
-  panelPlayerRole: { color: colors.skyGlow, fontSize: 12, fontWeight: '700', marginTop: 1 },
-  panelCloseIconBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255, 255, 255, 0.1)', justifyContent: 'center', alignItems: 'center' },
+  // CONFIRM MODAL OVERLAY
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(2, 8, 20, 0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  confirmBox: { backgroundColor: colors.navyDeep, borderRadius: 16, padding: 20, maxWidth: 400, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  confirmBoxTitle: { color: colors.white, fontSize: 16, fontWeight: '900', marginTop: 10 },
+  confirmBoxDesc: { color: colors.textMuted, fontSize: 12, textAlign: 'center', marginTop: 6, lineHeight: 18 },
+  confirmBtnRow: { flexDirection: 'row', gap: 10, marginTop: 16, width: '100%' },
+  confirmBtnCancel: { flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: colors.navyCard, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  confirmBtnCancelTxt: { color: colors.white, fontSize: 12, fontWeight: '800' },
+  confirmBtnOk: { flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: colors.skyPrimary, alignItems: 'center' },
+  confirmBtnOkTxt: { color: colors.navyDark, fontSize: 12, fontWeight: '900' },
 
-  panelSectionTitle: { color: colors.textMuted, fontSize: 11, fontWeight: '900', letterSpacing: 1, textAlign: 'center', marginBottom: 14 },
-  contextOptionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', marginBottom: 16 },
-  contextTileBtn: { width: '48%', flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(2, 8, 20, 0.8)', paddingVertical: 14, paddingHorizontal: 12, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' },
-  contextTileTxt: { color: colors.white, fontSize: 13, fontWeight: '800' },
-  panelCancelFullBtn: { backgroundColor: 'rgba(255, 255, 255, 0.08)', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
-  panelCancelFullTxt: { color: colors.white, fontSize: 13, fontWeight: '800' },
+  // PANEL DE ACCIONES DE JUGADOR
+  actionPanelCard: { marginTop: 16, backgroundColor: colors.navyDeep, borderRadius: 16, padding: 16, borderWidth: 1.5, borderColor: colors.skyPrimary },
+  actionPanelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
+  actionPlayerInfo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  actionDorsalTxt: { color: colors.skyGlow, fontSize: 18, fontWeight: '900' },
+  actionPlayerName: { color: colors.white, fontSize: 14, fontWeight: '900' },
+  actionPlayerRole: { color: colors.textMuted, fontSize: 11 },
 
-  panelTitle: { color: colors.white, fontSize: 16, fontWeight: '900', textAlign: 'center', marginBottom: 6 },
-  panelSubTxt: { color: colors.textMuted, fontSize: 12, textAlign: 'center', marginBottom: 10 },
-  scorerSummaryBox: { backgroundColor: 'rgba(52, 211, 153, 0.15)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.emeraldGlow, marginBottom: 12 },
-  scorerSummaryTxt: { color: colors.emeraldGlow, fontSize: 13, fontWeight: '900', textAlign: 'center' },
-  panelSubHeader: { color: colors.skyGlow, fontSize: 11, fontWeight: '900', letterSpacing: 0.5, marginBottom: 6 },
-  playerPickRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: 'rgba(255, 255, 255, 0.05)', marginBottom: 6 },
-  playerPickDorsal: { color: colors.skyPrimary, fontSize: 13, fontWeight: '900' },
-  playerPickName: { color: colors.white, fontSize: 13, fontWeight: '700' },
-  confirmGoalBtn: { backgroundColor: colors.emeraldGlow, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
-  confirmGoalBtnTxt: { color: colors.navyDark, fontSize: 13, fontWeight: '900' },
-  panelCancelBtn: { backgroundColor: 'rgba(255, 255, 255, 0.1)', paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
-  panelCancelBtnTxt: { color: colors.white, fontSize: 12, fontWeight: '800' },
+  actionMenuGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  actionGridBtn: { flex: 1, minWidth: '45%', flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 10 },
+  actionGridBtnTxt: { color: colors.white, fontSize: 11, fontWeight: '900' },
 
-  // EVENTOS GENERALES
-  generalOptionTile: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(2, 8, 20, 0.8)', paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' },
-  generalOptionTileTxt: { color: colors.white, fontSize: 13, fontWeight: '800' },
-  incidenceTextInput: { backgroundColor: 'rgba(255, 255, 255, 0.08)', color: colors.white, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border, fontSize: 13 },
-
-  // IA
-  panelAICard: { width: '100%', maxWidth: 440, backgroundColor: '#071A3D', borderRadius: 24, padding: 20, borderWidth: 1.5, borderColor: colors.purpleAI },
-  aiModalTitle: { color: '#F0ABFC', fontSize: 16, fontWeight: '900', textAlign: 'center', marginBottom: 4 },
-  aiModalSub: { color: colors.textMuted, fontSize: 12, textAlign: 'center', marginBottom: 10 },
-  aiProposalCard: { backgroundColor: 'rgba(2, 8, 20, 0.85)', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.4)', gap: 6 },
-  aiPropBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  aiPropBadgeTxt: { color: '#F0ABFC', fontSize: 11, fontWeight: '900' },
-  aiPropFormationTxt: { backgroundColor: colors.purpleAI, color: '#FFFFFF', fontSize: 12, fontWeight: '900', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  aiPropDescTxt: { color: '#E2E8F0', fontSize: 12, lineHeight: 16 },
+  subSelectWrapper: { gap: 8 },
+  subSelectTitle: { color: colors.white, fontSize: 12, fontWeight: '900' },
+  noAssistBtn: { backgroundColor: colors.navyCard, padding: 10, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  noAssistBtnTxt: { color: colors.skyGlow, fontSize: 12, fontWeight: '800' },
+  subOptionRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, backgroundColor: colors.navyCard, borderRadius: 8, marginBottom: 4 },
+  subOptionDorsal: { color: colors.emeraldGlow, fontSize: 13, fontWeight: '900' },
+  subOptionName: { color: colors.white, fontSize: 12, fontWeight: '700' },
+  confirmGoalDesc: { color: colors.white, fontSize: 13, fontWeight: '700', marginVertical: 6 },
 });
