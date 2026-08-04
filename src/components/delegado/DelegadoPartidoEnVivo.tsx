@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, TextInput } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, TextInput, AppState, AppStateStatus } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { TacticalPitch, PitchPlayer } from './liveMatch/TacticalPitch';
@@ -18,8 +18,6 @@ import {
   recordRedCard,
   recordInjury,
 } from '../../utils/liveMatchState';
-
-
 
 const colors = {
   navyDark: '#020814',
@@ -51,7 +49,6 @@ const INITIAL_STARTERS_14231: PitchPlayer[] = [
   { id: '9', dorsal: '9', name: 'ALEJANDRO', role: 'DC', xPercent: 50, yPercent: 14 },
 ];
 
-
 const INITIAL_BENCH: PitchPlayer[] = [
   { id: '13', dorsal: '13', name: 'ÁLVARO G.', isGoalkeeper: true, role: 'POR', xPercent: 0, yPercent: 0 },
   { id: '12', dorsal: '12', name: 'DIEGO', role: 'DFC', xPercent: 0, yPercent: 0 },
@@ -60,9 +57,6 @@ const INITIAL_BENCH: PitchPlayer[] = [
   { id: '16', dorsal: '16', name: 'IAN', role: 'EI', xPercent: 0, yPercent: 0 },
   { id: '17', dorsal: '17', name: 'ÁLEX', role: 'MC', xPercent: 0, yPercent: 0 },
 ];
-
-
-
 
 const buildInitialPlayerStates = (): Record<string, PlayerMatchState> => {
   const map: Record<string, PlayerMatchState> = {};
@@ -93,7 +87,6 @@ const buildInitialPlayerStates = (): Record<string, PlayerMatchState> => {
   return map;
 };
 
-
 interface PlayerStats {
   yellowCards: number;
   isRedCarded: boolean;
@@ -106,7 +99,6 @@ export type MatchStatus = 'BEFORE_START' | 'IN_PROGRESS' | 'PAUSED' | 'FINISHED'
 
 export type PlayerActionType = 'GOAL' | 'PENALTY' | 'YELLOW_CARD' | 'RED_CARD' | 'SUBSTITUTION' | 'INJURY';
 export type PlayerActionStep = 'MENU' | 'SELECT_ASSIST' | 'PENALTY_MENU' | 'SELECT_SUBSTITUTE' | 'CONFIRM';
-
 
 export interface PlayerActionFlow {
   visible: boolean;
@@ -128,6 +120,43 @@ const initialPlayerActionFlow: PlayerActionFlow = {
   isSubmitting: false,
 };
 
+const TIMER_SNAPSHOT_KEY = '@cd_jesuitas_live_match_timer_snapshot';
+const REGULATION_HALFTIME_SECONDS = 35 * 60; // 35:00 (Infantiles / Categorías base reglamentarias)
+
+export interface TimerSnapshot {
+  matchId: string;
+  status: MatchStatus;
+  accumulatedSeconds: number;
+  runningSinceTimestamp: number | null;
+  isRunning: boolean;
+  savedAt: number;
+}
+
+const saveTimerSnapshot = (snapshot: TimerSnapshot) => {
+  try {
+    const jsonVal = JSON.stringify(snapshot);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(TIMER_SNAPSHOT_KEY, jsonVal);
+    }
+  } catch (e) {
+    // Silent catch
+  }
+};
+
+const loadTimerSnapshot = (): TimerSnapshot | null => {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const jsonVal = window.localStorage.getItem(TIMER_SNAPSHOT_KEY);
+      if (jsonVal) {
+        return JSON.parse(jsonVal) as TimerSnapshot;
+      }
+    }
+  } catch (e) {
+    // Silent catch
+  }
+  return null;
+};
+
 export function DelegadoPartidoEnVivo() {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -136,6 +165,38 @@ export function DelegadoPartidoEnVivo() {
   // 1. ESTADO CENTRAL DEL CRONÓMETRO (BEFORE_START | IN_PROGRESS | PAUSED | FINISHED)
   const [matchStatus, setMatchStatus] = useState<MatchStatus>('BEFORE_START');
   const [matchSeconds, setMatchSeconds] = useState(0);
+
+  // REFERENCIAS DE TIEMPO ABSOLUTO (SISTEMA DE RELOJ DE PARED REAL MULTIPLATAFORMA)
+  const stintStartTimestampRef = useRef<number | null>(null);
+  const accumulatedMatchSecondsRef = useRef<number>(0);
+
+  // Helper determinista que calcula el tiempo transcurrido exacto según Date.now() del sistema
+  const calculateCurrentMatchSeconds = useCallback(() => {
+    if (stintStartTimestampRef.current === null) {
+      return accumulatedMatchSecondsRef.current;
+    }
+    const elapsedSinceStintStart = Math.floor((Date.now() - stintStartTimestampRef.current) / 1000);
+    return Math.max(0, accumulatedMatchSecondsRef.current + elapsedSinceStintStart);
+  }, []);
+
+  // RECUPERACIÓN AUTOMÁTICA DE SNAPSHOT AL REMONTAR EL COMPONENTE
+  useEffect(() => {
+    const snapshot = loadTimerSnapshot();
+    if (snapshot) {
+      if (snapshot.status === 'IN_PROGRESS' && snapshot.runningSinceTimestamp !== null) {
+        accumulatedMatchSecondsRef.current = snapshot.accumulatedSeconds;
+        stintStartTimestampRef.current = snapshot.runningSinceTimestamp;
+        const current = Math.max(0, snapshot.accumulatedSeconds + Math.floor((Date.now() - snapshot.runningSinceTimestamp) / 1000));
+        setMatchSeconds(current);
+        setMatchStatus('IN_PROGRESS');
+      } else if (snapshot.status === 'PAUSED') {
+        accumulatedMatchSecondsRef.current = snapshot.accumulatedSeconds;
+        stintStartTimestampRef.current = null;
+        setMatchSeconds(snapshot.accumulatedSeconds);
+        setMatchStatus('PAUSED');
+      }
+    }
+  }, []);
 
   // 2. MARCADOR Y REGLAMENTO
   const [homeScore, setHomeScore] = useState(0);
@@ -149,7 +210,6 @@ export function DelegadoPartidoEnVivo() {
   const [playerStats, setPlayerStats] = useState<Record<string, PlayerStats>>({});
   const [playerMatchStates, setPlayerMatchStates] = useState<Record<string, PlayerMatchState>>(buildInitialPlayerStates);
 
-
   // 4. TIMELINE DE EVENTOS CON ID ÚNICO Y CLAVE ESTABLE
   const [events, setEvents] = useState<any[]>([]);
 
@@ -162,18 +222,66 @@ export function DelegadoPartidoEnVivo() {
   const [showIncidenceInput, setShowIncidenceInput] = useState(false);
   const [incidenceText, setIncidenceText] = useState('');
 
-  // UNICO USEEFFECT DEL CRONÓMETRO DEPENDIENTE EXCLUSIVAMENTE DE matchStatus === 'IN_PROGRESS'
+  // CRONÓMETRO ABSOLUTO BASADO EN RELOJ REAL DEL SISTEMA (iOS / iPadOS / Android / Web)
   useEffect(() => {
     if (matchStatus !== 'IN_PROGRESS' || isSuspended) return;
 
-    const intervalId = setInterval(() => {
-      setMatchSeconds(prev => prev + 1);
-    }, 1000);
+    const updateTime = () => {
+      const current = calculateCurrentMatchSeconds();
+      setMatchSeconds(current);
+    };
+
+    updateTime();
+
+    // 1. Ticker continuo para refresco visual fluido en primer plano
+    const intervalId = setInterval(updateTime, 500);
+
+    // 2. Listener de AppState para React Native (bloqueo/desbloqueo de pantalla e inactividad en iOS, iPadOS y Android)
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        updateTime();
+      } else if (nextAppState === 'background' || nextAppState === 'inactive') {
+        saveTimerSnapshot({
+          matchId: 'cadete-b-live-1',
+          status: 'IN_PROGRESS',
+          accumulatedSeconds: accumulatedMatchSecondsRef.current,
+          runningSinceTimestamp: stintStartTimestampRef.current,
+          isRunning: true,
+          savedAt: Date.now(),
+        });
+      }
+    });
+
+    // 3. Listener de visibilitychange para navegadores web (React Native Web)
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined') {
+        if (document.visibilityState === 'visible') {
+          updateTime();
+        } else if (document.visibilityState === 'hidden') {
+          saveTimerSnapshot({
+            matchId: 'cadete-b-live-1',
+            status: 'IN_PROGRESS',
+            accumulatedSeconds: accumulatedMatchSecondsRef.current,
+            runningSinceTimestamp: stintStartTimestampRef.current,
+            isRunning: true,
+            savedAt: Date.now(),
+          });
+        }
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
 
     return () => {
       clearInterval(intervalId);
+      subscription?.remove();
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
     };
-  }, [matchStatus, isSuspended]);
+  }, [matchStatus, isSuspended, calculateCurrentMatchSeconds]);
 
   const formatTimer = (totalSecs: number) => {
     const mins = Math.floor(totalSecs / 60);
@@ -181,7 +289,16 @@ export function DelegadoPartidoEnVivo() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getMinuteText = () => `${Math.floor(matchSeconds / 60)}'`;
+  const regulationSeconds = Math.min(matchSeconds, REGULATION_HALFTIME_SECONDS);
+  const extraTimeSeconds = Math.max(0, matchSeconds - REGULATION_HALFTIME_SECONDS);
+
+  const getMinuteText = () => {
+    if (extraTimeSeconds > 0) {
+      const extraMins = Math.floor(extraTimeSeconds / 60);
+      return `35' (+${extraMins}' añ.)`;
+    }
+    return `${Math.floor(matchSeconds / 60)}'`;
+  };
 
   const getPStats = (id: string): PlayerStats => {
     const pState = playerMatchStates[id];
@@ -197,12 +314,23 @@ export function DelegadoPartidoEnVivo() {
     return playerStats[id] || { yellowCards: 0, isRedCarded: false, isInjured: false, goals: 0, assists: 0 };
   };
 
-
   // CONTROL DEL CRONÓMETRO (START, PAUSE, RESUME, FINISH)
   const handleStartMatch = () => {
     if (matchStatus !== 'BEFORE_START') return;
 
+    accumulatedMatchSecondsRef.current = 0;
+    stintStartTimestampRef.current = Date.now();
+    setMatchSeconds(0);
     setMatchStatus('IN_PROGRESS');
+    saveTimerSnapshot({
+      matchId: 'cadete-b-live-1',
+      status: 'IN_PROGRESS',
+      accumulatedSeconds: 0,
+      runningSinceTimestamp: stintStartTimestampRef.current,
+      isRunning: true,
+      savedAt: Date.now(),
+    });
+
     setEvents(prev => [
       {
         id: `ev-${Date.now()}`,
@@ -220,7 +348,20 @@ export function DelegadoPartidoEnVivo() {
   const handlePauseMatch = (reason = 'Pausa manual') => {
     if (matchStatus !== 'IN_PROGRESS') return;
 
+    const currentSecs = calculateCurrentMatchSeconds();
+    accumulatedMatchSecondsRef.current = currentSecs;
+    stintStartTimestampRef.current = null;
+    setMatchSeconds(currentSecs);
     setMatchStatus('PAUSED');
+    saveTimerSnapshot({
+      matchId: 'cadete-b-live-1',
+      status: 'PAUSED',
+      accumulatedSeconds: currentSecs,
+      runningSinceTimestamp: null,
+      isRunning: false,
+      savedAt: Date.now(),
+    });
+
     const minTxt = getMinuteText();
     setEvents(prev => [
       {
@@ -239,7 +380,17 @@ export function DelegadoPartidoEnVivo() {
   const handleResumeMatch = () => {
     if (matchStatus !== 'PAUSED') return;
 
+    stintStartTimestampRef.current = Date.now();
     setMatchStatus('IN_PROGRESS');
+    saveTimerSnapshot({
+      matchId: 'cadete-b-live-1',
+      status: 'IN_PROGRESS',
+      accumulatedSeconds: accumulatedMatchSecondsRef.current,
+      runningSinceTimestamp: stintStartTimestampRef.current,
+      isRunning: true,
+      savedAt: Date.now(),
+    });
+
     const minTxt = getMinuteText();
     setEvents(prev => [
       {
@@ -256,6 +407,11 @@ export function DelegadoPartidoEnVivo() {
   };
 
   const handleFinishMatch = () => {
+
+    const currentSecs = calculateCurrentMatchSeconds();
+    accumulatedMatchSecondsRef.current = currentSecs;
+    stintStartTimestampRef.current = null;
+    setMatchSeconds(currentSecs);
     setMatchStatus('FINISHED');
     const minTxt = getMinuteText();
     setEvents(prev => [
@@ -275,6 +431,8 @@ export function DelegadoPartidoEnVivo() {
 
   // REINICIAR SISTEMA COMPLETO
   const resetDemo = () => {
+    accumulatedMatchSecondsRef.current = 0;
+    stintStartTimestampRef.current = null;
     setMatchStatus('BEFORE_START');
     setMatchSeconds(0);
     setHomeScore(0);
@@ -292,6 +450,7 @@ export function DelegadoPartidoEnVivo() {
     setShowIncidenceInput(false);
     setIncidenceText('');
   };
+
 
 
   // GESTIÓN DEL PANEL SUPERPUESTO DE ACCIONES (ÚNICA FUNCIÓN DE APERTURA Y CIERRE)
@@ -905,7 +1064,12 @@ export function DelegadoPartidoEnVivo() {
             </View>
 
             <View style={styles.timerBox}>
-              <Text style={styles.timerTxt}>{formatTimer(matchSeconds)}</Text>
+              <Text style={styles.timerTxt}>{formatTimer(regulationSeconds)}</Text>
+              {extraTimeSeconds > 0 && (
+                <View style={styles.extraTimeBadge}>
+                  <Text style={styles.extraTimeBadgeTxt}>+{formatTimer(extraTimeSeconds)} AÑADIDO</Text>
+                </View>
+              )}
               <Text style={styles.timerSubTxt}>
                 {matchStatus === 'BEFORE_START' ? 'Sin comenzar' : `Minuto ${getMinuteText()}`}
               </Text>
@@ -1395,6 +1559,8 @@ const styles = StyleSheet.create({
   timerBox: { alignItems: 'center', paddingHorizontal: 16 },
   timerTxt: { color: colors.emeraldGlow, fontSize: 30, fontWeight: '900' },
   timerSubTxt: { color: colors.textMuted, fontSize: 11, fontWeight: '600', marginBottom: 6 },
+  extraTimeBadge: { backgroundColor: 'rgba(245, 158, 11, 0.18)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#F59E0B', marginBottom: 4, marginTop: -2 },
+  extraTimeBadgeTxt: { color: '#F59E0B', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
   timerControlBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.emeraldGlow, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   timerControlBtnTxt: { color: colors.navyDark, fontSize: 11, fontWeight: '900' },
 
