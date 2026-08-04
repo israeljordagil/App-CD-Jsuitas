@@ -45,12 +45,14 @@ export interface TacticalPitchProps {
   systemName?: string;
   starters?: PitchPlayer[];
   onPlayerPress?: (player: PitchPlayer) => void;
+  isAway?: boolean;
 }
 
 export function TacticalPitch({
   systemName = '1-4-2-3-1',
   starters = STARTERS_14231,
   onPlayerPress,
+  isAway = false,
 }: TacticalPitchProps) {
   return (
     <View style={styles.container}>
@@ -98,6 +100,7 @@ export function TacticalPitch({
               dorsal={player.dorsal}
               name={player.name}
               isGoalkeeper={player.isGoalkeeper}
+              isAway={isAway}
               yellowCardCount={player.yellowCardCount}
               isRedCarded={player.isRedCarded}
               isInjured={player.isInjured}

@@ -263,15 +263,27 @@ type GeneralEventStep =
 
 export interface DelegadoPartidoEnVivoProps {
   category?: string;
+  teamName?: string;
+  rivalName?: string;
+  matchCondition?: 'LOCAL' | 'VISITANTE';
 }
 
-export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEnVivoProps) {
+export function DelegadoPartidoEnVivo({ 
+  category = 'Infantil',
+  teamName = 'Infantil A',
+  rivalName = 'Valencia CF "B"',
+  matchCondition = 'VISITANTE',
+}: DelegadoPartidoEnVivoProps) {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 900;
 
-  const matchCategory = category && CATEGORY_TIME_CONFIGS[category] ? category : 'Cadete';
-  const timeConfig = CATEGORY_TIME_CONFIGS[matchCategory] || CATEGORY_TIME_CONFIGS['Cadete'];
+  const matchCategory = category && CATEGORY_TIME_CONFIGS[category] ? category : 'Infantil';
+  const timeConfig = CATEGORY_TIME_CONFIGS[matchCategory] || CATEGORY_TIME_CONFIGS['Infantil'];
+
+  const isAwayMatch = matchCondition === 'VISITANTE';
+  const homeTeamLabel = isAwayMatch ? rivalName : `CD Jesuitas (${teamName})`;
+  const awayTeamLabel = isAwayMatch ? `CD Jesuitas (${teamName})` : rivalName;
 
   const firstHalfLimitSecs = timeConfig.halfDurationMinutes * 60;
   const secondHalfLimitSecs = timeConfig.halfDurationMinutes * 2 * 60;
@@ -370,7 +382,6 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
 
   // 5. PANEL DE ACCIONES Y EVENTOS GENERALES
   const [playerAction, setPlayerAction] = useState<PlayerActionFlow>(initialPlayerActionFlow);
-  const [showAIReorgModal, setShowAIReorgModal] = useState(false);
   const [showGeneralEventModal, setShowGeneralEventModal] = useState(false);
   const [generalEventStep, setGeneralEventStep] = useState<GeneralEventStep>('MENU');
   const [incidenceText, setIncidenceText] = useState('');
@@ -537,7 +548,7 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
         minute: "00'00\"",
         type: 'INICIO',
         title: 'Comienza el partido',
-        desc: `1ª Parte en juego · Categoría ${matchCategory} · Cadete B vs Torrent CF`,
+        desc: `1ª Parte en juego · Categoría ${matchCategory} · ${homeTeamLabel} vs ${awayTeamLabel}`,
         icon: 'play',
         color: colors.emeraldGlow,
       },
@@ -670,7 +681,7 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
         minute: minTxt,
         type: 'FIN',
         title: '🏁 Final del partido',
-        desc: `Resultado final: Cadete B ${homeScore} - ${awayScore} Torrent CF`,
+        desc: `Resultado final: ${homeTeamLabel} ${homeScore} - ${awayScore} ${awayTeamLabel}`,
         icon: 'checkmark-done-circle',
         color: colors.skyGlow,
       },
@@ -701,7 +712,6 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
     setPlayerMatchStates(buildInitialPlayerStates());
     setEvents([]);
     setPlayerAction(initialPlayerActionFlow);
-    setShowAIReorgModal(false);
     setShowGeneralEventModal(false);
     setGeneralEventStep('MENU');
     setIncidenceText('');
@@ -743,7 +753,11 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
       const scorerId = scorer.id || scorer.dorsal;
       const assistId = assister ? (assister.id || assister.dorsal) : null;
 
-      setHomeScore(prev => prev + 1);
+      if (isAwayMatch) {
+        setAwayScore(prev => prev + 1);
+      } else {
+        setHomeScore(prev => prev + 1);
+      }
 
       setPlayerMatchStates(prev => {
         const updated = { ...prev };
@@ -791,7 +805,7 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
           id: `ev-${Date.now()}`,
           minute: minTxt,
           type: 'GOL',
-          title: '¡Gol de Cadete B!',
+          title: `¡Gol del CD Jesuitas!`,
           desc: descTxt,
           icon: 'football',
           color: colors.emeraldGlow,
@@ -812,7 +826,11 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
       const scorer = playerAction.player;
       const scorerId = scorer.id || scorer.dorsal;
 
-      setHomeScore(prev => prev + 1);
+      if (isAwayMatch) {
+        setAwayScore(prev => prev + 1);
+      } else {
+        setHomeScore(prev => prev + 1);
+      }
 
       setPlayerMatchStates(prev => {
         const updated = { ...prev };
@@ -843,7 +861,7 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
           id: `ev-${Date.now()}`,
           minute: minTxt,
           type: 'PENALTI_GOL',
-          title: '¡Gol de penalti!',
+          title: '¡Gol de penalti del CD Jesuitas!',
           desc: `#${scorer.dorsal} ${scorer.name}`,
           icon: 'football',
           color: colors.emeraldGlow,
@@ -1063,7 +1081,11 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
   };
 
   const handleConfirmRivalGoal = () => {
-    setAwayScore(prev => prev + 1);
+    if (isAwayMatch) {
+      setHomeScore(prev => prev + 1);
+    } else {
+      setAwayScore(prev => prev + 1);
+    }
     const minTxt = getMinuteText();
 
     setEvents(prev => [
@@ -1071,8 +1093,8 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
         id: `ev-${Date.now()}`,
         minute: minTxt,
         type: 'GOL_RIVAL',
-        title: '¡Gol de Torrent CF!',
-        desc: 'Gol anotado por el equipo rival',
+        title: `¡Gol del ${rivalName}!`,
+        desc: `Gol anotado por el equipo rival (${isAwayMatch ? 'Local' : 'Visitante'})`,
         icon: 'football',
         color: colors.redCard,
       },
@@ -1202,7 +1224,7 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={styles.titleTxt}>PARTIDO EN VIVO</Text>
-            <Text style={styles.subtitleTxt}>Liga Preferente {matchCategory} · Cadete B vs Torrent CF ({timeConfig.halfDurationMinutes} min/parte)</Text>
+            <Text style={styles.subtitleTxt}>Liga Preferente {matchCategory} · {homeTeamLabel} vs {awayTeamLabel} ({timeConfig.halfDurationMinutes} min/parte)</Text>
           </View>
           <TouchableOpacity style={styles.resetDemoBtn} onPress={resetDemo}>
             <Ionicons name="refresh" size={14} color="#94A3B8" />
@@ -1232,7 +1254,7 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
 
           <View style={styles.scoreRow}>
             <View style={styles.teamScoreBox}>
-              <Text style={styles.teamScoreName}>Cadete B</Text>
+              <Text style={styles.teamScoreName}>{homeTeamLabel}</Text>
               <Text style={styles.scoreDigit}>{homeScore}</Text>
             </View>
 
@@ -1290,7 +1312,7 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
             </View>
 
             <View style={styles.teamScoreBox}>
-              <Text style={styles.teamScoreName}>Torrent CF</Text>
+              <Text style={styles.teamScoreName}>{awayTeamLabel}</Text>
               <Text style={styles.scoreDigit}>{awayScore}</Text>
             </View>
           </View>
@@ -1299,17 +1321,10 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
         {/* LAYOUT PRINCIPAL */}
         <View style={isDesktop ? styles.desktopGrid : styles.mobileStack}>
           <View style={isDesktop ? styles.mainColDesktop : { width: '100%' }}>
-            {/* BOTÓN DE REORGANIZACIÓN IA TRAS EXPULSIÓN */}
-            {pitchPlayers.length < 11 && !isSuspended && matchPhase !== 'FINISHED' && (
-              <TouchableOpacity style={styles.aiReorgTriggerBtn} onPress={() => setShowAIReorgModal(true)}>
-                <Text style={{ fontSize: 18 }}>🧠</Text>
-                <Text style={styles.aiReorgTriggerTxt}>Generar reorganización táctica IA ({pitchPlayers.length} jugadores)</Text>
-              </TouchableOpacity>
-            )}
-
             {/* CAMPO TÁCTICO */}
             <TacticalPitch 
               systemName={systemName} 
+              isAway={isAwayMatch}
               starters={pitchPlayers.map(p => {
                 const pId = p.id || p.dorsal;
                 const pState = playerMatchStates[pId];
@@ -1360,6 +1375,7 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
                         dorsal={player.dorsal} 
                         name={player.name} 
                         isGoalkeeper={player.isGoalkeeper} 
+                        isAway={isAwayMatch}
                         yellowCardCount={stats.yellowCards}
                         isRedCarded={stats.isRedCarded}
                         isInjured={stats.isInjured}
@@ -1434,7 +1450,7 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
                   </View>
                   <View>
                     <Text style={styles.modalPlayerName}>NUEVO EVENTO GENERAL</Text>
-                    <Text style={styles.modalPlayerRole}>Categoría {matchCategory} · Cadete B vs Torrent CF</Text>
+                    <Text style={styles.modalPlayerRole}>Categoría {matchCategory} · {homeTeamLabel} vs {awayTeamLabel}</Text>
                   </View>
                 </View>
                 <TouchableOpacity style={styles.modalCloseIconBtn} onPress={() => setShowGeneralEventModal(false)}>
@@ -1455,7 +1471,7 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.generalOptionTitle, { color: colors.redCard }]}>Gol del rival</Text>
-                      <Text style={styles.generalOptionSub}>Sumar 1 gol al marcador de Torrent CF</Text>
+                      <Text style={styles.generalOptionSub}>Sumar 1 gol al marcador de {rivalName}</Text>
                     </View>
                   </TouchableOpacity>
 
@@ -1552,7 +1568,7 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
                   <Text style={styles.big3dIcon}>⚽</Text>
                   <Text style={styles.confirmActionTitle}>¿Confirmar gol del equipo rival?</Text>
                   <Text style={styles.confirmActionDesc}>
-                    Se sumará 1 gol al marcador del rival (Torrent CF) y se registrará automáticamente en el minuto actual ({getMinuteText()}).
+                    Se sumará 1 gol al marcador del rival ({rivalName}) y se registrará automáticamente en el minuto actual ({getMinuteText()}).
                   </Text>
                   <View style={styles.confirmActionBtnRow}>
                     <TouchableOpacity style={styles.confirmBtnCancel} onPress={() => setGeneralEventStep('MENU')}>
@@ -2034,9 +2050,6 @@ const styles = StyleSheet.create({
   mobileStack: { gap: 16 },
   mainColDesktop: { flex: 1.6 },
   sidebarColDesktop: { flex: 1 },
-
-  aiReorgTriggerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(56, 189, 248, 0.15)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.skyPrimary, marginBottom: 12 },
-  aiReorgTriggerTxt: { color: colors.skyGlow, fontSize: 12, fontWeight: '900' },
 
   generalEventTriggerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.skyPrimary, padding: 12, borderRadius: 12, marginBottom: 16 },
   generalEventTriggerTxt: { color: colors.navyDark, fontSize: 13, fontWeight: '900' },

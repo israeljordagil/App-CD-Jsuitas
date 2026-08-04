@@ -1,11 +1,42 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
+export interface KitConfig {
+  outfieldShirt: string;
+  outfieldNumber: string;
+  goalkeeperShirt: string;
+  goalkeeperNumber: string;
+  captainArmband: string;
+  collar: string;
+  cuff: string;
+}
+
+export const HOME_KIT: KitConfig = {
+  outfieldShirt: '#38BDF8',   // Celeste
+  outfieldNumber: '#071A3D',  // Navy Blue
+  goalkeeperShirt: '#800020', // Granate
+  goalkeeperNumber: '#FF6600',// Naranja
+  captainArmband: '#071A3D',  // Navy Blue
+  collar: '#071A3D',
+  cuff: '#071A3D',
+};
+
+export const AWAY_KIT: KitConfig = {
+  outfieldShirt: '#0F172A',   // Negro
+  outfieldNumber: '#FACC15',  // Amarillo
+  goalkeeperShirt: '#4ADE80', // Verde claro
+  goalkeeperNumber: '#14532D',// Verde oscuro
+  captainArmband: '#FFFFFF',  // Blanco
+  collar: '#FACC15',
+  cuff: '#FACC15',
+};
+
 export interface TacticalJerseyProps {
   dorsal: string;
   name: string;
   isGoalkeeper?: boolean;
   isAway?: boolean;
+  variant?: 'HOME' | 'AWAY';
   yellowCardCount?: number;
   isRedCarded?: boolean;
   isInjured?: boolean;
@@ -20,6 +51,7 @@ export function TacticalJersey({
   name,
   isGoalkeeper = false,
   isAway = false,
+  variant,
   yellowCardCount = 0,
   isRedCarded = false,
   isInjured = false,
@@ -29,15 +61,16 @@ export function TacticalJersey({
   scale = 1,
 }: TacticalJerseyProps) {
 
+  const activeVariant = variant || (isAway ? 'AWAY' : 'HOME');
+  const kit = activeVariant === 'AWAY' ? AWAY_KIT : HOME_KIT;
 
-  // PRIMERA EQUIPACIÓN OFICIAL CD JESUITAS (PARTIDO COMO LOCAL)
-  // Jugador Campo: Cuerpo Celeste (#38BDF8), Mangas Celestes (#38BDF8), Cuello Azul Marino (#071A3D), Puños Azul Marino (#071A3D), Dorsal Azul Marino (#071A3D)
-  // Portero Local: Cuerpo Granate (#800020), Mangas Granate (#800020), Cuello Azul Marino (#071A3D), Puños Azul Marino (#071A3D), Dorsal Naranja (#FF6600)
-  let bodyColor = isGoalkeeper ? '#800020' : isAway ? '#FFFFFF' : '#38BDF8'; // Granate oficial para portero local
-  let sleeveColor = bodyColor; // Mangas del mismo color principal
-  let collarColor = isAway ? '#0F172A' : '#071A3D'; // Cuello en azul marino
-  let cuffColor = isAway ? '#0F172A' : '#071A3D'; // Puños en azul marino
-  let dorsalColor = isGoalkeeper ? '#FF6600' : isAway ? '#071A3D' : '#071A3D'; // Dorsal naranja oficial para portero sobre granate
+  const bodyColor = isGoalkeeper ? kit.goalkeeperShirt : kit.outfieldShirt;
+  const sleeveColor = bodyColor;
+  const collarColor = isGoalkeeper ? (activeVariant === 'AWAY' ? '#14532D' : kit.collar) : kit.collar;
+  const cuffColor = isGoalkeeper ? (activeVariant === 'AWAY' ? '#14532D' : kit.cuff) : kit.cuff;
+  const dorsalColor = isGoalkeeper ? kit.goalkeeperNumber : kit.outfieldNumber;
+  const armbandColor = kit.captainArmband;
+  const armbandBorderColor = activeVariant === 'AWAY' ? '#0F172A' : '#FFFFFF';
 
   return (
     <TouchableOpacity 
@@ -46,7 +79,7 @@ export function TacticalJersey({
       disabled={!onPress}
       activeOpacity={0.85}
     >
-      {/* CAMISETA REAL DE FÚTBOL (CUERPO + MANGAS UNIDAS + PUÑOS AZUL MARINO + CUELLO AZUL MARINO) */}
+      {/* CAMISETA REAL DE FÚTBOL (CUERPO + MANGAS UNIDAS + PUÑOS + CUELLO) */}
       <View style={styles.jerseyWrapper}>
         {/* INDICADOR DE TARJETA AMARILLA PEQUEÑO EN LA ESQUINA SUPERIOR DERECHA */}
         {yellowCardCount === 1 && !isRedCarded && (
@@ -65,25 +98,25 @@ export function TacticalJersey({
           </View>
         )}
 
-
-        {/* MANGA IZQUIERDA CON BRAZALETE DE CAPITÁN Y PUÑO AZUL MARINO */}
+        {/* MANGA IZQUIERDA CON BRAZALETE DE CAPITÁN Y PUÑO */}
         <View style={[styles.sleeveLeft, { backgroundColor: sleeveColor }]}>
-          {isCaptain && <View style={styles.captainArmband} />}
+          {isCaptain && (
+            <View style={[styles.captainArmband, { backgroundColor: armbandColor, borderColor: armbandBorderColor }]} />
+          )}
           <View style={[styles.sleeveCuff, { backgroundColor: cuffColor }]} />
         </View>
 
-        
-        {/* MANGA DERECHA CON PUÑO AZUL MARINO */}
+        {/* MANGA DERECHA CON PUÑO */}
         <View style={[styles.sleeveRight, { backgroundColor: sleeveColor }]}>
           <View style={[styles.sleeveCuff, { backgroundColor: cuffColor }]} />
         </View>
 
         {/* CUERPO PRINCIPAL DE LA CAMISETA */}
         <View style={[styles.jerseyBody, { backgroundColor: bodyColor }]}>
-          {/* CUELLO AZUL MARINO VISIBLE */}
+          {/* CUELLO VISIBLE */}
           <View style={[styles.collarCut, { backgroundColor: collarColor }]} />
 
-          {/* DORSAL AZUL MARINO GRANDE CENTRADO (SIN NOMBRE EN LA CAMISETA) */}
+          {/* DORSAL GRANDE CENTRADO */}
           <Text style={[styles.dorsalTxt, { color: dorsalColor }]}>{dorsal}</Text>
         </View>
       </View>
@@ -124,24 +157,24 @@ const styles = StyleSheet.create({
   },
   sleeveLeft: {
     position: 'absolute',
-    top: 2,
-    left: -4,
-    width: 14,
-    height: 22,
+    top: 1,
+    left: -3,
+    width: 19,
+    height: 23,
     borderTopLeftRadius: 8,
     borderBottomLeftRadius: 6,
-    transform: [{ rotate: '-22deg' }],
+    transform: [{ rotate: '-20deg' }],
     overflow: 'hidden',
   },
   sleeveRight: {
     position: 'absolute',
-    top: 2,
-    right: -4,
-    width: 14,
-    height: 22,
+    top: 1,
+    right: -3,
+    width: 19,
+    height: 23,
     borderTopRightRadius: 8,
     borderBottomRightRadius: 6,
-    transform: [{ rotate: '22deg' }],
+    transform: [{ rotate: '20deg' }],
     overflow: 'hidden',
   },
   sleeveCuff: {
