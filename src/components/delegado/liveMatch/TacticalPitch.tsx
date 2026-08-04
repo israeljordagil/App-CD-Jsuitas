@@ -18,7 +18,6 @@ export interface PitchPlayer {
   yPercent: number; // Porcentaje Y (0-100)
 }
 
-
 const STARTERS_14231: PitchPlayer[] = [
   // DELANTERO (#9 ALEJANDRO)
   { id: '9', dorsal: '9', name: 'ALEJANDRO', role: 'DC', xPercent: 50, yPercent: 14 },
@@ -27,7 +26,6 @@ const STARTERS_14231: PitchPlayer[] = [
   { id: '11', dorsal: '11', name: 'DAVID', role: 'EI', xPercent: 18, yPercent: 34 },
   { id: '10', dorsal: '10', name: 'MARCOS', role: 'MP', isCaptain: true, xPercent: 50, yPercent: 33 },
   { id: '7', dorsal: '7', name: 'IVÁN', role: 'ED', xPercent: 82, yPercent: 34 },
-
 
   // DOBLE PIVOTE (#8 PABLO, #6 JAVI)
   { id: '8', dorsal: '8', name: 'PABLO', role: 'MC', xPercent: 35, yPercent: 52 },
@@ -68,8 +66,8 @@ export function TacticalPitch({
 
       {/* TERRENO DE JUEGO (CÉSPED VERDE REALISTA) */}
       <View style={styles.pitchField}>
-        {/* FRANJAS VERDES DEL CÉSPED */}
-        <View style={styles.stripeOverlay}>
+        {/* FRANJAS VERDES DEL CÉSPED (POINTER EVENTS NONE PARA NO BLOQUEAR CLICK/TOUCH) */}
+        <View style={styles.stripeOverlay} pointerEvents="none">
           <View style={styles.stripeItem} />
           <View style={[styles.stripeItem, { backgroundColor: '#15803D' }]} />
           <View style={styles.stripeItem} />
@@ -77,15 +75,15 @@ export function TacticalPitch({
           <View style={styles.stripeItem} />
         </View>
 
-        {/* LÍNEAS BLANCAS DEL CAMPO */}
-        <View style={styles.pitchBoundary} />
-        <View style={styles.centerLine} />
-        <View style={styles.centerCircle} />
-        <View style={styles.centerDot} />
+        {/* LÍNEAS BLANCAS DEL CAMPO (POINTER EVENTS NONE) */}
+        <View style={styles.pitchBoundary} pointerEvents="none" />
+        <View style={styles.centerLine} pointerEvents="none" />
+        <View style={styles.centerCircle} pointerEvents="none" />
+        <View style={styles.centerDot} pointerEvents="none" />
 
-        {/* ÁREAS Y PORTERÍAS */}
-        <View style={styles.topGoalArea} />
-        <View style={styles.bottomGoalArea} />
+        {/* ÁREAS Y PORTERÍAS (POINTER EVENTS NONE) */}
+        <View style={styles.topGoalArea} pointerEvents="none" />
+        <View style={styles.bottomGoalArea} pointerEvents="none" />
 
         {/* JUGADORES TITULARES CON CAMISETAS 3D EN CADA POSICIÓN */}
         {starters.map((player) => (
@@ -107,14 +105,12 @@ export function TacticalPitch({
               timeText={player.timeText}
               onPress={() => onPlayerPress && onPlayerPress(player)}
             />
-
           </View>
         ))}
       </View>
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
@@ -247,6 +243,6 @@ const styles = StyleSheet.create({
     marginTop: -35,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10,
+    zIndex: 50,
   },
 });

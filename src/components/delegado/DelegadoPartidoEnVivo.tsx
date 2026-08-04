@@ -153,16 +153,72 @@ const saveTimerSnapshot = (snapshot: TimerSnapshot) => {
   }
 };
 
+// MIGRACIÓN ROBUSTA DE SNAPSHOTS ANTERIORES PARA PREVENIR ERRORES FATALES DE PROPIEDADES UNDEFINED
 const loadTimerSnapshot = (): TimerSnapshot | null => {
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
       const jsonVal = window.localStorage.getItem(TIMER_SNAPSHOT_KEY);
-      if (jsonVal) {
-        return JSON.parse(jsonVal) as TimerSnapshot;
+      if (!jsonVal) return null;
+
+      const parsed = JSON.parse(jsonVal);
+      if (!parsed || typeof parsed !== 'object') return null;
+
+      // 1. Snapshot con arquitectura nueva (contiene matchPhase explícito)
+      if (parsed.matchPhase && typeof parsed.matchPhase === 'string') {
+        return {
+          matchId: parsed.matchId || 'cadete-b-live-1',
+          category: parsed.category || 'Cadete',
+          matchPhase: parsed.matchPhase as MatchPhase,
+          currentPeriod: parsed.currentPeriod === 2 ? 2 : 1,
+          regulationAccumulatedSeconds: typeof parsed.regulationAccumulatedSeconds === 'number' ? parsed.regulationAccumulatedSeconds : 0,
+          runningSinceTimestamp: typeof parsed.runningSinceTimestamp === 'number' ? parsed.runningSinceTimestamp : null,
+          isRunning: Boolean(parsed.isRunning),
+          addedTimeSeconds: typeof parsed.addedTimeSeconds === 'number' ? parsed.addedTimeSeconds : 0,
+          addedTimeRunningSinceTimestamp: typeof parsed.addedTimeRunningSinceTimestamp === 'number' ? parsed.addedTimeRunningSinceTimestamp : null,
+          halfTimeStartedAtTimestamp: typeof parsed.halfTimeStartedAtTimestamp === 'number' ? parsed.halfTimeStartedAtTimestamp : null,
+          configuredRestSeconds: typeof parsed.configuredRestSeconds === 'number' ? parsed.configuredRestSeconds : 600,
+          savedAt: typeof parsed.savedAt === 'number' ? parsed.savedAt : Date.now(),
+        };
+      }
+
+      // 2. Migración transparente de Snapshot con arquitectura antigua (contiene status: 'IN_PROGRESS' | 'PAUSED' | 'BEFORE_START' | 'FINISHED')
+      if (parsed.status && typeof parsed.status === 'string') {
+        const oldStatus = parsed.status;
+        const oldSecs = typeof parsed.accumulatedSeconds === 'number' ? parsed.accumulatedSeconds : 0;
+        const oldRunningTs = typeof parsed.runningSinceTimestamp === 'number' ? parsed.runningSinceTimestamp : null;
+
+        let migratedPhase: MatchPhase = 'BEFORE_START';
+        if (oldStatus === 'IN_PROGRESS') {
+          migratedPhase = 'FIRST_HALF';
+        } else if (oldStatus === 'PAUSED') {
+          migratedPhase = 'PAUSED';
+        } else if (oldStatus === 'FINISHED') {
+          migratedPhase = 'FINISHED';
+        }
+
+        return {
+          matchId: parsed.matchId || 'cadete-b-live-1',
+          category: 'Cadete',
+          matchPhase: migratedPhase,
+          currentPeriod: 1,
+          regulationAccumulatedSeconds: oldSecs,
+          runningSinceTimestamp: oldRunningTs,
+          isRunning: oldRunningTs !== null,
+          addedTimeSeconds: 0,
+          addedTimeRunningSinceTimestamp: null,
+          halfTimeStartedAtTimestamp: null,
+          configuredRestSeconds: 600,
+          savedAt: parsed.savedAt || Date.now(),
+        };
       }
     }
   } catch (e) {
-    // Silent catch
+    // Si la estructura guardada estuviera corrupta, limpiar de forma segura sin provocar crash
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem(TIMER_SNAPSHOT_KEY);
+      }
+    } catch (_) {}
   }
   return null;
 };
@@ -199,13 +255,13 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
   const { width } = useWindowDimensions();
   const isDesktop = width >= 900;
 
-  // DEDUCCIÓN DINÁMICA DE LA CONFIGURACIÓN DE TIEMPO SEGÚN LA CATEGORÍA DEL ENCUENTRO
+  // DEDUCCIÓN DINÁMICA DE LA CONFIGURACIÓN DE TIEMPO SEGÚN LA CATEGORÍA DEL ENCUENTRO CON FALLBACK SEGURO
   const matchCategory = category && CATEGORY_TIME_CONFIGS[category] ? category : 'Cadete';
-  const timeConfig = CATEGORY_TIME_CONFIGS[matchCategory];
+  const timeConfig = CATEGORY_TIME_CONFIGS[matchCategory] || CATEGORY_TIME_CONFIGS['Cadete'];
 
-  const firstHalfLimitSecs = timeConfig.halfDurationMinutes * 60; // Cadete: 40 min = 2400 s
-  const secondHalfLimitSecs = timeConfig.halfDurationMinutes * 2 * 60; // Cadete: 80 min = 4800 s
-  const restDurationSecs = timeConfig.restDurationMinutes * 60; // Cadete: 10 min = 600 s
+  const firstHalfLimitSecs = timeConfig.halfDurationMinutes * 60;
+  const secondHalfLimitSecs = timeConfig.halfDurationMinutes * 2 * 60;
+  const restDurationSecs = timeConfig.restDurationMinutes * 60;
 
   // =========================================================================
   // 1. MÁQUINA DE ESTADOS Y CRONÓMETRO ABSOLUTO BASADO EN Date.now()
@@ -254,30 +310,30 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
     return Math.max(0, restDurationSecs - elapsed);
   }, [restDurationSecs]);
 
-  // RECUPERACIÓN AUTOMÁTICA DESDE SNAPSHOT AL MONTAR
+  // RECUPERACIÓN AUTOMÁTICA DESDE SNAPSHOT AL MONTAR CON MIGRACIÓN SEGURA
   useEffect(() => {
     const snapshot = loadTimerSnapshot();
     if (snapshot) {
-      setMatchPhase(snapshot.matchPhase);
-      setCurrentPeriod(snapshot.currentPeriod);
-      accumulatedMatchSecondsRef.current = snapshot.regulationAccumulatedSeconds;
-      stintStartTimestampRef.current = snapshot.runningSinceTimestamp;
-      accumulatedAddedTimeSecondsRef.current = snapshot.addedTimeSeconds;
-      addedTimeStartTimestampRef.current = snapshot.addedTimeRunningSinceTimestamp;
-      halfTimeStartedAtTimestampRef.current = snapshot.halfTimeStartedAtTimestamp;
+      setMatchPhase(snapshot.matchPhase || 'BEFORE_START');
+      setCurrentPeriod(snapshot.currentPeriod === 2 ? 2 : 1);
+      accumulatedMatchSecondsRef.current = snapshot.regulationAccumulatedSeconds || 0;
+      stintStartTimestampRef.current = snapshot.runningSinceTimestamp || null;
+      accumulatedAddedTimeSecondsRef.current = snapshot.addedTimeSeconds || 0;
+      addedTimeStartTimestampRef.current = snapshot.addedTimeRunningSinceTimestamp || null;
+      halfTimeStartedAtTimestampRef.current = snapshot.halfTimeStartedAtTimestamp || null;
 
       const now = Date.now();
-      const maxLimit = snapshot.currentPeriod === 1 ? firstHalfLimitSecs : secondHalfLimitSecs;
+      const maxLimit = snapshot.currentPeriod === 2 ? secondHalfLimitSecs : firstHalfLimitSecs;
 
       if (snapshot.matchPhase === 'FIRST_HALF' || snapshot.matchPhase === 'SECOND_HALF') {
         const reg = Math.min(
-          snapshot.regulationAccumulatedSeconds + (snapshot.runningSinceTimestamp ? Math.floor((now - snapshot.runningSinceTimestamp) / 1000) : 0),
+          (snapshot.regulationAccumulatedSeconds || 0) + (snapshot.runningSinceTimestamp ? Math.floor((now - snapshot.runningSinceTimestamp) / 1000) : 0),
           maxLimit
         );
         setMatchSeconds(reg);
       } else if (snapshot.matchPhase === 'FIRST_HALF_ADDED' || snapshot.matchPhase === 'SECOND_HALF_ADDED') {
         setMatchSeconds(maxLimit);
-        const add = snapshot.addedTimeSeconds + (snapshot.addedTimeRunningSinceTimestamp ? Math.floor((now - snapshot.addedTimeRunningSinceTimestamp) / 1000) : 0);
+        const add = (snapshot.addedTimeSeconds || 0) + (snapshot.addedTimeRunningSinceTimestamp ? Math.floor((now - snapshot.addedTimeRunningSinceTimestamp) / 1000) : 0);
         setAddedTimeSeconds(add);
       } else if (snapshot.matchPhase === 'HALF_TIME') {
         setMatchSeconds(firstHalfLimitSecs);
@@ -416,8 +472,9 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
 
   // FORMATO DE TIEMPOS
   const formatTimer = (totalSecs: number) => {
-    const mins = Math.floor(totalSecs / 60);
-    const secs = totalSecs % 60;
+    const safeSecs = Number.isFinite(totalSecs) && totalSecs >= 0 ? totalSecs : 0;
+    const mins = Math.floor(safeSecs / 60);
+    const secs = safeSecs % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
@@ -440,11 +497,11 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
     const pState = playerMatchStates[id];
     if (pState) {
       return {
-        yellowCards: pState.yellowCards,
-        isRedCarded: pState.isRedCarded,
-        isInjured: pState.isInjured,
-        goals: pState.goals.length,
-        assists: pState.assistsCount,
+        yellowCards: pState.yellowCards || 0,
+        isRedCarded: Boolean(pState.isRedCarded),
+        isInjured: Boolean(pState.isInjured),
+        goals: pState.goals ? pState.goals.length : 0,
+        assists: pState.assistsCount || 0,
       };
     }
     return (playerStats[id] as PlayerStats) || { yellowCards: 0, isRedCarded: false, isInjured: false, goals: 0, assists: 0 };
@@ -665,6 +722,10 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
   // GESTIÓN DE ACCIONES DE JUGADORES
   const handleOpenPlayerActionPanel = (player: PitchPlayer) => {
     if (isSuspended || matchPhase === 'FINISHED') return;
+    const pId = player.id || player.dorsal;
+    const stats = getPStats(pId);
+    if (stats.isRedCarded) return;
+
     setPlayerAction({
       visible: true,
       player,
@@ -1011,7 +1072,7 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
     }
   };
 
-  // ETIQUETA E INFO DE BADGE DEL ENCUENTRO
+  // ETIQUETA E INFO DE BADGE DEL ENCUENTRO CON FALLBACK SEGURO
   const getMatchBadgeInfo = () => {
     switch (matchPhase) {
       case 'BEFORE_START':
@@ -1030,6 +1091,8 @@ export function DelegadoPartidoEnVivo({ category = 'Cadete' }: DelegadoPartidoEn
         return { label: 'PARTIDO FINALIZADO', color: colors.skyGlow };
       case 'PAUSED':
         return { label: 'PARTIDO PAUSADO', color: colors.yellowCard };
+      default:
+        return { label: 'SIN COMENZAR', color: colors.textMuted };
     }
   };
 
