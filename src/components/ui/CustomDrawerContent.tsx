@@ -66,6 +66,7 @@ const DELEGATE_MENU_ITEMS = [
   { label: 'Inicio', route: 'index', icon: '🏠' },
   { label: 'Preparación del partido', route: 'delegado/preparacion', icon: '📋' },
   { label: 'Partido en Vivo', route: 'delegado/partido-en-vivo', icon: '🏟️' },
+  { label: 'Acta del Partido', route: 'delegado/acta', icon: '📝' },
   { label: 'Mi equipo', route: 'delegado/equipo', icon: '👥' },
   { label: 'Documentación', route: 'delegado/documentacion', icon: '📄' },
   { label: 'Mi temporada', route: 'delegado/temporada', icon: '📅' },

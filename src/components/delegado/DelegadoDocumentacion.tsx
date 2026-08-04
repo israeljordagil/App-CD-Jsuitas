@@ -45,7 +45,16 @@ export function DelegadoDocumentacion() {
 
       <View style={styles.grid}>
         {DOC_SECTIONS.map((sec) => (
-          <TouchableOpacity key={sec.id} style={styles.docCard} activeOpacity={0.88}>
+          <TouchableOpacity 
+            key={sec.id} 
+            style={styles.docCard} 
+            activeOpacity={0.88}
+            onPress={() => {
+              if (sec.id === 'actas') {
+                router.push('/delegado/acta' as any);
+              }
+            }}
+          >
             <View style={[styles.iconBox, { backgroundColor: `${sec.color}20` }]}>
               <Ionicons name={sec.icon as any} size={28} color={sec.color} />
             </View>

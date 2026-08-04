@@ -15,7 +15,7 @@ const ROLE_ROUTES: Record<string, string[]> = {
   'JUGADOR': ['/', '/inicio', '/jugadores', '/partidos', '/convocatorias', '/estadisticas', '/informes', '/logros', '/comunicacion', '/instalaciones', '/configuracion'],
   'FAMILIA': ['/', '/inicio', '/jugadores', '/partidos', '/convocatorias', '/entrenamientos', '/live_match', '/torneos', '/comunicacion', '/avisos', '/instalaciones', '/configuracion'],
   'ENTRENADOR': ['/', '/inicio', '/plantillas', '/partidos', '/convocatorias', '/entrenamientos', '/tactica', '/live_match', '/estadisticas', '/informes', '/comunicacion', '/logros', '/configuracion'],
-  'DELEGADO': ['/', '/inicio', '/delegado', '/delegado/temporada', '/delegado/documentacion', '/delegado/equipo', '/delegado/preparacion', '/delegado/partido-en-vivo', '/comunicacion', '/configuracion'],
+  'DELEGADO': ['/', '/inicio', '/delegado', '/delegado/temporada', '/delegado/documentacion', '/delegado/equipo', '/delegado/preparacion', '/delegado/partido-en-vivo', '/delegado/acta', '/comunicacion', '/configuracion'],
   'COORDINADOR': ['/', '/inicio', '/partidos', '/equipos', '/jugadores', '/entrenadores', '/plantillas', '/entrenamientos', '/informes', '/estadisticas', '/clasificaciones', '/familias', '/comunicacion', '/arbitros', '/vestuarios', '/instalaciones', '/material', '/configuracion']
 };
 

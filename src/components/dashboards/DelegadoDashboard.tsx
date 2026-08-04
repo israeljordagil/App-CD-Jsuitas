@@ -294,18 +294,19 @@ export function DelegadoDashboard() {
 
       <View style={styles.recentMatchesBox}>
         {MOCK_RECENT_MATCHES.map((match) => (
-          <View key={match.id} style={styles.recentMatchRow}>
+          <TouchableOpacity key={match.id} style={styles.recentMatchRow} onPress={() => router.push('/delegado/acta' as any)} activeOpacity={0.85}>
             <View style={styles.recentRoundBadge}>
               <Text style={styles.recentRoundTxt}>{match.round}</Text>
             </View>
             <View style={styles.recentRivalCol}>
               <Text style={styles.recentRivalTxt}>vs {match.rival}</Text>
-              <Text style={styles.recentDateTxt}>{match.date}</Text>
+              <Text style={styles.recentDateTxt}>{match.date} · Ver Acta</Text>
             </View>
             <View style={[styles.recentScoreBadge, match.isWin ? styles.scoreWin : styles.scoreDraw]}>
               <Text style={styles.recentScoreTxt}>{match.score}</Text>
             </View>
-          </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </TouchableOpacity>
         ))}
       </View>
     </ScrollView>
