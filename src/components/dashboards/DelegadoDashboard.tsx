@@ -50,8 +50,8 @@ const colors = {
 
 // Datos controlados de demostración centralizados
 const MOCK_NEXT_MATCH = {
-  teamName: 'Cadete B',
-  rivalName: 'Patacona C',
+  teamName: 'Alevín A',
+  rivalName: 'Patacona Alevín A',
   dateText: 'Sábado, 8 de Agosto de 2026',
   timeText: '10:30 hs',
   facility: 'Campo Municipal San Gregorio',

@@ -53,9 +53,13 @@ export function DelegadoPreparacionPartido() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 900;
 
-  // 12. COMPROBACIONES MANUALES (ÚNICOS 2 CONTROLES INTERACTIVOS)
+  // 12. COMPROBACIONES MANUALES (MATERIALES Y DOCUMENTACIÓN)
   const [checkBotiquin, setCheckBotiquin] = useState(false);
   const [checkBalones, setCheckBalones] = useState(false);
+  const [checkEntrenadorPrincipal, setCheckEntrenadorPrincipal] = useState(false);
+  const [checkSegundoEntrenador, setCheckSegundoEntrenador] = useState(false);
+  const [checkDelegado, setCheckDelegado] = useState(false);
+  const [checkDelegadoCampo, setCheckDelegadoCampo] = useState(false);
 
   const isReadyToStart = checkBotiquin && checkBalones;
 
@@ -265,10 +269,12 @@ export function DelegadoPreparacionPartido() {
               <Text style={[styles.cardTitleTxt, { color: colors.emeraldGlow }]}>COMPROBACIONES FINALES</Text>
             </View>
             <Text style={styles.checklistNoticeTxt}>
-              Marca únicamente los dos elementos materiales preparados para habilitar el partido:
+              Verifica el equipamiento material y los miembros del cuerpo técnico en la lista previa:
             </Text>
 
             <View style={styles.checklistContainer}>
+              <Text style={styles.checkSubHeaderTxt}>EQUIPAMIENTO Y MATERIAL</Text>
+
               {/* COMPROBACIÓN 1: BOTIQUÍN PREPARADO */}
               <TouchableOpacity 
                 style={[styles.checkTileBtn, checkBotiquin && styles.checkTileBtnActive]}
@@ -300,6 +306,77 @@ export function DelegadoPreparacionPartido() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.checkTileTitle}>Balones preparados</Text>
                   <Text style={styles.checkTileDesc}>Balones de calentamiento y juego hinchados</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* BLOQUE NUEVO: DOCUMENTACIÓN DEL ACTA */}
+              <Text style={[styles.checkSubHeaderTxt, { marginTop: 14 }]}>DOCUMENTACIÓN DEL ACTA</Text>
+
+              {/* COMPROBACIÓN 3: ENTRENADOR PRINCIPAL */}
+              <TouchableOpacity 
+                style={[styles.checkTileBtn, checkEntrenadorPrincipal && styles.checkTileBtnActive]}
+                onPress={() => setCheckEntrenadorPrincipal(!checkEntrenadorPrincipal)}
+                activeOpacity={0.85}
+              >
+                <Ionicons 
+                  name={checkEntrenadorPrincipal ? "checkbox" : "square-outline"} 
+                  size={26} 
+                  color={checkEntrenadorPrincipal ? colors.emeraldGlow : colors.textMuted} 
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.checkTileTitle}>Entrenador principal incluido en el acta</Text>
+                  <Text style={styles.checkTileDesc}>Acreditación y licencia del Míster verificada</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* COMPROBACIÓN 4: SEGUNDO ENTRENADOR */}
+              <TouchableOpacity 
+                style={[styles.checkTileBtn, checkSegundoEntrenador && styles.checkTileBtnActive]}
+                onPress={() => setCheckSegundoEntrenador(!checkSegundoEntrenador)}
+                activeOpacity={0.85}
+              >
+                <Ionicons 
+                  name={checkSegundoEntrenador ? "checkbox" : "square-outline"} 
+                  size={26} 
+                  color={checkSegundoEntrenador ? colors.emeraldGlow : colors.textMuted} 
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.checkTileTitle}>Segundo entrenador incluido en el acta (si corresponde)</Text>
+                  <Text style={styles.checkTileDesc}>Asistente técnico o preparador físico registrado</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* COMPROBACIÓN 5: DELEGADO */}
+              <TouchableOpacity 
+                style={[styles.checkTileBtn, checkDelegado && styles.checkTileBtnActive]}
+                onPress={() => setCheckDelegado(!checkDelegado)}
+                activeOpacity={0.85}
+              >
+                <Ionicons 
+                  name={checkDelegado ? "checkbox" : "square-outline"} 
+                  size={26} 
+                  color={checkDelegado ? colors.emeraldGlow : colors.textMuted} 
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.checkTileTitle}>Delegado incluido en el acta</Text>
+                  <Text style={styles.checkTileDesc}>Ficha del Delegado de equipo confirmada</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* COMPROBACIÓN 6: DELEGADO DE CAMPO */}
+              <TouchableOpacity 
+                style={[styles.checkTileBtn, checkDelegadoCampo && styles.checkTileBtnActive]}
+                onPress={() => setCheckDelegadoCampo(!checkDelegadoCampo)}
+                activeOpacity={0.85}
+              >
+                <Ionicons 
+                  name={checkDelegadoCampo ? "checkbox" : "square-outline"} 
+                  size={26} 
+                  color={checkDelegadoCampo ? colors.emeraldGlow : colors.textMuted} 
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.checkTileTitle}>Delegado de campo incluido en el acta</Text>
+                  <Text style={styles.checkTileDesc}>Responsable de instalaciones y campo asignado</Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -625,6 +702,14 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     marginBottom: 14,
+  },
+  checkSubHeaderTxt: {
+    color: colors.skyGlow,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    marginTop: 4,
+    marginBottom: 2,
   },
   checklistContainer: {
     gap: 10,

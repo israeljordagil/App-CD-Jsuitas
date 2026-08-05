@@ -18,6 +18,7 @@ import {
   recordYellowCard,
   recordInjury,
 } from '../../utils/liveMatchState';
+import { getMatchConfigForTeam } from '../../utils/teamConfig';
 
 const colors = {
   navyDark: '#020814',
@@ -58,9 +59,14 @@ const INITIAL_BENCH: PitchPlayer[] = [
   { id: '17', dorsal: '17', name: 'ÁLEX', role: 'MC', xPercent: 0, yPercent: 0 },
 ];
 
-const buildInitialPlayerStates = (): Record<string, PlayerMatchState> => {
+const buildInitialPlayerStates = (
+  starters: PitchPlayer[] = [],
+  bench: PitchPlayer[] = []
+): Record<string, PlayerMatchState> => {
+  const safeStarters = Array.isArray(starters) ? starters : [];
+  const safeBench = Array.isArray(bench) ? bench : [];
   const map: Record<string, PlayerMatchState> = {};
-  INITIAL_STARTERS_14231.forEach((p) => {
+  safeStarters.forEach((p) => {
     const id = p.id || p.dorsal;
     map[id] = createInitialPlayerState({
       playerId: id,
@@ -73,7 +79,7 @@ const buildInitialPlayerStates = (): Record<string, PlayerMatchState> => {
       yPercent: p.yPercent,
     });
   });
-  INITIAL_BENCH.forEach((b) => {
+  safeBench.forEach((b) => {
     const id = b.id || b.dorsal;
     map[id] = createInitialPlayerState({
       playerId: id,
@@ -269,25 +275,26 @@ export interface DelegadoPartidoEnVivoProps {
 }
 
 export function DelegadoPartidoEnVivo({ 
-  category = 'Cadete',
-  teamName = 'Cadete B',
-  rivalName = 'Patacona C',
+  category = 'Alevín',
+  teamName = 'Alevín A',
+  rivalName = 'Patacona Alevín A',
   matchCondition = 'LOCAL',
+  matchId = 'alevin-a-test-01',
 }: DelegadoPartidoEnVivoProps) {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 900;
 
-  const matchCategory = category && CATEGORY_TIME_CONFIGS[category] ? category : 'Infantil';
-  const timeConfig = CATEGORY_TIME_CONFIGS[matchCategory] || CATEGORY_TIME_CONFIGS['Infantil'];
+  const teamConfig = getMatchConfigForTeam(teamName);
+  const matchCategory = teamConfig.category;
 
   const isAwayMatch = matchCondition === 'VISITANTE';
   const homeTeamLabel = isAwayMatch ? rivalName : `CD Jesuitas (${teamName})`;
   const awayTeamLabel = isAwayMatch ? `CD Jesuitas (${teamName})` : rivalName;
 
-  const firstHalfLimitSecs = timeConfig.halfDurationMinutes * 60;
-  const secondHalfLimitSecs = timeConfig.halfDurationMinutes * 2 * 60;
-  const restDurationSecs = timeConfig.restDurationMinutes * 60;
+  const firstHalfLimitSecs = teamConfig.halfDurationMinutes * 60;
+  const secondHalfLimitSecs = teamConfig.halfDurationMinutes * 2 * 60;
+  const restDurationSecs = teamConfig.restDurationMinutes * 60;
 
   // 1. CRONÓMETRO ABSOLUTO BASADO EN Date.now()
   const [matchPhase, setMatchPhase] = useState<MatchPhase>('BEFORE_START');
@@ -368,14 +375,17 @@ export function DelegadoPartidoEnVivo({
   // 2. MARCADOR Y REGLAMENTO
   const [homeScore, setHomeScore] = useState(0);
   const [awayScore, setAwayScore] = useState(0);
-  const [systemName, setSystemName] = useState('1-4-2-3-1');
+  const [systemName, setSystemName] = useState(teamConfig.defaultTactic);
   const [isSuspended, setIsSuspended] = useState(false);
 
   // 3. JUGADORES Y ESTADÍSTICAS
-  const [pitchPlayers, setPitchPlayers] = useState<PitchPlayer[]>(INITIAL_STARTERS_14231);
-  const [benchPlayers, setBenchPlayers] = useState<PitchPlayer[]>(INITIAL_BENCH);
+  const activeBench = INITIAL_BENCH.slice(0, teamConfig.benchPlayersCount);
+  const [pitchPlayers, setPitchPlayers] = useState<PitchPlayer[]>(teamConfig.defaultStarters);
+  const [benchPlayers, setBenchPlayers] = useState<PitchPlayer[]>(activeBench);
   const [playerStats, setPlayerStats] = useState<Record<string, PlayerStats>>({});
-  const [playerMatchStates, setPlayerMatchStates] = useState<Record<string, PlayerMatchState>>(buildInitialPlayerStates);
+  const [playerMatchStates, setPlayerMatchStates] = useState<Record<string, PlayerMatchState>>(() =>
+    buildInitialPlayerStates(teamConfig.defaultStarters, activeBench)
+  );
 
   // 4. TIMELINE DE EVENTOS
   const [events, setEvents] = useState<any[]>([]);
@@ -492,11 +502,11 @@ export function DelegadoPartidoEnVivo({
   const getMinuteText = () => {
     if (matchPhase === 'FIRST_HALF_ADDED') {
       const addedMins = Math.floor(addedTimeSeconds / 60);
-      return `${timeConfig.halfDurationMinutes}' (+${addedMins}' añ.)`;
+      return `${teamConfig.halfDurationMinutes}' (+${addedMins}' añ.)`;
     }
     if (matchPhase === 'SECOND_HALF_ADDED') {
       const addedMins = Math.floor(addedTimeSeconds / 60);
-      return `${timeConfig.halfDurationMinutes * 2}' (+${addedMins}' añ.)`;
+      return `${teamConfig.halfDurationMinutes * 2}' (+${addedMins}' añ.)`;
     }
     if (matchPhase === 'HALF_TIME') {
       return 'Descanso';
@@ -611,7 +621,7 @@ export function DelegadoPartidoEnVivo({
         minute: minTxt,
         type: 'DESCANSO',
         title: 'Final de la 1ª Parte · Descanso',
-        desc: `Tiempo de descanso configurado: ${timeConfig.restDurationMinutes} min`,
+        desc: `Tiempo de descanso configurado: ${teamConfig.restDurationMinutes} min`,
         icon: 'pause',
         color: colors.yellowCard,
       },
@@ -673,10 +683,10 @@ export function DelegadoPartidoEnVivo({
     setEvents(prev => [
       {
         id: `ev-${Date.now()}`,
-        minute: `${timeConfig.halfDurationMinutes}'00"`,
+        minute: `${teamConfig.halfDurationMinutes}'00"`,
         type: 'SEGUNDA_PARTE',
         title: 'Inicio de la Segunda Parte',
-        desc: `Segunda parte en juego · Cronómetro desde ${timeConfig.halfDurationMinutes}:00`,
+        desc: `Segunda parte en juego · Cronómetro desde ${teamConfig.halfDurationMinutes}:00`,
         icon: 'play-forward',
         color: colors.skyPrimary,
       },
@@ -826,12 +836,12 @@ export function DelegadoPartidoEnVivo({
     setRestSeconds(restDurationSecs);
     setHomeScore(0);
     setAwayScore(0);
-    setSystemName('1-4-2-3-1');
+    setSystemName(teamConfig.defaultTactic);
     setIsSuspended(false);
-    setPitchPlayers(INITIAL_STARTERS_14231);
-    setBenchPlayers(INITIAL_BENCH);
+    setPitchPlayers(teamConfig.defaultStarters);
+    setBenchPlayers(activeBench);
     setPlayerStats({});
-    setPlayerMatchStates(buildInitialPlayerStates());
+    setPlayerMatchStates(buildInitialPlayerStates(teamConfig.defaultStarters, activeBench));
     setEvents([]);
     setPlayerAction(initialPlayerActionFlow);
     setShowGeneralEventModal(false);
@@ -1346,7 +1356,7 @@ export function DelegadoPartidoEnVivo({
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={styles.titleTxt}>PARTIDO EN VIVO</Text>
-            <Text style={styles.subtitleTxt}>Liga Preferente {matchCategory} · {homeTeamLabel} vs {awayTeamLabel} ({timeConfig.halfDurationMinutes} min/parte)</Text>
+            <Text style={styles.subtitleTxt}>Liga Preferente {matchCategory} · {homeTeamLabel} vs {awayTeamLabel} ({teamConfig.halfDurationMinutes} min/parte)</Text>
           </View>
           <TouchableOpacity style={styles.resetDemoBtn} onPress={resetDemo}>
             <Ionicons name="refresh" size={14} color="#94A3B8" />
@@ -1626,7 +1636,7 @@ export function DelegadoPartidoEnVivo({
               <Ionicons name="time-outline" size={32} color={colors.yellowCard} />
               <Text style={styles.confirmBoxTitle}>Descanso no finalizado</Text>
               <Text style={styles.confirmBoxDesc}>
-                El tiempo de descanso configurado para {matchCategory} ({timeConfig.restDurationMinutes} min) aún no ha terminado (quedan {formatTimer(restSeconds)}). ¿Deseas iniciar la segunda parte ahora?
+                El tiempo de descanso configurado para {matchCategory} ({teamConfig.restDurationMinutes} min) aún no ha terminado (quedan {formatTimer(restSeconds)}). ¿Deseas iniciar la segunda parte ahora?
               </Text>
               <View style={styles.confirmBtnRow}>
                 <TouchableOpacity style={styles.confirmBtnCancel} onPress={() => setShowEarlySecondHalfConfirmModal(false)}>
@@ -1691,7 +1701,7 @@ export function DelegadoPartidoEnVivo({
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.generalOptionTitle, { color: colors.yellowCard }]}>1. Descanso</Text>
-                      <Text style={styles.generalOptionSub}>Finalizar parte e iniciar cuenta atrás de descanso ({timeConfig.restDurationMinutes} min)</Text>
+                      <Text style={styles.generalOptionSub}>Finalizar parte e iniciar cuenta atrás de descanso ({teamConfig.restDurationMinutes} min)</Text>
                     </View>
                   </TouchableOpacity>
 
@@ -1793,7 +1803,7 @@ export function DelegadoPartidoEnVivo({
                   <Text style={styles.big3dIcon}>🥤</Text>
                   <Text style={styles.confirmActionTitle}>¿Confirmar el inicio del descanso?</Text>
                   <Text style={styles.confirmActionDesc}>
-                    Se dará por finalizada la 1ª parte y comenzará la cuenta atrás de descanso configurada para {matchCategory} ({timeConfig.restDurationMinutes} min).
+                    Se dará por finalizada la 1ª parte y comenzará la cuenta atrás de descanso configurada para {matchCategory} ({teamConfig.restDurationMinutes} min).
                   </Text>
                   <View style={styles.confirmActionBtnRow}>
                     <TouchableOpacity style={styles.confirmBtnCancel} onPress={() => setGeneralEventStep('MENU')}>

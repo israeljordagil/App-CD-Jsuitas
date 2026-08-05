@@ -15,6 +15,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useDemoNavigation } from '../../context/DemoNavigationContext';
 import { useSport } from '../../context/SportContext';
 import { useDelegadoTheme } from '../../context/DelegadoThemeContext';
+import { getMatchConfigForTeam } from '../../utils/teamConfig';
 
 export function DelegadoAjustesView() {
   const router = useRouter();
@@ -22,6 +23,9 @@ export function DelegadoAjustesView() {
   const { resetDemoFlow } = useDemoNavigation();
   const { setSport } = useSport();
   const { themePreference, setThemePreference, colors } = useDelegadoTheme();
+
+  const assignedTeamName = 'Alevín A';
+  const teamConfig = getMatchConfigForTeam(assignedTeamName);
 
   // 1. Notificaciones state
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -75,12 +79,12 @@ export function DelegadoAjustesView() {
 
             <View style={dynamicStyles.readOnlyItem}>
               <Text style={dynamicStyles.readOnlyLabel}>Equipo asignado:</Text>
-              <Text style={dynamicStyles.readOnlyVal}>Cadete B</Text>
+              <Text style={dynamicStyles.readOnlyVal}>{teamConfig.teamName}</Text>
             </View>
 
             <View style={dynamicStyles.readOnlyItem}>
-              <Text style={dynamicStyles.readOnlyLabel}>Categoría:</Text>
-              <Text style={dynamicStyles.readOnlyVal}>Cadete Masculino (Fútbol 11)</Text>
+              <Text style={dynamicStyles.readOnlyLabel}>Categoría y Formato:</Text>
+              <Text style={dynamicStyles.readOnlyVal}>{teamConfig.category} ({teamConfig.formatLabel})</Text>
             </View>
 
             <View style={dynamicStyles.readOnlyItem}>
