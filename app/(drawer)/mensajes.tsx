@@ -1,18 +1,24 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useAuth } from '../../src/context/AuthContext';
+import { useDemoNavigation } from '../../src/context/DemoNavigationContext';
 import { FamiliaMensajesView } from '../../src/components/views/FamiliaMensajesView';
+import { DelegadoComunicacionesView } from '../../src/components/views/DelegadoComunicacionesView';
 import { PremiumHeader } from '../../src/components/ui/PremiumHeader';
 
 export default function MensajesDrawerScreen() {
   const { user } = useAuth();
-  const currentRole = user?.role || 'FAMILIA';
+  const { selectedDemoProfile } = useDemoNavigation();
 
-  if (currentRole === 'FAMILIA') {
+  const currentRole = selectedDemoProfile || user?.role || 'FAMILIA';
+  const normalizedRole = String(currentRole).toUpperCase();
+  const isDelegado = normalizedRole === 'DELEGADO';
+
+  if (isDelegado) {
     return (
       <View style={styles.container}>
-        <PremiumHeader title="COMUNICACIONES" subtitle="MENSAJES Y NOTIFICACIONES" />
-        <FamiliaMensajesView />
+        <PremiumHeader title="COMUNICACIONES" subtitle="CANALES Y DIRECCIÓN" />
+        <DelegadoComunicacionesView />
       </View>
     );
   }
