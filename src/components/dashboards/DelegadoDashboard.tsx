@@ -49,8 +49,8 @@ const colors = {
 
 // Datos controlados de demostración centralizados
 const MOCK_NEXT_MATCH = {
-  teamName: 'Infantil A',
-  rivalName: 'Torrent CF "A"',
+  teamName: 'Cadete B',
+  rivalName: 'Patacona C',
   dateText: 'Sábado, 8 de Agosto de 2026',
   timeText: '10:30 hs',
   facility: 'Campo Municipal San Gregorio',
@@ -85,12 +85,59 @@ export function DelegadoDashboard() {
   const sportName = getSportLabel(sport);
   const delegateName = user?.full_name || 'Carlos Ruiz';
 
+  const [pendingActaMatch, setPendingActaMatch] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const stored = window.localStorage.getItem('@cd_jesuitas_pending_acta_match');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.pendingActa) {
+            setPendingActaMatch(parsed);
+          }
+        }
+      } catch (_) {}
+    }
+  }, []);
+
   return (
     <ScrollView 
       style={styles.container} 
       contentContainerStyle={[styles.scrollContent, isDesktop && styles.scrollContentDesktop]}
       showsVerticalScrollIndicator={false}
     >
+      {/* BANNER DESTACADO SI HAY UN ACTA PENDIENTE DE GENERAR TRAS PARTIDO FINALIZADO */}
+      {pendingActaMatch && (
+        <View style={styles.pendingActaCard}>
+          <View style={styles.pendingActaHeader}>
+            <View style={styles.pendingActaIconCircle}>
+              <Ionicons name="document-text-outline" size={24} color={colors.warning} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.pendingPillBadge}>
+                <Text style={styles.pendingPillBadgeTxt}>ACTA PENDIENTE DE GENERAR</Text>
+              </View>
+              <Text style={styles.pendingMatchScoreTxt}>
+                {pendingActaMatch.homeTeamLabel} {pendingActaMatch.homeScore} - {pendingActaMatch.awayScore} {pendingActaMatch.awayTeamLabel}
+              </Text>
+              <Text style={styles.pendingMatchMetaTxt}>
+                Partido finalizado · Categoría {pendingActaMatch.category} · {pendingActaMatch.finishedAtFormatted || 'Hoy'}
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity 
+            style={styles.pendingActaActionBtn} 
+            onPress={() => router.push('/delegado/acta' as any)}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.pendingActaActionBtnEmoji}>📝</Text>
+            <Text style={styles.pendingActaActionBtnTxt}>Generar Acta del Partido</Text>
+            <Ionicons name="arrow-forward" size={16} color={colors.navyDark} />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* 1. HERO DEPORTIVO PREMIUM */}
       <View style={styles.heroCard}>
         <LinearGradient 
@@ -293,6 +340,21 @@ export function DelegadoDashboard() {
       </View>
 
       <View style={styles.recentMatchesBox}>
+        {pendingActaMatch && (
+          <TouchableOpacity key="pending-acta-row" style={[styles.recentMatchRow, { borderColor: colors.warning, backgroundColor: 'rgba(245, 158, 11, 0.08)' }]} onPress={() => router.push('/delegado/acta' as any)} activeOpacity={0.85}>
+            <View style={[styles.recentRoundBadge, { backgroundColor: 'rgba(245, 158, 11, 0.2)' }]}>
+              <Text style={[styles.recentRoundTxt, { color: colors.warning }]}>PEND</Text>
+            </View>
+            <View style={styles.recentRivalCol}>
+              <Text style={styles.recentRivalTxt}>{pendingActaMatch.homeTeamLabel} vs {pendingActaMatch.awayTeamLabel}</Text>
+              <Text style={[styles.recentDateTxt, { color: colors.warning, fontWeight: '800' }]}>📝 Acta pendiente de generar</Text>
+            </View>
+            <View style={[styles.recentScoreBadge, { backgroundColor: 'rgba(245, 158, 11, 0.2)' }]}>
+              <Text style={[styles.recentScoreTxt, { color: colors.warning }]}>{pendingActaMatch.homeScore} - {pendingActaMatch.awayScore}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.warning} />
+          </TouchableOpacity>
+        )}
         {MOCK_RECENT_MATCHES.map((match) => (
           <TouchableOpacity key={match.id} style={styles.recentMatchRow} onPress={() => router.push('/delegado/acta' as any)} activeOpacity={0.85}>
             <View style={styles.recentRoundBadge}>
@@ -650,32 +712,36 @@ const styles = StyleSheet.create({
   recentMatchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
+    padding: 12,
+    backgroundColor: colors.navyDeep,
+    borderRadius: 12,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   recentRoundBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
   },
   recentRoundTxt: {
-    color: colors.white,
+    color: colors.skyGlow,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   recentRivalCol: {
     flex: 1,
-    marginHorizontal: 12,
   },
   recentRivalTxt: {
     color: colors.white,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   recentDateTxt: {
     color: colors.textMuted,
     fontSize: 11,
+    marginTop: 2,
   },
   recentScoreBadge: {
     paddingHorizontal: 10,
@@ -683,15 +749,87 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   scoreWin: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: 'rgba(52, 211, 153, 0.2)',
   },
   scoreDraw: {
-    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
   },
   recentScoreTxt: {
     color: colors.white,
-    fontSize: 12.5,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+
+  // CARD DE ACTA PENDIENTE DE GENERAR
+  pendingActaCard: {
+    backgroundColor: colors.navyDeep,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: colors.warning,
+    marginBottom: 20,
+    gap: 14,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  pendingActaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  pendingActaIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.warning,
+  },
+  pendingPillBadge: {
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginBottom: 4,
+  },
+  pendingPillBadgeTxt: {
+    color: colors.warning,
+    fontSize: 9.5,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  pendingMatchScoreTxt: {
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  pendingMatchMetaTxt: {
+    color: colors.textMuted,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  pendingActaActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.warning,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  pendingActaActionBtnEmoji: {
+    fontSize: 18,
+  },
+  pendingActaActionBtnTxt: {
+    color: colors.navyDark,
+    fontSize: 14,
     fontWeight: '900',
   },
 });
-

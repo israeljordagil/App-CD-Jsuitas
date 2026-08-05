@@ -307,6 +307,22 @@ export const generateMatchReportHtml = (data: MatchReportData): string => {
           <td><span style="color: #D97706; font-weight: 800;">Tarjeta Amarilla</span></td>
         </tr>
       `).join('')}
+      ${data.secondYellows.map(c => `
+        <tr>
+          <td><strong>${c.minute}'</strong></td>
+          <td>#${c.dorsal} ${c.player}</td>
+          <td>${c.team}</td>
+          <td><span style="color: #DC2626; font-weight: 800;">2ª Amarilla / Expulsión</span></td>
+        </tr>
+      `).join('')}
+      ${data.redCards.map(c => `
+        <tr>
+          <td><strong>${c.minute}'</strong></td>
+          <td>#${c.dorsal} ${c.player}</td>
+          <td>${c.team}</td>
+          <td><span style="color: #DC2626; font-weight: 800;">Tarjeta Roja Directa</span></td>
+        </tr>
+      `).join('')}
     </tbody>
   </table>
 
@@ -385,8 +401,199 @@ export function DelegadoActaPartido() {
   // VISTA PREVIA DEL PDF EN PANTALLA COMPLETA
   const [showPdfModal, setShowPdfModal] = useState(false);
 
-  // FLUJO SIMPLIFICADO: AL CONFIRMAR -> GENERA Y ABRE DIRECTAMENTE LA VISTA PREVIA FULLSCREEN
+function parseEventsForMatchReport(parsed: any, defaultReport: MatchReportData): MatchReportData {
+  if (!parsed || !parsed.matchId) return defaultReport;
+
+  const events: any[] = Array.isArray(parsed.events) ? parsed.events : [];
+  const homeTeam = parsed.homeTeamLabel || defaultReport.homeTeam;
+  const awayTeam = parsed.awayTeamLabel || defaultReport.awayTeam;
+
+  const yellowCards: MatchReportCard[] = [];
+  const redCards: MatchReportCard[] = [];
+  const secondYellows: MatchReportCard[] = [];
+  const goals: MatchReportGoal[] = [];
+  const penaltiesMissed: MatchReportPenaltyMissed[] = [];
+  const injuries: MatchReportInjury[] = [];
+  const substitutions: MatchReportSubstitution[] = [];
+
+  events.forEach((ev: any) => {
+    if (!ev || !ev.type) return;
+
+    const minVal = parseInt(String(ev.minute || '0').replace("'", ''), 10) || 0;
+
+    let dorsal = 'S/D';
+    let player = 'Jugador';
+
+    if (ev.desc && typeof ev.desc === 'string') {
+      const match = ev.desc.match(/^#(\d+)\s+([^(]+)/);
+      if (match) {
+        dorsal = match[1];
+        player = match[2].trim();
+      } else {
+        player = ev.desc.trim();
+      }
+    }
+
+    const isRivalEvent = ev.title?.includes('Rival') || ev.desc?.includes(awayTeam) || ev.type === 'GOL_RIVAL';
+    const teamName = isRivalEvent ? awayTeam : homeTeam;
+
+    if (ev.type === 'AMARILLA') {
+      yellowCards.push({
+        minute: minVal,
+        player,
+        dorsal,
+        team: teamName,
+        type: 'YELLOW',
+      });
+    } else if (ev.type === 'ROJA') {
+      if (ev.title?.includes('2ª Amarilla')) {
+        secondYellows.push({
+          minute: minVal,
+          player,
+          dorsal,
+          team: teamName,
+          type: 'SECOND_YELLOW',
+        });
+      } else {
+        redCards.push({
+          minute: minVal,
+          player,
+          dorsal,
+          team: teamName,
+          type: 'RED',
+        });
+      }
+    } else if (ev.type === 'GOL' || ev.type === 'PENALTI' || ev.type === 'PENALTI_GOL' || ev.type === 'GOL_RIVAL') {
+      goals.push({
+        minute: minVal,
+        player,
+        dorsal,
+        team: teamName,
+        isPenalty: ev.type === 'PENALTI' || ev.type === 'PENALTI_GOL',
+        scoreAfter: '0 - 0',
+      });
+    } else if (ev.type === 'PENALTI_FALLADO') {
+      penaltiesMissed.push({
+        minute: minVal,
+        player,
+        dorsal,
+        team: teamName,
+        reason: 'Penalti fallado (Detenido / Fuera)',
+      });
+    } else if (ev.type === 'LESIÓN') {
+      injuries.push({
+        minute: minVal,
+        player,
+        dorsal,
+        team: teamName,
+        desc: ev.desc || 'Molestias atendidas por el cuerpo técnico',
+      });
+    } else if (ev.type === 'SUSTITUCIÓN') {
+      substitutions.push({
+        minute: minVal,
+        outPlayer: player,
+        inPlayer: 'Sustituto',
+        team: teamName,
+      });
+    }
+  });
+
+  yellowCards.sort((a, b) => a.minute - b.minute);
+  redCards.sort((a, b) => a.minute - b.minute);
+  secondYellows.sort((a, b) => a.minute - b.minute);
+  goals.sort((a, b) => a.minute - b.minute);
+  substitutions.sort((a, b) => a.minute - b.minute);
+  injuries.sort((a, b) => a.minute - b.minute);
+
+  let runningHome = 0;
+  let runningAway = 0;
+  const goalsWithProgressiveScore = goals.map(g => {
+    if (g.team === homeTeam) {
+      runningHome++;
+    } else {
+      runningAway++;
+    }
+    return {
+      ...g,
+      scoreAfter: `${runningHome} - ${runningAway}`,
+    };
+  });
+
+  const hasParsedEvents = Array.isArray(parsed.events);
+  const homeGoalsCount = goalsWithProgressiveScore.filter(g => g.team === homeTeam).length;
+  const awayGoalsCount = goalsWithProgressiveScore.filter(g => g.team === awayTeam).length;
+
+  const finalGoalsFor = hasParsedEvents && goalsWithProgressiveScore.length > 0 ? homeGoalsCount : (typeof parsed.homeScore === 'number' ? parsed.homeScore : defaultReport.summary.goalsFor);
+  const finalGoalsAgainst = hasParsedEvents && goalsWithProgressiveScore.length > 0 ? awayGoalsCount : (typeof parsed.awayScore === 'number' ? parsed.awayScore : defaultReport.summary.goalsAgainst);
+
+  return {
+    ...defaultReport,
+    matchId: parsed.matchId,
+    category: parsed.category || defaultReport.category,
+    homeTeam,
+    awayTeam,
+    homeScore: finalGoalsFor,
+    awayScore: finalGoalsAgainst,
+    date: parsed.finishedAtFormatted || defaultReport.date,
+    goals: hasParsedEvents ? goalsWithProgressiveScore : defaultReport.goals,
+    penaltiesMissed: hasParsedEvents ? penaltiesMissed : defaultReport.penaltiesMissed,
+    yellowCards: hasParsedEvents ? yellowCards : defaultReport.yellowCards,
+    redCards: hasParsedEvents ? redCards : defaultReport.redCards,
+    secondYellows: hasParsedEvents ? secondYellows : defaultReport.secondYellows,
+    injuries: hasParsedEvents ? injuries : defaultReport.injuries,
+    substitutions: hasParsedEvents ? substitutions : defaultReport.substitutions,
+    summary: {
+      goalsFor: finalGoalsFor,
+      goalsAgainst: finalGoalsAgainst,
+      yellowCards: hasParsedEvents ? yellowCards.length : defaultReport.summary.yellowCards,
+      redCards: hasParsedEvents ? (redCards.length + secondYellows.length) : defaultReport.summary.redCards,
+      injuries: hasParsedEvents ? injuries.length : defaultReport.summary.injuries,
+      substitutions: hasParsedEvents ? substitutions.length : defaultReport.summary.substitutions,
+    }
+  };
+}
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const stored = window.localStorage.getItem('@cd_jesuitas_active_acta_match') || window.localStorage.getItem('@cd_jesuitas_pending_acta_match');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.matchId) {
+            setReportData(prev => parseEventsForMatchReport(parsed, prev));
+          }
+        }
+      } catch (_) {}
+    }
+  }, []);
+
   const handleConfirmActa = () => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.removeItem('@cd_jesuitas_pending_acta_match');
+      } catch (_) {}
+
+      try {
+        const activeMatchId = reportData.matchId || 'cadete-b-live-1';
+        const rawHistory = window.localStorage.getItem('@cd_jesuitas_finished_matches_history');
+        if (rawHistory) {
+          const historyArray = JSON.parse(rawHistory);
+          if (Array.isArray(historyArray)) {
+            const idx = historyArray.findIndex((m: any) => m && m.matchId === activeMatchId);
+            if (idx >= 0) {
+              historyArray[idx] = {
+                ...historyArray[idx],
+                actaGenerated: true,
+                pendingActa: false,
+              };
+              window.localStorage.setItem('@cd_jesuitas_finished_matches_history', JSON.stringify(historyArray));
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[DelegadoActaPartido] History update failed gracefully:', err);
+      }
+    }
     if (!isConfirmed) {
       const nowStr = new Date().toLocaleString('es-ES', {
         day: '2-digit',
@@ -578,12 +785,12 @@ export function DelegadoActaPartido() {
           <View style={styles.sectionCard}>
             <View style={styles.cardHeaderRow}>
               <Ionicons name="square-outline" size={20} color={colors.yellowCard} />
-              <Text style={styles.cardHeaderTitle}>4. TARJETAS ({reportData.yellowCards.length + reportData.redCards.length})</Text>
+              <Text style={styles.cardHeaderTitle}>4. TARJETAS ({reportData.yellowCards.length + reportData.secondYellows.length + reportData.redCards.length})</Text>
             </View>
 
             <View style={styles.listContainer}>
               {reportData.yellowCards.map((c, idx) => (
-                <View key={`card-${idx}`} style={styles.eventRow}>
+                <View key={`y-card-${idx}`} style={styles.eventRow}>
                   <View style={styles.minuteBadge}>
                     <Text style={styles.minuteTxt}>{c.minute}'</Text>
                   </View>
@@ -591,6 +798,32 @@ export function DelegadoActaPartido() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.eventPrimaryTxt}>#{c.dorsal} {c.player}</Text>
                     <Text style={styles.eventSubTxt}>{c.team} · Tarjeta Amarilla</Text>
+                  </View>
+                </View>
+              ))}
+
+              {reportData.secondYellows.map((c, idx) => (
+                <View key={`sy-card-${idx}`} style={styles.eventRow}>
+                  <View style={styles.minuteBadge}>
+                    <Text style={styles.minuteTxt}>{c.minute}'</Text>
+                  </View>
+                  <View style={[styles.cardSquare, styles.redCardBg]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.eventPrimaryTxt}>#{c.dorsal} {c.player}</Text>
+                    <Text style={styles.eventSubTxt}>{c.team} · Segunda Amarilla / Expulsión</Text>
+                  </View>
+                </View>
+              ))}
+
+              {reportData.redCards.map((c, idx) => (
+                <View key={`r-card-${idx}`} style={styles.eventRow}>
+                  <View style={styles.minuteBadge}>
+                    <Text style={styles.minuteTxt}>{c.minute}'</Text>
+                  </View>
+                  <View style={[styles.cardSquare, styles.redCardBg]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.eventPrimaryTxt}>#{c.dorsal} {c.player}</Text>
+                    <Text style={styles.eventSubTxt}>{c.team} · Tarjeta Roja Directa</Text>
                   </View>
                 </View>
               ))}
@@ -814,8 +1047,18 @@ export function DelegadoActaPartido() {
               {/* TARJETAS */}
               <Text style={styles.pdfPaperSecTitle}>Tarjetas y Amonestaciones</Text>
               {reportData.yellowCards.map((c, i) => (
-                <View key={`pdf-c-${i}`} style={styles.pdfPaperRow}>
+                <View key={`pdf-yc-${i}`} style={styles.pdfPaperRow}>
                   <Text style={styles.pdfPaperRowTxt}>Min {c.minute}' · #{c.dorsal} {c.player} ({c.team}) — Tarjeta Amarilla</Text>
+                </View>
+              ))}
+              {reportData.secondYellows.map((c, i) => (
+                <View key={`pdf-syc-${i}`} style={styles.pdfPaperRow}>
+                  <Text style={[styles.pdfPaperRowTxt, { color: colors.redCard }]}>Min {c.minute}' · #{c.dorsal} {c.player} ({c.team}) — Segunda Amarilla / Expulsión</Text>
+                </View>
+              ))}
+              {reportData.redCards.map((c, i) => (
+                <View key={`pdf-rc-${i}`} style={styles.pdfPaperRow}>
+                  <Text style={[styles.pdfPaperRowTxt, { color: colors.redCard }]}>Min {c.minute}' · #{c.dorsal} {c.player} ({c.team}) — Tarjeta Roja Directa</Text>
                 </View>
               ))}
 
@@ -925,6 +1168,7 @@ const styles = StyleSheet.create({
 
   cardSquare: { width: 14, height: 18, borderRadius: 3 },
   yellowCardBg: { backgroundColor: colors.yellowCard },
+  redCardBg: { backgroundColor: colors.redCard },
 
   subLineRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   subOutTxt: { color: '#FCA5A5', fontSize: 12, fontWeight: '700' },

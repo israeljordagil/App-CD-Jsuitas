@@ -163,7 +163,7 @@ const loadTimerSnapshot = (): TimerSnapshot | null => {
 
       if (parsed.matchPhase && typeof parsed.matchPhase === 'string') {
         return {
-          matchId: parsed.matchId || 'cadete-b-live-1',
+          matchId: parsed.matchId || 'cadete-b-patacona-c-test-1',
           category: parsed.category || 'Cadete',
           matchPhase: parsed.matchPhase as MatchPhase,
           currentPeriod: parsed.currentPeriod === 2 ? 2 : 1,
@@ -193,7 +193,7 @@ const loadTimerSnapshot = (): TimerSnapshot | null => {
         }
 
         return {
-          matchId: parsed.matchId || 'cadete-b-live-1',
+          matchId: parsed.matchId || 'cadete-b-patacona-c-test-1',
           category: 'Cadete',
           matchPhase: migratedPhase,
           currentPeriod: 1,
@@ -269,10 +269,10 @@ export interface DelegadoPartidoEnVivoProps {
 }
 
 export function DelegadoPartidoEnVivo({ 
-  category = 'Infantil',
-  teamName = 'Infantil A',
-  rivalName = 'Valencia CF "B"',
-  matchCondition = 'VISITANTE',
+  category = 'Cadete',
+  teamName = 'Cadete B',
+  rivalName = 'Patacona C',
+  matchCondition = 'LOCAL',
 }: DelegadoPartidoEnVivoProps) {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -426,7 +426,7 @@ export function DelegadoPartidoEnVivo({
 
     const handleBackgroundSave = () => {
       saveTimerSnapshot({
-        matchId: 'cadete-b-live-1',
+        matchId: 'cadete-b-patacona-c-test-1',
         category: matchCategory,
         matchPhase,
         currentPeriod,
@@ -528,7 +528,7 @@ export function DelegadoPartidoEnVivo({
     setMatchPhase('FIRST_HALF');
 
     saveTimerSnapshot({
-      matchId: 'cadete-b-live-1',
+      matchId: 'cadete-b-patacona-c-test-1',
       category: matchCategory,
       matchPhase: 'FIRST_HALF',
       currentPeriod: 1,
@@ -590,7 +590,7 @@ export function DelegadoPartidoEnVivo({
     });
 
     saveTimerSnapshot({
-      matchId: 'cadete-b-live-1',
+      matchId: 'cadete-b-patacona-c-test-1',
       category: matchCategory,
       matchPhase: 'HALF_TIME',
       currentPeriod: 1,
@@ -656,7 +656,7 @@ export function DelegadoPartidoEnVivo({
     });
 
     saveTimerSnapshot({
-      matchId: 'cadete-b-live-1',
+      matchId: 'cadete-b-patacona-c-test-1',
       category: matchCategory,
       matchPhase: 'SECOND_HALF',
       currentPeriod: 2,
@@ -694,6 +694,9 @@ export function DelegadoPartidoEnVivo({
     }
   };
 
+  const [finishedMatchContext, setFinishedMatchContext] = useState<any>(null);
+  const [showMatchSummaryModal, setShowMatchSummaryModal] = useState(false);
+
   const handleFinishMatch = () => {
     const finalSecs = calculateRegulationSeconds();
     accumulatedMatchSecondsRef.current = finalSecs;
@@ -703,19 +706,110 @@ export function DelegadoPartidoEnVivo({
     setMatchPhase('FINISHED');
     const minTxt = getMinuteText();
 
-    setEvents(prev => [
-      {
-        id: `ev-${Date.now()}`,
-        minute: minTxt,
-        type: 'FIN',
-        title: '🏁 Final del partido',
-        desc: `Resultado final: ${homeTeamLabel} ${homeScore} - ${awayScore} ${awayTeamLabel}`,
-        icon: 'checkmark-done-circle',
-        color: colors.skyGlow,
-      },
-      ...prev,
-    ]);
+    const now = new Date();
+    const dateFormatted = now.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+    const timeFormatted = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const finishedAtStr = `${dateFormatted} · ${timeFormatted} hs`;
+
+    const finalEventItem = {
+      id: `ev-${Date.now()}`,
+      minute: minTxt,
+      type: 'FIN',
+      title: '🏁 Final del partido',
+      desc: `Resultado final: ${homeTeamLabel} ${homeScore} - ${awayScore} ${awayTeamLabel}`,
+      icon: 'checkmark-done-circle',
+      color: colors.skyGlow,
+    };
+
+    const updatedEvents = [finalEventItem, ...events];
+    setEvents(updatedEvents);
+
+    const newFinishedContext = {
+      matchId: 'cadete-b-patacona-c-test-1',
+      category: matchCategory,
+      teamName: `CD Jesuitas (${teamName})`,
+      rivalName: rivalName,
+      homeTeamLabel: homeTeamLabel,
+      awayTeamLabel: awayTeamLabel,
+      isHome: !isAwayMatch,
+      homeScore: homeScore,
+      awayScore: awayScore,
+      finishedAtFormatted: finishedAtStr,
+      finishedTimestamp: Date.now(),
+      matchPhase: 'FINISHED',
+      actaGenerated: false,
+      pendingActa: true,
+      events: updatedEvents,
+    };
+
+    setFinishedMatchContext(newFinishedContext);
+
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.setItem('@cd_jesuitas_last_finished_match', JSON.stringify(newFinishedContext));
+        window.localStorage.setItem('@cd_jesuitas_pending_acta_match', JSON.stringify(newFinishedContext));
+      } catch (_) {}
+
+      try {
+        const rawHistory = window.localStorage.getItem('@cd_jesuitas_finished_matches_history');
+        let historyArray: any[] = [];
+        if (rawHistory) {
+          try {
+            const parsed = JSON.parse(rawHistory);
+            if (Array.isArray(parsed)) {
+              historyArray = parsed;
+            }
+          } catch (e) {
+            console.warn('[FinishedMatchHistory] Corrupted history JSON recovered silently:', e);
+            historyArray = [];
+          }
+        }
+
+        const existingIdx = historyArray.findIndex((m: any) => m && m.matchId === newFinishedContext.matchId);
+        if (existingIdx >= 0) {
+          historyArray[existingIdx] = newFinishedContext;
+        } else {
+          historyArray.unshift(newFinishedContext);
+        }
+
+        historyArray.sort((a: any, b: any) => (b.finishedTimestamp || 0) - (a.finishedTimestamp || 0));
+
+        window.localStorage.setItem('@cd_jesuitas_finished_matches_history', JSON.stringify(historyArray));
+      } catch (err) {
+        console.warn('[FinishedMatchHistory] Secondary history save failed gracefully:', err);
+      }
+    }
+
     setShowGeneralEventModal(false);
+  };
+
+  const handleOpenActaForFinishedMatch = () => {
+    const matchData = finishedMatchContext || {
+      matchId: 'cadete-b-patacona-c-test-1',
+      category: matchCategory,
+      teamName: `CD Jesuitas (${teamName})`,
+      rivalName: rivalName,
+      homeTeamLabel: homeTeamLabel,
+      awayTeamLabel: awayTeamLabel,
+      isHome: !isAwayMatch,
+      homeScore: homeScore,
+      awayScore: awayScore,
+      finishedAtFormatted: new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) + ' · ' + new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + ' hs',
+      finishedTimestamp: Date.now(),
+      matchPhase: 'FINISHED',
+      actaGenerated: false,
+      pendingActa: true,
+      events: events,
+    };
+
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.setItem('@cd_jesuitas_active_acta_match', JSON.stringify(matchData));
+        window.localStorage.setItem('@cd_jesuitas_pending_acta_match', JSON.stringify(matchData));
+      } catch (_) {}
+    }
+
+    router.push('/delegado/acta' as any);
   };
 
   const resetDemo = () => {
@@ -1345,6 +1439,90 @@ export function DelegadoPartidoEnVivo({
             </View>
           </View>
         </View>
+
+        {/* PANTALLA DE CIERRE DEL ENCUENTRO CUANDO EL PARTIDO HA FINALIZADO */}
+        {matchPhase === 'FINISHED' && (
+          <View style={styles.matchCompletionContainer}>
+            <View style={styles.matchCompletionCard}>
+              <View style={styles.completionSuccessHeader}>
+                <View style={styles.completionIconBadge}>
+                  <Ionicons name="checkmark-circle" size={32} color={colors.emeraldGlow} />
+                </View>
+                <Text style={styles.completionSuccessTitle}>✅ Partido finalizado correctamente</Text>
+                <Text style={styles.completionSuccessSub}>Se ha registrado el cierre definitivo del encuentro</Text>
+              </View>
+
+              {/* RESULTADO FINAL Y DATOS DEL PARTIDO */}
+              <View style={styles.completionScoreBox}>
+                <Text style={styles.completionScoreLabel}>RESULTADO FINAL</Text>
+                <View style={styles.completionScoreRow}>
+                  <Text style={styles.completionTeamName}>{homeTeamLabel}</Text>
+                  <View style={styles.completionScoreBadge}>
+                    <Text style={styles.completionScoreDigits}>{homeScore} - {awayScore}</Text>
+                  </View>
+                  <Text style={styles.completionTeamName}>{awayTeamLabel}</Text>
+                </View>
+              </View>
+
+              <View style={styles.completionInfoGrid}>
+                <View style={styles.completionInfoItem}>
+                  <Ionicons name="calendar-outline" size={16} color={colors.skyGlow} />
+                  <Text style={styles.completionInfoLabel}>Fecha y hora:</Text>
+                  <Text style={styles.completionInfoVal}>{finishedMatchContext?.finishedAtFormatted || '5 de agosto de 2026 · 11:25 hs'}</Text>
+                </View>
+
+                <View style={styles.completionInfoItem}>
+                  <Ionicons name="shield-checkmark-outline" size={16} color={colors.skyGlow} />
+                  <Text style={styles.completionInfoLabel}>Equipo:</Text>
+                  <Text style={styles.completionInfoVal}>{`CD Jesuitas (${teamName})`}</Text>
+                </View>
+
+                <View style={styles.completionInfoItem}>
+                  <Ionicons name="people-outline" size={16} color={colors.skyGlow} />
+                  <Text style={styles.completionInfoLabel}>Rival:</Text>
+                  <Text style={styles.completionInfoVal}>{rivalName}</Text>
+                </View>
+              </View>
+
+              {/* TRES ACCIONES */}
+              <View style={styles.completionActionsCol}>
+                {/* 1. BOTÓN PRINCIPAL: GIGANTE Y EL MÁS DESTACADO */}
+                <TouchableOpacity 
+                  style={styles.btnGenerarActaPrincipal} 
+                  onPress={handleOpenActaForFinishedMatch}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.btnGenerarActaEmoji}>📝</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.btnGenerarActaTitle}>Generar Acta</Text>
+                    <Text style={styles.btnGenerarActaSub}>Abrir el acta oficial correspondiente a este partido recién finalizado</Text>
+                  </View>
+                  <Ionicons name="arrow-forward" size={24} color={colors.navyDark} />
+                </TouchableOpacity>
+
+                {/* 2. BOTÓN SECUNDARIO: VER RESUMEN DEL PARTIDO */}
+                <TouchableOpacity 
+                  style={styles.btnVerResumenSecundario} 
+                  onPress={() => setShowMatchSummaryModal(true)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="document-text-outline" size={18} color={colors.skyGlow} />
+                  <Text style={styles.btnVerResumenTxt}>📄 Ver Resumen del Partido</Text>
+                </TouchableOpacity>
+
+                {/* 3. BOTÓN TERCIARIO: VOLVER AL PANEL DEL DELEGADO */}
+                <TouchableOpacity 
+                  style={styles.btnVolverDashboardTerciario} 
+                  onPress={() => router.push('/delegado' as any)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="home-outline" size={18} color={colors.textMuted} />
+                  <Text style={styles.btnVolverDashboardTxt}>🏠 Volver al Panel del Delegado</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* LAYOUT PRINCIPAL */}
         <View style={isDesktop ? styles.desktopGrid : styles.mobileStack}>
@@ -2028,6 +2206,76 @@ export function DelegadoPartidoEnVivo({
             </View>
           </View>
         </Modal>
+
+        {/* MODAL DE RESUMEN COMPLETO DEL PARTIDO */}
+        <Modal
+          visible={showMatchSummaryModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowMatchSummaryModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalActionBox, { maxHeight: '85%' }]}>
+              <View style={styles.modalHeaderRow}>
+                <View style={styles.modalPlayerHeaderLeft}>
+                  <View style={styles.modalDorsalBadge}>
+                    <Text style={{ fontSize: 18 }}>📄</Text>
+                  </View>
+                  <View>
+                    <Text style={styles.modalPlayerName}>RESUMEN DEL ENCUENTRO</Text>
+                    <Text style={styles.modalPlayerRole}>{homeTeamLabel} vs {awayTeamLabel}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity style={styles.modalCloseIconBtn} onPress={() => setShowMatchSummaryModal(false)}>
+                  <Ionicons name="close" size={22} color={colors.white} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ marginTop: 12 }} showsVerticalScrollIndicator={false}>
+                <View style={styles.completionScoreBox}>
+                  <Text style={styles.completionScoreLabel}>RESULTADO FINAL</Text>
+                  <Text style={{ color: colors.emeraldGlow, fontSize: 26, fontWeight: '900' }}>
+                    {homeTeamLabel} {homeScore} - {awayScore} {awayTeamLabel}
+                  </Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                    {finishedMatchContext?.finishedAtFormatted || 'Partido finalizado'}
+                  </Text>
+                </View>
+
+                <View style={[styles.sectionHeaderRow, { marginTop: 16 }]}>
+                  <Ionicons name="time-outline" size={18} color={colors.skyGlow} />
+                  <Text style={styles.sectionTitleTxt}>EVENTOS Y LÍNEA TEMPORAL ({events.length})</Text>
+                </View>
+
+                {events.length === 0 ? (
+                  <Text style={styles.emptyTimelineTxt}>Sin eventos registrados</Text>
+                ) : (
+                  <View style={{ gap: 8, marginTop: 6 }}>
+                    {events.map((ev) => (
+                      <View key={ev.id} style={styles.timelineItem}>
+                        <Text style={styles.timelineTime}>{ev.minute}</Text>
+                        <View style={[styles.timelineIconDot, { backgroundColor: ev.color }]}>
+                          <Ionicons name={ev.icon as any} size={14} color={colors.navyDark} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.timelineTitle}>{ev.title}</Text>
+                          <Text style={styles.timelineDesc}>{ev.desc}</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </ScrollView>
+
+              <TouchableOpacity 
+                style={[styles.confirmBtnCancel, { marginTop: 16, width: '100%', alignItems: 'center' }]} 
+                onPress={() => setShowMatchSummaryModal(false)}
+              >
+                <Text style={styles.confirmBtnCancelTxt}>Cerrar Resumen</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </View>
   );
@@ -2037,39 +2285,36 @@ const styles = StyleSheet.create({
   mainWrapper: { flex: 1, backgroundColor: colors.navyDark },
   container: { flex: 1, backgroundColor: colors.navyDark },
   content: { padding: 16, paddingBottom: 40 },
-  contentDesktop: { maxWidth: 1080, alignSelf: 'center', width: '100%' },
+  contentDesktop: { maxWidth: 1200, alignSelf: 'center', width: '100%' },
 
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.navyCard, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-  titleTxt: { color: colors.white, fontSize: 18, fontWeight: '900' },
-  subtitleTxt: { color: colors.emeraldGlow, fontSize: 12, fontWeight: '700' },
-  resetDemoBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.navyCard, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
-  resetDemoBtnTxt: { color: colors.textMuted, fontSize: 11, fontWeight: '700' },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.navyDeep, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  titleTxt: { color: colors.white, fontSize: 18, fontWeight: '900', letterSpacing: 0.5 },
+  subtitleTxt: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+  resetDemoBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.navyDeep, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
+  resetDemoBtnTxt: { color: '#94A3B8', fontSize: 11, fontWeight: '700' },
 
-  suspensionBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(239, 68, 68, 0.15)', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#EF4444', marginBottom: 14 },
-  suspensionTitle: { color: '#EF4444', fontSize: 13, fontWeight: '900' },
+  suspensionBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1.5, borderColor: '#EF4444', borderRadius: 12, padding: 14, marginBottom: 16 },
+  suspensionTitle: { color: '#EF4444', fontSize: 14, fontWeight: '900' },
   suspensionDesc: { color: colors.white, fontSize: 11, marginTop: 2 },
 
   scoreboardCard: { backgroundColor: colors.navyDeep, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.border, marginBottom: 16 },
-  liveBadgeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 10 },
+  liveBadgeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 12 },
   liveRedDot: { width: 8, height: 8, borderRadius: 4 },
-  liveBadgeTxt: { fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
-
+  liveBadgeTxt: { fontSize: 11, fontWeight: '900', letterSpacing: 1 },
   scoreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   teamScoreBox: { flex: 1, alignItems: 'center' },
-  teamScoreName: { color: colors.white, fontSize: 13, fontWeight: '800', textAlign: 'center', marginBottom: 4 },
-  scoreDigit: { color: colors.emeraldGlow, fontSize: 32, fontWeight: '900' },
+  teamScoreName: { color: colors.white, fontSize: 14, fontWeight: '800', textAlign: 'center', marginBottom: 4 },
+  scoreDigit: { color: colors.white, fontSize: 36, fontWeight: '900' },
 
-  timerBox: { alignItems: 'center', paddingHorizontal: 10 },
-  timerTxt: { color: colors.white, fontSize: 26, fontWeight: '900' },
-  timerSubTxt: { color: colors.textMuted, fontSize: 10, fontWeight: '700', marginTop: 2 },
-
-  restLabelTxt: { color: colors.yellowCard, fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
-  restTimerTxt: { color: colors.yellowCard, fontSize: 26, fontWeight: '900' },
-  restFinishedTxt: { color: colors.emeraldGlow, fontSize: 10, fontWeight: '800', marginTop: 2 },
-
-  extraTimeBadge: { backgroundColor: 'rgba(245, 158, 11, 0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 2, borderWidth: 1, borderColor: colors.yellowCard },
+  timerBox: { alignItems: 'center', flex: 1.2 },
+  timerTxt: { color: colors.emeraldGlow, fontSize: 26, fontWeight: '900', letterSpacing: 1 },
+  timerSubTxt: { color: colors.textMuted, fontSize: 10, marginTop: 2, fontWeight: '700' },
+  extraTimeBadge: { backgroundColor: 'rgba(245, 158, 11, 0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginTop: 2 },
   extraTimeBadgeTxt: { color: colors.yellowCard, fontSize: 10, fontWeight: '900' },
+  restLabelTxt: { color: colors.yellowCard, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  restTimerTxt: { color: colors.yellowCard, fontSize: 24, fontWeight: '900', marginVertical: 2 },
+  restFinishedTxt: { color: colors.emeraldGlow, fontSize: 10, fontWeight: '800' },
 
   timerControlBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, marginTop: 8 },
   timerControlBtnTxt: { color: colors.navyDark, fontSize: 11, fontWeight: '900' },
@@ -2093,10 +2338,37 @@ const styles = StyleSheet.create({
   emptyTimelineTxt: { color: colors.textMuted, fontSize: 12, fontStyle: 'italic', textAlign: 'center', marginTop: 20 },
   timelineItem: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.navyCard, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border },
   timelineTime: { color: colors.skyGlow, fontSize: 11, fontWeight: '900', width: 44 },
+  timelineIconDot: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   timelineTitle: { color: colors.white, fontSize: 12, fontWeight: '800' },
-  timelineDesc: { color: colors.textMuted, fontSize: 10, marginTop: 1 },
+  timelineDesc: { color: colors.textMuted, fontSize: 11, marginTop: 1 },
 
-  // ESTILOS DE MODALES
+  // PANTALLA DE CIERRE DEL ENCUENTRO (PARTIDO FINALIZADO)
+  matchCompletionContainer: { marginVertical: 16 },
+  matchCompletionCard: { backgroundColor: colors.navyDeep, borderRadius: 16, padding: 20, borderWidth: 2, borderColor: colors.emeraldGlow, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 8, gap: 16 },
+  completionSuccessHeader: { alignItems: 'center', gap: 6 },
+  completionIconBadge: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(52, 211, 153, 0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.emeraldGlow },
+  completionSuccessTitle: { color: colors.emeraldGlow, fontSize: 18, fontWeight: '900', textAlign: 'center' },
+  completionSuccessSub: { color: colors.textMuted, fontSize: 12, textAlign: 'center' },
+  completionScoreBox: { backgroundColor: colors.navyCard, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.border, alignItems: 'center', gap: 8 },
+  completionScoreLabel: { color: colors.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  completionScoreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, width: '100%' },
+  completionTeamName: { color: colors.white, fontSize: 14, fontWeight: '800', flex: 1, textAlign: 'center' },
+  completionScoreBadge: { backgroundColor: colors.navyDark, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: colors.emeraldGlow },
+  completionScoreDigits: { color: colors.emeraldGlow, fontSize: 22, fontWeight: '900' },
+  completionInfoGrid: { backgroundColor: 'rgba(255, 255, 255, 0.03)', borderRadius: 12, padding: 12, gap: 8, borderWidth: 1, borderColor: colors.border },
+  completionInfoItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  completionInfoLabel: { color: colors.textMuted, fontSize: 12, fontWeight: '700' },
+  completionInfoVal: { color: colors.white, fontSize: 12, fontWeight: '800', flex: 1 },
+  completionActionsCol: { gap: 12, marginTop: 8 },
+  btnGenerarActaPrincipal: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.emeraldGlow, paddingHorizontal: 18, paddingVertical: 16, borderRadius: 14, shadowColor: '#34D399', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 },
+  btnGenerarActaEmoji: { fontSize: 28 },
+  btnGenerarActaTitle: { color: colors.navyDark, fontSize: 17, fontWeight: '900', letterSpacing: 0.3 },
+  btnGenerarActaSub: { color: '#064E3B', fontSize: 11, fontWeight: '700', marginTop: 2 },
+  btnVerResumenSecundario: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(56, 189, 248, 0.15)', paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.skyPrimary },
+  btnVerResumenTxt: { color: colors.skyGlow, fontSize: 13, fontWeight: '800' },
+  btnVolverDashboardTerciario: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'rgba(255, 255, 255, 0.05)', paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
+  btnVolverDashboardTxt: { color: colors.white, fontSize: 13, fontWeight: '800' },
+
   modalOverlay: { flex: 1, backgroundColor: 'rgba(2, 8, 20, 0.85)', justifyContent: 'center', alignItems: 'center', padding: 16 },
   confirmBox: { backgroundColor: colors.navyDeep, borderRadius: 16, padding: 20, maxWidth: 400, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
   confirmBoxTitle: { color: colors.white, fontSize: 16, fontWeight: '900', marginTop: 10 },
@@ -2107,7 +2379,6 @@ const styles = StyleSheet.create({
   confirmBtnOk: { flex: 1, paddingVertical: 10, borderRadius: 8, backgroundColor: colors.skyPrimary, alignItems: 'center' },
   confirmBtnOkTxt: { color: colors.navyDark, fontSize: 12, fontWeight: '900' },
 
-  // MODAL ACCIONES DEL JUGADOR & NUEVO EVENTO (SUPERPUESTA Y CENTRADA CON EMOJIS 3D)
   modalActionBox: { backgroundColor: colors.navyDeep, borderRadius: 20, padding: 20, width: '92%', maxWidth: 440, borderWidth: 1.5, borderColor: colors.skyPrimary, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 12 },
   modalHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   modalPlayerHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -2117,35 +2388,29 @@ const styles = StyleSheet.create({
   modalPlayerRole: { color: colors.textMuted, fontSize: 11, marginTop: 1 },
   modalCloseIconBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.navyCard, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
 
-  // BOTONES GENERALES DE OPCIONES PARA "NUEVO EVENTO"
   generalOptionBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 12, borderWidth: 1.5 },
   generalOptionTitle: { fontSize: 13, fontWeight: '900' },
   generalOptionSub: { color: colors.textMuted, fontSize: 10, marginTop: 1 },
 
-  // INPUT PARA INCIDENCIA
   incidenceTextInput: { backgroundColor: colors.navyCard, borderRadius: 10, borderWidth: 1, borderColor: colors.border, color: colors.white, padding: 12, fontSize: 12, textAlignVertical: 'top', minHeight: 70, marginVertical: 6 },
 
-  // CUADRÍCULA 2 x 3 DE ACCIONES DEL JUGADOR
   actionGridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between' },
   actionGridCardBtn: { width: '48%', paddingVertical: 14, paddingHorizontal: 10, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', gap: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3 },
   icon3dBadge: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(2, 8, 20, 0.4)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.12)' },
   icon3dEmoji: { fontSize: 20 },
   actionGridCardTxt: { fontSize: 12, fontWeight: '900', textAlign: 'center' },
 
-  // SUBMENÚ MINI PANEL DE PENALTI
   penaltySubMenuWrapper: { gap: 10 },
   penaltyOptionBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, borderWidth: 1.5 },
   penaltyOptionEmoji: { fontSize: 22 },
   penaltyOptionTxt: { fontSize: 14, fontWeight: '900' },
 
-  // VISTAS DE CONFIRMACIÓN
   confirmActionWrapper: { alignItems: 'center', paddingVertical: 8 },
   big3dIcon: { fontSize: 42, marginBottom: 4 },
   confirmActionTitle: { color: colors.white, fontSize: 16, fontWeight: '900', marginTop: 6, textAlign: 'center' },
   confirmActionDesc: { color: colors.textMuted, fontSize: 12, textAlign: 'center', marginTop: 6, lineHeight: 18, paddingHorizontal: 4 },
   confirmActionBtnRow: { flexDirection: 'row', gap: 10, marginTop: 18, width: '100%' },
 
-  // VISTA DE SELECCIÓN DE SUPLENTES
   subSelectWrapper: { gap: 10 },
   subSelectTitle: { color: colors.white, fontSize: 13, fontWeight: '900', letterSpacing: 0.5, marginBottom: 4 },
   noAssistBtn: { backgroundColor: colors.navyCard, padding: 12, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: colors.skyPrimary, marginBottom: 4 },
