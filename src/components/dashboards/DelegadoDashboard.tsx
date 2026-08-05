@@ -18,6 +18,7 @@ import { Ionicons, FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { useSport } from '../../context/SportContext';
+import { useDelegadoTheme } from '../../context/DelegadoThemeContext';
 import { supabase } from '../../lib/supabase';
 
 // Reutilizar exactamente la misma URL pública oficial de la camiseta de Delegado
@@ -68,6 +69,7 @@ const MOCK_RECENT_MATCHES = [
 export function DelegadoDashboard() {
   const { user } = useAuth();
   const { sport } = useSport();
+  const { colors } = useDelegadoTheme();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 900;
@@ -103,7 +105,7 @@ export function DelegadoDashboard() {
 
   return (
     <ScrollView 
-      style={styles.container} 
+      style={[styles.container, { backgroundColor: colors.navyDark }]} 
       contentContainerStyle={[styles.scrollContent, isDesktop && styles.scrollContentDesktop]}
       showsVerticalScrollIndicator={false}
     >

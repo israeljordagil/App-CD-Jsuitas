@@ -237,6 +237,7 @@ function NavigationStack() {
 }
 
 import { DemoNavigationProvider } from '../src/context/DemoNavigationContext';
+import { DelegadoThemeProvider } from '../src/context/DelegadoThemeContext';
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
@@ -247,9 +248,11 @@ function RootLayoutNav() {
         <RoleProvider>
           <ReviewProvider>
             <DemoNavigationProvider>
-              <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-                <NavigationStack />
-              </ThemeProvider>
+              <DelegadoThemeProvider>
+                <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+                  <NavigationStack />
+                </ThemeProvider>
+              </DelegadoThemeProvider>
             </DemoNavigationProvider>
           </ReviewProvider>
         </RoleProvider>

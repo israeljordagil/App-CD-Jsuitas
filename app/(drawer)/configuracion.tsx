@@ -4,13 +4,35 @@ import { colors, spacing, typography } from '../../src/utils/theme';
 import { GradientCard } from '../../src/components/ui/GradientCard';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRole } from '../../src/context/RoleContext';
+import { useAuth } from '../../src/context/AuthContext';
+import { useDemoNavigation } from '../../src/context/DemoNavigationContext';
 import { FamiliaAjustes } from '../../src/components/dashboards/FamiliaAjustes';
+import { DelegadoAjustesView } from '../../src/components/views/DelegadoAjustesView';
 import { PremiumHeader } from '../../src/components/ui/PremiumHeader';
 
 export default function ConfiguracionScreen() {
   const { role } = useRole();
+  const { user } = useAuth();
+  const { selectedDemoProfile } = useDemoNavigation();
 
-  if (role === 'familias') {
+  const currentRole = selectedDemoProfile || user?.role || role || 'FAMILIA';
+  const isDelegado = String(currentRole).toUpperCase() === 'DELEGADO';
+
+  if (isDelegado) {
+    return (
+      <View style={styles.familiasContainer}>
+        <PremiumHeader 
+          title="AJUSTES"
+          subtitle="CONFIGURACIÓN Y PREFERENCIAS"
+          showSearchAndActions={false}
+          showAvatar={false}
+        />
+        <DelegadoAjustesView />
+      </View>
+    );
+  }
+
+  if (role === 'familias' || String(currentRole).toUpperCase() === 'FAMILIA') {
     return (
       <View style={styles.familiasContainer}>
          <PremiumHeader 
