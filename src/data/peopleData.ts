@@ -13,7 +13,7 @@ export const INITIAL_PEOPLE: ManagedPerson[] = [
     phone: '+34 600 111 222',
     status: 'ACTIVE',
     roles: ['ADMIN_GENERAL'],
-    responsibilities: ['Administración', 'Instalaciones'],
+    responsibilities: ['Administración', 'Instalaciones', 'Material'],
     teamAssignments: [
       { id: 'as-ij-1', teamId: 'b1000001-0000-4000-8000-000000000019', teamName: 'Alevín E', category: 'Alevín', sport: 'Fútbol', positionTitle: 'Segundo Entrenador', season: '2026/2027', isActive: true },
       { id: 'as-ij-2', teamId: 'b1000001-0000-4000-8000-000000000023', teamName: 'Benjamín A', category: 'Benjamín', sport: 'Fútbol', positionTitle: 'Segundo Entrenador', season: '2026/2027', isActive: true }
@@ -109,7 +109,7 @@ export const INITIAL_PEOPLE: ManagedPerson[] = [
     phone: '+34 644 555 666',
     status: 'ACTIVE',
     roles: ['COORDINADOR', 'ENTRENADOR'],
-    responsibilities: ['Coordinador F8', 'Material'],
+    responsibilities: ['Coordinador F8'],
     teamAssignments: [
       { id: 'as-rg-1', teamId: 'b1000001-0000-4000-8000-000000000009', teamName: 'Infantil A', category: 'Infantil', sport: 'Fútbol', positionTitle: 'Primer Entrenador', season: '2026/2027', isActive: true },
       { id: 'as-rg-2', teamId: 'b1000001-0000-4000-8000-000000000023', teamName: 'Benjamín A', category: 'Benjamín', sport: 'Fútbol', positionTitle: 'Primer Entrenador', season: '2026/2027', isActive: true }
@@ -325,7 +325,7 @@ export const INITIAL_PEOPLE: ManagedPerson[] = [
     roles: ['ENTRENADOR'],
     responsibilities: [],
     teamAssignments: [
-      { id: 'as-jm-1', teamId: 'b1000001-0000-4000-8000-000000000014', teamName: 'Infantil Femenino', category: 'Infantil', sport: 'Fútbol', positionTitle: 'Primer Entrenador', season: '2026/2027', isActive: true },
+      { id: 'as-jm-1', teamId: 'b1000001-0000-4000-8000-000000000009', teamName: 'Infantil A', category: 'Infantil', sport: 'Fútbol', positionTitle: 'Primer Entrenador', season: '2026/2027', isActive: true },
       { id: 'as-jm-2', teamId: 'b1000001-0000-4000-8000-000000000017', teamName: 'Alevín C', category: 'Alevín', sport: 'Fútbol', positionTitle: 'Primer Entrenador', season: '2026/2027', isActive: true }
     ],
     licenses: [{ id: 'lic-jm-1', licenseType: 'Sin licencia', isValid: true }],
@@ -817,7 +817,7 @@ export const INITIAL_PEOPLE: ManagedPerson[] = [
     roles: ['ENTRENADOR'],
     responsibilities: [],
     teamAssignments: [
-      { id: 'as-mmoch-1', teamId: 'b1000001-0000-4000-8000-000000000014', teamName: 'Infantil Femenino', category: 'Infantil', sport: 'Fútbol', positionTitle: 'Segundo Entrenador', season: '2026/2027', isActive: true }
+      { id: 'as-mmoch-1', teamId: 'b1000001-0000-4000-8000-000000000009', teamName: 'Infantil A', category: 'Infantil', sport: 'Fútbol', positionTitle: 'Segundo Entrenador', season: '2026/2027', isActive: true }
     ],
     licenses: [{ id: 'lic-mmoch-1', licenseType: 'Sin licencia', isValid: true }],
     account: { hasAccess: false },

@@ -3,6 +3,9 @@ export type AppRole =
   | 'DIR_DEPORTIVA'
   | 'COORDINADOR'
   | 'ENTRENADOR'
+  | 'SEGUNDO_ENTRENADOR'
+  | 'PREPARADOR_FISICO'
+  | 'FISIOTERAPEUTA'
   | 'DELEGADO'
   | 'FAMILIA';
 

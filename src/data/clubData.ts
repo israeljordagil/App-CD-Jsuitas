@@ -228,148 +228,16 @@ export const TEAMS = [
 
 export const PLAYERS = [
   {
-    "id": "JES-0001",
-    "nombreCompleto": "Marc Domínguez Marqués",
-    "equipo": "Juvenil A",
-    "categoria": "Juvenil",
-    "dorsal": "-",
-    "posicion": "Jugador",
-    "activo": true
-  },
-  {
-    "id": "JES-0002",
-    "nombreCompleto": "David Guillot López",
-    "equipo": "Juvenil A",
-    "categoria": "Juvenil",
-    "dorsal": "-",
-    "posicion": "Jugador",
-    "activo": true
-  },
-  {
-    "id": "JES-0003",
-    "nombreCompleto": "Rubén Cabanes Martínez",
-    "equipo": "Juvenil A",
-    "categoria": "Juvenil",
-    "dorsal": "-",
-    "posicion": "Jugador",
-    "activo": true
-  },
-  {
-    "id": "JES-0004",
-    "nombreCompleto": "Marc Fort Campos",
-    "equipo": "Juvenil A",
-    "categoria": "Juvenil",
-    "dorsal": "-",
-    "posicion": "Jugador",
-    "activo": true
-  },
-  {
-    "id": "JES-0005",
-    "nombreCompleto": "Guillermo Montaner Campos",
-    "equipo": "Juvenil A",
-    "categoria": "Juvenil",
-    "dorsal": "-",
-    "posicion": "Jugador",
-    "activo": true
-  },
-  {
-    "id": "JES-0006",
-    "nombreCompleto": "Diego Esteban Platero",
-    "equipo": "Juvenil A",
-    "categoria": "Juvenil",
-    "dorsal": "-",
-    "posicion": "Jugador",
-    "activo": true
-  },
-  {
-    "id": "JES-0007",
-    "nombreCompleto": "Nacho Mondragón Peciña",
-    "equipo": "Juvenil A",
-    "categoria": "Juvenil",
-    "dorsal": "-",
-    "posicion": "Jugador",
-    "activo": true
-  },
-  {
-    "id": "JES-0008",
-    "nombreCompleto": "Borja Pérez Morales",
-    "equipo": "Juvenil A",
-    "categoria": "Juvenil",
-    "dorsal": "-",
-    "posicion": "Jugador",
-    "activo": true
-  },
-  {
-    "id": "JES-0009",
-    "nombreCompleto": "Alejandro Herrero Cog",
-    "equipo": "Juvenil A",
-    "categoria": "Juvenil",
-    "dorsal": "-",
-    "posicion": "Jugador",
-    "activo": true
-  },
-  {
-    "id": "JES-0010",
-    "nombreCompleto": "Marcos García Macías",
-    "equipo": "Juvenil A",
-    "categoria": "Juvenil",
-    "dorsal": "-",
-    "posicion": "Jugador",
-    "activo": true
-  },
-  {
     "id": "JES-0011",
     "nombreCompleto": "Izan Albiach Jiménez",
     "equipo": "Juvenil A",
     "categoria": "Juvenil",
     "dorsal": "-",
     "posicion": "Jugador",
-    "activo": true
-  },
-  {
-    "id": "JES-0012",
-    "nombreCompleto": "Izan González Prats",
-    "equipo": "Juvenil A",
-    "categoria": "Juvenil",
-    "dorsal": "-",
-    "posicion": "Jugador",
-    "activo": true
-  },
-  {
-    "id": "JES-0013",
-    "nombreCompleto": "Guillem Palacios Estrelles",
-    "equipo": "Juvenil A",
-    "categoria": "Juvenil",
-    "dorsal": "-",
-    "posicion": "Jugador",
-    "activo": true
-  },
-  {
-    "id": "JES-0014",
-    "nombreCompleto": "Alfredo Liñana Ros",
-    "equipo": "Juvenil A",
-    "categoria": "Juvenil",
-    "dorsal": "-",
-    "posicion": "Jugador",
-    "activo": true
-  },
-  {
-    "id": "JES-0015",
-    "nombreCompleto": "Miguel Nieto Medina",
-    "equipo": "Juvenil A",
-    "categoria": "Juvenil",
-    "dorsal": "-",
-    "posicion": "Jugador",
-    "activo": true
-  },
-  {
-    "id": "JES-0016",
-    "nombreCompleto": "Lucas Domenech Tomás",
-    "equipo": "Juvenil A",
-    "categoria": "Juvenil",
-    "dorsal": "-",
-    "posicion": "Jugador",
-    "activo": true
+    "activo": true,
+    "estadoFederativo": "En tramitación",
+    "estadoDocumental": "Pendiente de documentación",
+    "fechaFinLicencia": "30-06-2027"
   },
   {
     "id": "JES-0017",
@@ -378,7 +246,202 @@ export const PLAYERS = [
     "categoria": "Juvenil",
     "dorsal": "-",
     "posicion": "Jugador",
-    "activo": true
+    "activo": true,
+    "estadoFederativo": "En tramitación",
+    "estadoDocumental": "Pendiente de documentación",
+    "fechaFinLicencia": "30-06-2027"
+  },
+  {
+    "id": "JES-0003",
+    "nombreCompleto": "Rubén Cabanes Martínez",
+    "equipo": "Juvenil A",
+    "categoria": "Juvenil",
+    "dorsal": "-",
+    "posicion": "Jugador",
+    "activo": true,
+    "estadoFederativo": "En tramitación",
+    "estadoDocumental": "Pendiente de documentación",
+    "fechaFinLicencia": "30-06-2027"
+  },
+  {
+    "id": "JES-0001",
+    "nombreCompleto": "Marc Domínguez Marques",
+    "equipo": "Juvenil A",
+    "categoria": "Juvenil",
+    "dorsal": "-",
+    "posicion": "Jugador",
+    "activo": true,
+    "estadoFederativo": "En tramitación",
+    "estadoDocumental": "Pendiente de documentación",
+    "fechaFinLicencia": "30-06-2027"
+  },
+  {
+    "id": "JES-0006",
+    "nombreCompleto": "Diego Esteban Platero",
+    "equipo": "Juvenil A",
+    "categoria": "Juvenil",
+    "dorsal": "-",
+    "posicion": "Jugador",
+    "activo": true,
+    "estadoFederativo": "En tramitación",
+    "estadoDocumental": "Pendiente de documentación",
+    "fechaFinLicencia": "30-06-2027"
+  },
+  {
+    "id": "JES-0018",
+    "nombreCompleto": "Nicolás Ferreiro de Castro",
+    "equipo": "Juvenil A",
+    "categoria": "Juvenil",
+    "dorsal": "-",
+    "posicion": "Jugador",
+    "activo": true,
+    "estadoFederativo": "En tramitación",
+    "estadoDocumental": "Pendiente de documentación",
+    "fechaFinLicencia": "30-06-2027"
+  },
+  {
+    "id": "JES-0004",
+    "nombreCompleto": "Marc Fort Campos",
+    "equipo": "Juvenil A",
+    "categoria": "Juvenil",
+    "dorsal": "-",
+    "posicion": "Jugador",
+    "activo": true,
+    "estadoFederativo": "En tramitación",
+    "estadoDocumental": "Pendiente de documentación",
+    "fechaFinLicencia": "30-06-2027"
+  },
+  {
+    "id": "JES-0010",
+    "nombreCompleto": "Marcos García Macías",
+    "equipo": "Juvenil A",
+    "categoria": "Juvenil",
+    "dorsal": "-",
+    "posicion": "Jugador",
+    "activo": true,
+    "estadoFederativo": "En tramitación",
+    "estadoDocumental": "Pendiente de documentación",
+    "fechaFinLicencia": "30-06-2027"
+  },
+  {
+    "id": "JES-0012",
+    "nombreCompleto": "Izan González Prats",
+    "equipo": "Juvenil A",
+    "categoria": "Juvenil",
+    "dorsal": "-",
+    "posicion": "Jugador",
+    "activo": true,
+    "estadoFederativo": "En tramitación",
+    "estadoDocumental": "Pendiente de documentación",
+    "fechaFinLicencia": "30-06-2027"
+  },
+  {
+    "id": "JES-0002",
+    "nombreCompleto": "David Guillot López",
+    "equipo": "Juvenil A",
+    "categoria": "Juvenil",
+    "dorsal": "-",
+    "posicion": "Jugador",
+    "activo": true,
+    "estadoFederativo": "En tramitación",
+    "estadoDocumental": "Pendiente de documentación",
+    "fechaFinLicencia": "30-06-2027"
+  },
+  {
+    "id": "JES-0009",
+    "nombreCompleto": "Alejandro Herrero Cot",
+    "equipo": "Juvenil A",
+    "categoria": "Juvenil",
+    "dorsal": "-",
+    "posicion": "Jugador",
+    "activo": true,
+    "estadoFederativo": "En tramitación",
+    "estadoDocumental": "Pendiente de documentación",
+    "fechaFinLicencia": "30-06-2027"
+  },
+  {
+    "id": "JES-0014",
+    "nombreCompleto": "Alfredo Liñana Ros",
+    "equipo": "Juvenil A",
+    "categoria": "Juvenil",
+    "dorsal": "-",
+    "posicion": "Jugador",
+    "activo": true,
+    "estadoFederativo": "En tramitación",
+    "estadoDocumental": "Pendiente de documentación",
+    "fechaFinLicencia": "30-06-2027"
+  },
+  {
+    "id": "JES-0016",
+    "nombreCompleto": "Lucas Martínez Domenech",
+    "equipo": "Juvenil A",
+    "categoria": "Juvenil",
+    "dorsal": "-",
+    "posicion": "Jugador",
+    "activo": true,
+    "estadoFederativo": "En tramitación",
+    "estadoDocumental": "Pendiente de documentación",
+    "fechaFinLicencia": "30-06-2027"
+  },
+  {
+    "id": "JES-0007",
+    "nombreCompleto": "Nacho Mondragón Peciña",
+    "equipo": "Juvenil A",
+    "categoria": "Juvenil",
+    "dorsal": "-",
+    "posicion": "Jugador",
+    "activo": true,
+    "estadoFederativo": "En tramitación",
+    "estadoDocumental": "Pendiente de documentación",
+    "fechaFinLicencia": "30-06-2027"
+  },
+  {
+    "id": "JES-0005",
+    "nombreCompleto": "Guillermo Montaner Campos",
+    "equipo": "Juvenil A",
+    "categoria": "Juvenil",
+    "dorsal": "-",
+    "posicion": "Jugador",
+    "activo": true,
+    "estadoFederativo": "En tramitación",
+    "estadoDocumental": "Pendiente de documentación",
+    "fechaFinLicencia": "30-06-2027"
+  },
+  {
+    "id": "JES-0015",
+    "nombreCompleto": "Miguel Nieto Medina",
+    "equipo": "Juvenil A",
+    "categoria": "Juvenil",
+    "dorsal": "-",
+    "posicion": "Jugador",
+    "activo": true,
+    "estadoFederativo": "En tramitación",
+    "estadoDocumental": "Pendiente de documentación",
+    "fechaFinLicencia": "30-06-2027"
+  },
+  {
+    "id": "JES-0013",
+    "nombreCompleto": "Guillermo Palacios Estrelles",
+    "equipo": "Juvenil A",
+    "categoria": "Juvenil",
+    "dorsal": "-",
+    "posicion": "Jugador",
+    "activo": true,
+    "estadoFederativo": "En tramitación",
+    "estadoDocumental": "Pendiente de documentación",
+    "fechaFinLicencia": "30-06-2027"
+  },
+  {
+    "id": "JES-0019",
+    "nombreCompleto": "Hugo San Eusebio Rodríguez",
+    "equipo": "Juvenil A",
+    "categoria": "Juvenil",
+    "dorsal": "-",
+    "posicion": "Jugador",
+    "activo": true,
+    "estadoFederativo": "En tramitación",
+    "estadoDocumental": "Pendiente de documentación",
+    "fechaFinLicencia": "30-06-2027"
   },
   {
     "id": "JES-0018",

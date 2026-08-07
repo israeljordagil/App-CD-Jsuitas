@@ -11,6 +11,10 @@ export type TeamCategory =
   | 'Cadete' 
   | 'Juvenil';
 
+export type FootballFormat = 'FOOTBALL_11' | 'FOOTBALL_8' | 'FOOTBALL_5';
+
+export type TeamLevel = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'FEMENINO' | 'UNICO';
+
 export interface TeamStaffMember {
   personId: string;
   personCode: string;
@@ -28,13 +32,18 @@ export interface TeamHistoryEvent {
 
 export interface ManagedTeam {
   id: string;             // UUID interno
+  clubId?: string;        // Identificador de club opcional (arquitectura multiclub)
   internalCode: string;   // Código visible, único e inmutable: EQU-000001, EQU-000002...
-  name: string;           // Nombre completo del equipo (ej. "Alevín A", "Cadete Femenino"). ¡SIN CAMPO letter!
+  name: string;           // Nombre completo del equipo (ej. "Alevín A", "Cadete Femenino")
+  shortName: string;      // Abreviatura inmutable (ej. "JUV-A", "CAD-FEM", "QUE-U")
   category: TeamCategory; // Categoría escrita como texto (ej. "Alevín", "Cadete")
   sport: string;          // Deporte escrito como texto (ej. "Fútbol")
-  gender: TeamGender;     // 'MASCULINO' | 'FEMENINO' | 'MIXTO'
+  footballFormat: FootballFormat; // 'FOOTBALL_11' | 'FOOTBALL_8' | 'FOOTBALL_5'
+  gender?: TeamGender | null;     // 'MASCULINO' | 'FEMENINO' | 'MIXTO' | null (null = pendiente de validación)
+  level: TeamLevel;       // 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'FEMENINO' | 'UNICO'
   season: string;         // '2026/2027'
   status: TeamStatus;     // 'ACTIVE' | 'INACTIVE' | 'ARCHIVED'
+  isActive: boolean;      // Estado operativo activo
   observations?: string;
   
   // Cuerpo técnico vinculado mediante person_team_assignments

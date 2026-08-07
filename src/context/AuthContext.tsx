@@ -6,6 +6,18 @@ import { ManagedPerson } from '../types/people';
 import { INITIAL_PEOPLE } from '../data/peopleData';
 import { ManagedTeam, TeamStaffMember } from '../types/teams';
 import { INITIAL_TEAMS } from '../data/teamsData';
+import { ResolvedIdentity } from '../types/identity';
+import { 
+  resolveCanonicalIdentity, 
+  mapCanonicalProfileToActiveContext, 
+  getSavedPreferredProfile, 
+  savePreferredProfile,
+  resolveInitialActiveTeam,
+  resolveInitialActivePlayer
+} from '../services/identityResolver';
+import { compareLegacyVsCanonical } from '../services/shadowComparator';
+import { FEATURE_FLAGS } from '../config/featureFlags';
+import { getStorageItem, setStorageItem, removeStorageItem } from '../utils/storageWrapper';
 
 export type ActiveContextType = AppRole;
 
@@ -13,6 +25,12 @@ export interface UserProfile {
   id: string;
   full_name: string | null;
   email: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  second_last_name?: string | null;
+  telefono?: string | null;
+  preferred_language?: string;
+  status?: string;
   roles: AppRole[];
 }
 
@@ -67,6 +85,11 @@ interface AuthContextProps {
   loginWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
   resetPassword: (email: string) => Promise<{ success: boolean; message: string }>;
   logout: () => Promise<void>;
+
+  // M6 Modo Sombra & M7 Resolver Canónico Gobernante
+  resolvedIdentity: ResolvedIdentity | null;
+  refreshResolvedIdentity: () => Promise<void>;
+  setActiveProfileFromCanonical: (profile: AppRole, remember?: boolean) => void;
 
   // Cambio de Contextos y Roles
   switchContext: (context: ActiveContextType) => void;
@@ -158,6 +181,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [childrenError, setChildrenError] = useState<string | null>(null);
   const [assignedTeams, setAssignedTeams] = useState<any[]>([]);
   const [activeTeamId, setActiveTeamId] = useState<string | null>(null);
+
+  // M6 Modo Sombra - Estado Canónico de Identidad
+  const [resolvedIdentity, setResolvedIdentity] = useState<ResolvedIdentity | null>(null);
+
+  const refreshResolvedIdentity = async () => {
+    if (user?.id) {
+      try {
+        const canonical = await resolveCanonicalIdentity(user.id);
+        setResolvedIdentity(canonical);
+      } catch (err) {
+        console.warn('Error en refreshResolvedIdentity (Modo Sombra):', err);
+      }
+    }
+  };
 
   // Módulo Usuarios
   const [managedUsers, setManagedUsers] = useState<ManagedUser[]>(INITIAL_TEST_USERS);
@@ -278,11 +315,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: t.id,
             internalCode: t.internal_code,
             name: t.name,
+            shortName: t.short_name || t.internal_code,
             category: t.category,
             sport: t.sport,
+            footballFormat: t.football_format || (t.category === 'Querubín' ? 'FOOTBALL_5' : ['Alevín', 'Benjamín', 'Prebenjamín'].includes(t.category) ? 'FOOTBALL_8' : 'FOOTBALL_11'),
             gender: t.gender,
+            level: t.level || 'A',
             season: t.season,
             status: t.status,
+            isActive: t.is_active !== undefined ? Boolean(t.is_active) : (t.status === 'ACTIVE'),
             observations: t.observations || undefined,
             staff: [],
             history: [
@@ -308,11 +349,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: t.id,
             internal_code: t.internalCode,
             name: t.name,
+            short_name: t.shortName,
             category: t.category,
             sport: t.sport,
+            football_format: t.footballFormat,
             gender: t.gender,
+            level: t.level,
             season: t.season,
-            status: t.status
+            status: t.status,
+            is_active: t.isActive
           }));
           supabase.from('teams').upsert(rowsToInsert, { onConflict: 'internal_code' }).then(() => {});
         }
@@ -361,14 +406,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let userRoles: AppRole[] = [];
 
       if (supabase && isSupabaseConfigured) {
+        let extraProfileFields: Partial<UserProfile> = {};
+
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('full_name, email')
+          .select('full_name, email, first_name, last_name, second_last_name, telefono, preferred_language, status')
           .eq('id', authUser.id)
           .maybeSingle();
 
-        if (profileData && profileData.full_name) {
-          fullName = profileData.full_name;
+        if (profileData) {
+          if (profileData.full_name) fullName = profileData.full_name;
+          extraProfileFields = {
+            first_name: profileData.first_name || null,
+            last_name: profileData.last_name || null,
+            second_last_name: profileData.second_last_name || null,
+            telefono: profileData.telefono || null,
+            preferred_language: profileData.preferred_language || 'es',
+            status: profileData.status || 'ACTIVO',
+          };
         }
 
         const { data: rolesData } = await supabase
@@ -390,6 +445,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         full_name: fullName || authUser.email?.split('@')[0] || 'Usuario Jesuitas',
         email: authUser.email || '',
         roles: userRoles,
+        ...extraProfileFields,
       };
 
       setUser(profile);
@@ -416,6 +472,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         setActiveContext(null);
+      }
+
+      // M6/M7 RESOLVER CANÓNICO DE IDENTIDAD
+      try {
+        const canonical = await resolveCanonicalIdentity(authUser.id);
+        setResolvedIdentity(canonical);
+
+        // M7-A: GOBIERNO DEL PERFIL INICIAL (Si la Feature Flag está activa)
+        let resolvedProfileContext: AppRole = profile.roles.length > 0 ? resolveDefaultContext(profile.roles) : 'FAMILIA';
+
+        if (FEATURE_FLAGS.USE_CANONICAL_PROFILE_ROUTING && canonical) {
+          const preferred = getSavedPreferredProfile(canonical.availableProfiles);
+          if (preferred) {
+            resolvedProfileContext = mapCanonicalProfileToActiveContext(preferred);
+            setActiveContext(resolvedProfileContext);
+          } else if (canonical.recommendedProfile) {
+            resolvedProfileContext = mapCanonicalProfileToActiveContext(canonical.recommendedProfile);
+            setActiveContext(resolvedProfileContext);
+          }
+        }
+
+        // M8: GOBIERNO DEL CONTEXTO OPERATIVO DE EQUIPOS Y JUGADORES (Si USE_CANONICAL_CONTEXT está activo)
+        if (FEATURE_FLAGS.USE_CANONICAL_CONTEXT && canonical) {
+          // 1. Equipos Canónicos
+          if (canonical.teams && canonical.teams.length > 0) {
+            setAssignedTeams(canonical.teams);
+            const savedTeam = getStorageItem('cd_jesuitas_last_active_team');
+            const initialTeamId = resolveInitialActiveTeam(canonical.teams, savedTeam);
+            setActiveTeamId(initialTeamId);
+          }
+
+          // 2. Deportistas Vinculados Canónicos
+          if (canonical.linkedPlayers && canonical.linkedPlayers.length > 0) {
+            setLinkedPlayers(canonical.linkedPlayers);
+            const savedPlayer = getStorageItem('cd_jesuitas_last_active_player');
+            const initialPlayerId = resolveInitialActivePlayer(resolvedProfileContext, canonical.linkedPlayers, savedPlayer);
+            setActivePlayerId(initialPlayerId);
+          }
+        }
+
+        // Diagnóstico en Modo Sombra (silencioso sin alertas)
+        compareLegacyVsCanonical(
+          {
+            roles: profile.roles,
+            activeContext: activeContext || resolveDefaultContext(profile.roles),
+            assignedTeams: profile.roles.includes('ENTRENADOR') ? mockTeams : [],
+            linkedPlayers: []
+          },
+          canonical
+        );
+      } catch (canonicalErr) {
+        console.warn('Advertencia no bloqueante en Resolver Canónico (Fallback a Legacy):', canonicalErr);
       }
     } catch (err) {
       console.error('Error cargando perfil del usuario:', err);
@@ -591,11 +699,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       id: realUuid,
       internalCode: equCode,
       name: teamData.name.trim(),
+      shortName: teamData.shortName || teamData.name.trim().substring(0, 8).toUpperCase(),
       category: teamData.category,
       sport: teamData.sport || 'Fútbol',
-      gender: teamData.gender || 'MIXTO',
+      footballFormat: teamData.footballFormat || (teamData.category === 'Querubín' ? 'FOOTBALL_5' : ['Alevín', 'Benjamín', 'Prebenjamín'].includes(teamData.category as string) ? 'FOOTBALL_8' : 'FOOTBALL_11'),
+      gender: teamData.gender !== undefined ? teamData.gender : null,
+      level: teamData.level || 'A',
       season: teamData.season || '2026/2027',
       status: teamData.status || 'ACTIVE',
+      isActive: teamData.isActive !== undefined ? teamData.isActive : true,
       observations: teamData.observations,
       staff: [],
       history: [
@@ -785,6 +897,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setActivePlayerId(null);
     setAssignedTeams([]);
     setActiveTeamId(null);
+    setResolvedIdentity(null);
   };
 
   const switchContext = (context: ActiveContextType) => {
@@ -807,10 +920,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const switchActivePlayer = (playerId: string) => {
     setActivePlayerId(playerId);
+    setStorageItem('cd_jesuitas_last_active_player', playerId);
   };
 
   const switchActiveTeam = (teamId: string) => {
     setActiveTeamId(teamId);
+    setStorageItem('cd_jesuitas_last_active_team', teamId);
   };
 
   const loginAsCoachInfantilA = () => {
@@ -828,6 +943,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const clearProfile = () => {
     setActiveContext(null);
+  };
+
+  const setActiveProfileFromCanonical = (profile: AppRole, remember: boolean = false) => {
+    const mappedContext = mapCanonicalProfileToActiveContext(profile);
+    switchContext(mappedContext);
+    if (remember) {
+      savePreferredProfile(profile);
+    }
   };
 
   return (
@@ -861,6 +984,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loginWithEmail,
         resetPassword,
         logout,
+        resolvedIdentity,
+        refreshResolvedIdentity,
+        setActiveProfileFromCanonical,
         switchContext,
         switchActivePlayer,
         switchActiveTeam,

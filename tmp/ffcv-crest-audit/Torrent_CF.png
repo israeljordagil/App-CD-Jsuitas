@@ -1,0 +1,662 @@
+// Punto de extensión para mejoras de UX/UI sin tocar la lógica principal.
+// Se carga al final de <body> en index.php
+(function(){
+  // Indicador flotante de carga movible
+  function initGlobalLoader(){
+    try{
+      if (document.getElementById('ffcv-loader')) return;
+      const el = document.createElement('div');
+      el.id = 'ffcv-loader';
+      el.setAttribute('role','status');
+      el.setAttribute('aria-live','polite');
+      el.innerHTML = `<span class="lspin" aria-hidden="true"></span><span class="ldot" aria-hidden="true"></span><span class="ltxt">Cargando<span class="lsub">…</span></span>`;
+      document.body.appendChild(el);
+
+      let dragging = false;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      const getPoint = (e)=>{
+        if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        return { x: e.clientX, y: e.clientY };
+      };
+
+      const onDown = (e)=>{
+        dragging = true;
+        const p = getPoint(e);
+        const rect = el.getBoundingClientRect();
+        offsetX = p.x - rect.left;
+        offsetY = p.y - rect.top;
+        el.style.left = rect.left + 'px';
+        el.style.top = rect.top + 'px';
+        el.style.right = 'auto';
+        el.style.bottom = 'auto';
+        e.preventDefault();
+      };
+      const onMove = (e)=>{
+        if (!dragging) return;
+        const p = getPoint(e);
+        let x = p.x - offsetX;
+        let y = p.y - offsetY;
+        const maxX = window.innerWidth - el.offsetWidth - 6;
+        const maxY = window.innerHeight - el.offsetHeight - 6;
+        x = Math.max(6, Math.min(maxX, x));
+        y = Math.max(6, Math.min(maxY, y));
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+      };
+      const onUp = ()=>{ dragging = false; };
+
+      el.addEventListener('mousedown', onDown);
+      el.addEventListener('touchstart', onDown, { passive:false });
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('touchmove', onMove, { passive:false });
+      window.addEventListener('mouseup', onUp);
+      window.addEventListener('touchend', onUp);
+      window.addEventListener('resize', ()=>{
+        if (el.style.left && el.style.top){
+          const rect = el.getBoundingClientRect();
+          const maxX = window.innerWidth - el.offsetWidth - 6;
+          const maxY = window.innerHeight - el.offsetHeight - 6;
+          el.style.left = Math.max(6, Math.min(maxX, rect.left)) + 'px';
+          el.style.top = Math.max(6, Math.min(maxY, rect.top)) + 'px';
+        }
+      });
+    }catch{}
+  }
+
+  function wrapFetchWithLoader(){
+    try{
+      if (!window.fetch || window.__ffcv_fetch_wrapped) return;
+      window.__ffcv_fetch_wrapped = true;
+      const orig = window.fetch.bind(window);
+      let pending = 0;
+      let showTimer = null;
+      const show = ()=>{
+        const el = document.getElementById('ffcv-loader');
+        if (el) el.style.display = 'inline-flex';
+      };
+      const hide = ()=>{
+        const el = document.getElementById('ffcv-loader');
+        if (el) el.style.display = 'none';
+      };
+      const scheduleShow = ()=>{
+        if (showTimer) return;
+        showTimer = setTimeout(()=>{
+          showTimer = null;
+          if (pending > 0) show();
+        }, 200);
+      };
+      window.fetch = function(...args){
+        pending++;
+        scheduleShow();
+        return orig(...args).finally(()=>{
+          pending = Math.max(0, pending - 1);
+          if (pending === 0){
+            if (showTimer){ clearTimeout(showTimer); showTimer = null; }
+            hide();
+          }
+        });
+      };
+    }catch{}
+  }
+  // Gate móvil: mostrar solo en PC y sugerir app oficial en móviles/tablets
+  const APP_LINKS = {
+    androidStore: 'https://play.google.com/store/apps/details?id=com.forja.ffcv',
+    iosStore: 'https://apps.apple.com/es/app/ffcv/id1033858098'
+  };
+  const APP_PACKAGE_ANDROID = 'com.forja.ffcv';
+  const APP_BUNDLE_IOS = 'com.forja.FFCV';
+  const APP_DEEPLINK_DEFAULT = 'https://ffcv.es/';
+  const APP_OPEN_TIMEOUT = 1400;
+  function isMobileLike(){
+    try{
+      const ua = navigator.userAgent || '';
+      const touch = ('ontouchstart' in window) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
+      const coarse = (window.matchMedia && window.matchMedia('(pointer:coarse)').matches) ? true : false;
+      const w = Math.min(window.innerWidth || 0, (screen && screen.width) || 0) || window.innerWidth || 0;
+      const uaMobile = /android|iphone|ipad|ipod|mobile|tablet|silk|kindle/i.test(ua);
+      return (uaMobile && (touch || coarse)) || ((touch || coarse) && w <= 1024);
+    }catch{ return false; }
+  }
+  function readStoredAny(keys){
+    for (const k of keys){
+      try{ const v = sessionStorage.getItem(k) || localStorage.getItem(k); if (v && String(v).trim() !== '') return String(v).trim(); }catch{}
+    }
+    return '';
+  }
+  function getParamAny(params, keys){
+    for (const k of keys){
+      const v = params.get(k);
+      if (v != null && String(v).trim() !== '') return String(v).trim();
+    }
+    return '';
+  }
+  function buildDeepLinkFromPage(){
+    try{
+      const params = new URLSearchParams(location.search || '');
+      const path = String(location.pathname || '').toLowerCase();
+      const hash = String(location.hash || '').toLowerCase();
+      const idTemp = getParamAny(params, ['id_temp','cod_temporada','codtemporada','temporada','id_temporada'])
+        || readStoredAny(['ffcv_cod_temporada']);
+      const idComp = getParamAny(params, ['id_competicion','id_competition','codcompeticion','cod_competicion','cod_competicion','id_competicion'])
+        || readStoredAny(['ffcv_cod_competicion']);
+      const idTorneo = getParamAny(params, ['id_torneo','codgrupo','cod_grupo','id_grupo','grupo'])
+        || readStoredAny(['ffcv_cod_grupo']);
+      const idModalidad = getParamAny(params, ['id_modalidad','cod_modalidad','modalidad','id_modalidad']);
+
+      const makeUrl = (base, entries)=>{
+        const qp = new URLSearchParams();
+        entries.forEach(([k,v])=>{ if (v != null && String(v).trim() !== '') qp.set(k, String(v).trim()); });
+        const qs = qp.toString();
+        return qs ? `${base}?${qs}` : base;
+      };
+
+      if (path.includes('/equipos/equipo.php')){
+        const idEquipo = getParamAny(params, ['id_equipo','cod_equipo','codigo_equipo','codequipo','equipo'])
+          || readStoredAny(['ffcv_cod_equipo']);
+        return makeUrl('https://resultadosffcv.isquad.es/equipo_p_partidos.php', [
+          ['id_equipo', idEquipo],
+          ['id_competicion', idComp]
+        ]);
+      }
+      if (path.includes('/jugadores/jugador.php')){
+        const idJugador = getParamAny(params, ['id_jugador','codigo','cod_jugador','codigo_jugador','jugador'])
+          || readStoredAny(['ffcv_cod_jugador']);
+        const isTechnician = getParamAny(params, ['isTechnician','is_technician','tecnico']);
+        return makeUrl('https://resultadosffcv.isquad.es/jugador_ficha.php', [
+          ['id_jugador', idJugador],
+          ['isTechnician', isTechnician]
+        ]);
+      }
+      if (path.includes('/partidos/partido.php')){
+        const idPartido = getParamAny(params, ['id_partido','cod_partido','codpartido','partido','codacta'])
+          || readStoredAny(['ffcv_cod_partido']);
+        return makeUrl('https://resultadosffcv.isquad.es/partido.php', [
+          ['id_competition', idComp],
+          ['id_partido', idPartido],
+          ['id_torneo', idTorneo]
+        ]);
+      }
+
+      const isHome = /\/ffcv_competiciones(\/|$)/.test(path) || path.endsWith('/includes/index_view.html') || path.endsWith('/index.php');
+      if (isHome){
+        if (hash.includes('clasificaciones')) {
+          return makeUrl('https://resultadosffcv.isquad.es/clasificacion.php', [
+            ['id_temp', idTemp],
+            ['id_modalidad', idModalidad],
+            ['id_competicion', idComp],
+            ['id_torneo', idTorneo]
+          ]);
+        }
+        if (hash.includes('calendario')) {
+          return makeUrl('https://resultadosffcv.isquad.es/calendario.php', [
+            ['id_temp', idTemp],
+            ['id_modalidad', idModalidad],
+            ['id_competicion', idComp],
+            ['id_torneo', idTorneo]
+          ]);
+        }
+        return makeUrl('https://resultadosffcv.isquad.es/total_partidos.php', [
+          ['id_temp', idTemp],
+          ['id_modalidad', idModalidad],
+          ['id_competicion', idComp],
+          ['id_torneo', idTorneo]
+        ]);
+      }
+      return '';
+    }catch{ return ''; }
+  }
+  function getAppDeepLink(){
+    try{
+      const fromGlobal = String(window.__FFCV_APP_DEEPLINK || '').trim();
+      if (fromGlobal) return fromGlobal;
+      const meta = document.querySelector('meta[name="ffcv-app-deeplink"]');
+      const content = meta?.getAttribute('content') || '';
+      const cleaned = String(content || '').trim();
+      if (cleaned) return cleaned;
+      const computed = buildDeepLinkFromPage();
+      if (computed) return computed;
+      // Por defecto, intentar con la URL actual (para Universal Links) o la home
+      const href = String(location.href || '').trim();
+      return href || APP_DEEPLINK_DEFAULT;
+    }catch{ return ''; }
+  }
+  function buildAndroidIntentUrl(deepLink){
+    try{
+      const m = String(deepLink || '').match(/^([a-z][a-z0-9+\-.]*):\/\/(.*)$/i);
+      if (!m) return '';
+      const scheme = m[1];
+      const hostPath = m[2] || '';
+      return `intent://${hostPath}#Intent;scheme=${scheme};package=${APP_PACKAGE_ANDROID};end`;
+    }catch{ return ''; }
+  }
+  function attemptOpenApp(opts={}){
+    try{
+      const deepLink = getAppDeepLink();
+      if (!deepLink) return false;
+      const ua = navigator.userAgent || '';
+      const isAndroid = /android/i.test(ua);
+      const isiOS = /iphone|ipad|ipod/i.test(ua);
+      const target = isAndroid ? (buildAndroidIntentUrl(deepLink) || deepLink) : deepLink;
+      if (!target) return false;
+      let didHide = false;
+      const onHide = ()=>{ if (document.hidden) didHide = true; };
+      document.addEventListener('visibilitychange', onHide, { once: true });
+      const timeoutMs = Number(opts.timeoutMs || APP_OPEN_TIMEOUT) || APP_OPEN_TIMEOUT;
+      setTimeout(()=>{
+        if (!didHide && typeof opts.onFail === 'function') {
+          try{ opts.onFail({ isAndroid, isiOS }); }catch{}
+        }
+      }, timeoutMs);
+      window.location.href = target;
+      return true;
+    }catch{ return false; }
+  }
+  function getPlatform(){
+    const ua = navigator.userAgent || '';
+    if (/android/i.test(ua)) return 'android';
+    if (/iphone|ipad|ipod/i.test(ua)) return 'ios';
+    return 'other';
+  }
+  function tryAutoOpenApp(){
+    try{
+      if (!isMobileLike()) return;
+      if (!getAppDeepLink()) return;
+      const platform = getPlatform();
+      attemptOpenApp({
+        timeoutMs: APP_OPEN_TIMEOUT,
+        onFail: ()=>{ showInstallPrompt({ platform }); }
+      });
+    }catch{}
+  }
+  function ensureMobileOverlay(){
+    let overlay = document.getElementById('mobile-overlay');
+    const needsInit = !overlay || overlay.getAttribute('data-ffcv-app-modal') !== '1';
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'mobile-overlay';
+    }
+    if (needsInit) {
+      overlay.setAttribute('data-ffcv-app-modal','1');
+      overlay.innerHTML = `
+        <div class="mo-card" role="dialog" aria-modal="true" aria-label="App oficial FFCV">
+          <div class="mo-logo-host" aria-hidden="true"></div>
+          <h2>Abre la App oficial de la FFCV</h2>
+          <p class="mo-text">Estamos intentando abrir la app. Si no la tienes instalada, puedes descargarla.</p>
+          <div class="mo-actions">
+            <a class="mo-btn mo-open" href="#" rel="noopener">Abrir app</a>
+            <a class="mo-btn mo-store" href="#" rel="noopener">Descargar app</a>
+          </div>
+        </div>`;
+    }
+    try{ if (!overlay.parentNode) document.body.appendChild(overlay); }catch{}
+    return overlay;
+  }
+  function ensureAppleSmartBanner(){
+    try{
+      if (document.querySelector('meta[name="apple-itunes-app"]')) return;
+      const meta = document.createElement('meta');
+      meta.name = 'apple-itunes-app';
+      meta.content = `app-id=1033858098`;
+      document.head.appendChild(meta);
+    }catch{}
+  }
+
+  function cloneLogoIntoOverlay(){
+    try{
+      const overlay = document.getElementById('mobile-overlay');
+      if (!overlay) return;
+      const host = overlay.querySelector('.mo-logo-host');
+      if (!host || host.dataset.ready === '1') return;
+      const logoImg = document.querySelector('.logo img');
+      if (logoImg) {
+        const clone = logoImg.cloneNode(true);
+        clone.classList.add('mo-logo');
+        clone.removeAttribute('style');
+        clone.setAttribute('alt', 'FFCV');
+        host.innerHTML = '';
+        host.appendChild(clone);
+        host.dataset.ready = '1';
+        return;
+      }
+      const iconHref = document.querySelector('link[rel="icon"]')?.getAttribute('href') || '';
+      if (iconHref) {
+        const img = document.createElement('img');
+        img.src = iconHref;
+        img.className = 'mo-logo';
+        img.alt = 'FFCV';
+        host.innerHTML = '';
+        host.appendChild(img);
+        host.dataset.ready = '1';
+      }
+    }catch{}
+  }
+  function setOverlayVisible(show){
+    const overlay = ensureMobileOverlay();
+    if (!overlay) return;
+    overlay.style.display = show ? 'flex' : 'none';
+    try{
+      document.documentElement.classList.toggle('ffcv-mobile-locked', show);
+      document.body.classList.toggle('ffcv-mobile-locked', show);
+      document.body.style.overflow = show ? 'hidden' : '';
+    }catch{}
+  }
+  function configureOverlayForPlatform(){
+    try{
+      const overlay = ensureMobileOverlay();
+      if (!overlay) return;
+      const platform = getPlatform();
+      const openBtn = overlay.querySelector('.mo-open');
+      const storeBtn = overlay.querySelector('.mo-store');
+      if (openBtn) {
+        openBtn.href = '#';
+        openBtn.textContent = 'Abrir app';
+        openBtn.style.display = getAppDeepLink() ? '' : 'none';
+      }
+      if (!storeBtn) return;
+      if (platform === 'android'){
+        storeBtn.href = APP_LINKS.androidStore;
+        storeBtn.textContent = 'Descargar en Google Play';
+        storeBtn.style.display = '';
+      } else if (platform === 'ios') {
+        storeBtn.href = APP_LINKS.iosStore;
+        storeBtn.textContent = 'Descargar en App Store';
+        storeBtn.style.display = '';
+      } else {
+        storeBtn.style.display = 'none';
+      }
+    }catch{}
+  }
+  function showInstallPrompt(opts={}){
+    try{
+      if (!isMobileLike()) return;
+      const overlay = ensureMobileOverlay();
+      if (!overlay) return;
+      configureOverlayForPlatform();
+      const txt = overlay.querySelector('.mo-text');
+      if (txt) txt.textContent = 'No hemos podido abrir la app. ¿Quieres descargarla ahora?';
+      setOverlayVisible(true);
+      cloneLogoIntoOverlay();
+    }catch{}
+  }
+  // Forzar entrada desde la portada (sesión):
+  // si se abre una ficha directamente sin navegación interna, volver a #partidos
+  function enforceEntryGate(){
+    try{
+      const rawPath = String(location.pathname || '');
+      const normalizedPath = rawPath.replace(/\/+$/,'');
+      const isHome = normalizedPath === ''
+        || normalizedPath === '/'
+        || /\/ffcv_competiciones$/.test(normalizedPath)
+        || /\/index\.php$/.test(normalizedPath)
+        || /\/includes\/index_view\.html$/.test(normalizedPath);
+      if (isHome) {
+        try{ sessionStorage.setItem('ffcv_entry_ok','1'); }catch{}
+        return;
+      }
+
+      const isDetailPage = /\/(partidos\/partido\.php|equipos\/equipo\.php|jugadores\/jugador\.php|instalaciones\/campo\.php)$/i.test(normalizedPath);
+      if (!isDetailPage) return;
+
+      const params = new URLSearchParams(location.search || '');
+      const allowDirect = params.get('allowDirect') === '1'
+        || params.get('direct') === '1'
+        || params.get('demo') === '1'
+        || params.has('returnTo')
+        || params.get('from') === 'partido'
+        || params.get('from') === 'equipo'
+        || params.get('from') === 'jugador'
+        || params.get('from') === 'campo';
+      if (allowDirect) {
+        try{ sessionStorage.setItem('ffcv_entry_ok','1'); }catch{}
+        return;
+      }
+
+      const ref = String(document.referrer || '');
+      let internalRef = false;
+      if (ref) {
+        try {
+          const refUrl = new URL(ref, location.href);
+          internalRef = refUrl.host === location.host;
+        } catch {}
+      }
+      if (internalRef) {
+        try{ sessionStorage.setItem('ffcv_entry_ok','1'); }catch{}
+        return;
+      }
+
+      // Sin referer interno (URL directa, favorito o reapertura): enviar a portada principal FFCV
+      window.location.replace('https://ffcv.es/');
+    }catch{}
+  }
+  // Mostrar JSON plano de goleadores
+  document.addEventListener('DOMContentLoaded', function(){
+    const pre = document.getElementById('json-goleadores');
+    if (pre) {
+      fetch('api/estadisticas/goleadores.php', { cache: 'no-cache' })
+        .then(r => r.json())
+        .then(data => {
+          pre.textContent = JSON.stringify(data, null, 2);
+        })
+        .catch(err => {
+          pre.textContent = 'Error al cargar el JSON de goleadores.';
+        });
+    }
+  });
+    // Refuerzo: posicionar el overlay del buscador de clubes siempre centrado bajo el input
+    function positionClubResults() {
+      const input = document.getElementById('club-search');
+      const results = document.getElementById('club-results');
+      if (!input || !results) return;
+      if (results.style.display === 'none' || results.childElementCount === 0) return;
+      // Obtener posición del input respecto a la ventana
+      const rect = input.getBoundingClientRect();
+      // Centrar horizontalmente respecto al input y dejarlo justo debajo
+      results.style.position = 'fixed';
+      results.style.left = (rect.left + rect.width/2) + 'px';
+      results.style.top = (rect.bottom + 6) + 'px';
+      results.style.transform = 'translateX(-50%)';
+      results.style.width = Math.max(rect.width, 220) + 'px';
+      results.style.maxWidth = '95vw';
+      results.style.zIndex = '10001';
+    }
+
+    document.addEventListener('DOMContentLoaded', function(){
+      // Gate móvil global
+      try{ ensureAppleSmartBanner(); }catch{}
+      try{ tryAutoOpenApp(); }catch{}
+      try{ enforceEntryGate(); }catch{}
+      try{ window.addEventListener('pageshow', ()=>{ try{ enforceEntryGate(); }catch{} }); }catch{}
+      try{
+        document.addEventListener('click', (e)=>{
+          const openBtn = e.target && e.target.closest ? e.target.closest('.mo-open') : null;
+          const storeBtn = e.target && e.target.closest ? e.target.closest('.mo-store') : null;
+          if (!openBtn && !storeBtn) return;
+          e.preventDefault();
+          if (openBtn) {
+            try{
+              attemptOpenApp({
+                timeoutMs: APP_OPEN_TIMEOUT,
+                onFail: ()=>{ showInstallPrompt(); }
+              });
+            }catch{}
+            return;
+          }
+          try{
+            const href = storeBtn.getAttribute('href') || '';
+            if (href && href !== '#') window.location.href = href;
+          }catch{}
+        });
+      }catch{}
+      const input = document.getElementById('club-search');
+      const results = document.getElementById('club-results');
+      if (input && results) {
+        // Reposicionar al mostrar resultados
+        const observer = new MutationObserver(positionClubResults);
+        observer.observe(results, { childList: true, subtree: false });
+        input.addEventListener('focus', positionClubResults);
+        window.addEventListener('resize', positionClubResults);
+        window.addEventListener('scroll', positionClubResults, true);
+      }
+
+        // Carrusel de jornadas eliminado. Selector de jornada es desplegable como los demás filtros.
+    });
+  function applyTheme(mode){
+    const root = document.documentElement;
+    if (mode === 'dark') {
+      root.setAttribute('data-theme','dark');
+    } else if (mode === 'light') {
+      root.removeAttribute('data-theme');
+    } else {
+      // Mantener tema claro por defecto para evitar cuerpo oscuro en Chrome
+      root.removeAttribute('data-theme');
+    }
+    const btn = document.getElementById('btn-theme');
+    if (btn) btn.textContent = 'Tema: ' + (mode ? (mode.charAt(0).toUpperCase()+mode.slice(1)) : 'Auto');
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    // Inicializar tema desde localStorage
+    const saved = localStorage.getItem('ffcv-theme');
+    const hasThemeButton = !!document.getElementById('btn-theme');
+    // Si quedó guardado "dark" pero no hay botón para revertir, forzar claro y limpiar el storage
+    if (saved === 'dark' && !hasThemeButton) {
+      try { localStorage.removeItem('ffcv-theme'); } catch {}
+      applyTheme('light');
+    } else {
+      applyTheme(saved || '');
+    }
+    // El botón de tema se reemplaza por compartir; mantenemos soporte de tema auto por preferencia del sistema.
+
+    // Reaccionar a cambios del sistema si estamos en auto
+    // (Auto desactivado para evitar oscurecer el body en Chrome)
+
+    // Menú móvil: toggle del nav en cabecera
+    try {
+      const header = document.querySelector('.main-header');
+      const toggle = document.getElementById('header-toggle');
+      if (header && toggle) {
+        toggle.addEventListener('click', function(){
+          const open = header.classList.toggle('nav-open');
+          this.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+        // Cerrar menú al hacer click en un enlace de navegación
+        header.addEventListener('click', function(ev){
+          const link = ev.target.closest('.main-nav a');
+          if (!link) return;
+          if (header.classList.contains('nav-open')) {
+            header.classList.remove('nav-open');
+            toggle.setAttribute('aria-expanded','false');
+          }
+        });
+      }
+      // --- CAMBIO DE TÍTULO DINÁMICO ---
+      const menuLinks = document.querySelectorAll('.main-nav a');
+      const pageTitle = document.getElementById('current-page-title');
+      if (menuLinks && pageTitle) {
+        menuLinks.forEach(link => {
+          link.addEventListener('click', function(e) {
+            let newTitle = this.textContent.trim();
+            // Solo si estamos en la ficha de jugador y es Estadísticas
+            if (newTitle === 'Estadísticas' && window.location.pathname.includes('jugador.php')) {
+              const metaTop = document.querySelector('.header-meta-top');
+              if (metaTop) {
+                const codcompeticion = metaTop.getAttribute('data-codcompeticion');
+                const codgrupo = metaTop.getAttribute('data-codgrupo');
+                const codtemporada = metaTop.getAttribute('data-codtemporada');
+                if (codcompeticion && codgrupo && codtemporada) {
+                  e.preventDefault();
+                  window.location.href = `https://ffcv.es/wp/competiciones/ffcv_competiciones/estadisticas/estadisticas.php?cod_temporada=${encodeURIComponent(codtemporada)}&codcompeticion=${encodeURIComponent(codcompeticion)}&codgrupo=${encodeURIComponent(codgrupo)}`;
+                  return;
+                }
+              }
+            }
+            // Evitar navegación si es un enlace interno
+            if (this.getAttribute('href') === '#') e.preventDefault();
+            // Quitar clase active de todos
+            menuLinks.forEach(l => { l.classList.remove('active'); l.removeAttribute('aria-current'); });
+            this.classList.add('active');
+            this.setAttribute('aria-current','page');
+            // Cambiar el título según el texto del enlace
+            if (newTitle === 'Partidos') newTitle = 'Partidos y Resultados';
+            if (newTitle === 'Clasificaciones') newTitle = 'Clasificaciones';
+            if (newTitle === 'Sanciones') newTitle = 'Sanciones';
+            if (newTitle === 'Estadísticas') newTitle = 'Estadísticas';
+            if (newTitle === 'Noticias') newTitle = 'Noticias';
+            pageTitle.textContent = newTitle;
+          });
+        });
+      }
+    } catch {}
+
+    // Compartir página: Web Share API con fallback
+    try {
+      const shareBtn = document.getElementById('btn-share');
+      if (shareBtn) {
+        shareBtn.addEventListener('click', async ()=>{
+          const title = document.title || 'FFCV Competiciones';
+          const url = window.location.href;
+          const text = 'Consulta de competiciones, partidos y clasificaciones FFCV';
+          if (navigator.share) {
+            try { await navigator.share({ title, text, url }); } catch {}
+          } else {
+            // Fallback: copiar enlace al portapapeles y mostrar aviso
+            try {
+              await navigator.clipboard.writeText(url);
+              shareBtn.classList.add('shared');
+              shareBtn.setAttribute('title','Enlace copiado');
+              setTimeout(()=>{ shareBtn.classList.remove('shared'); shareBtn.setAttribute('title','Compartir esta página'); }, 1800);
+            } catch {}
+          }
+        });
+      }
+    } catch {}
+  });
+  // Ajuste global para la publicidad lateral fija (evitar corte con cabeceras altas)
+  function initAdLeftRail(){
+    try{
+      const ad = document.querySelector('.ad-left-rail');
+      if (!ad) return;
+      const header = document.querySelector('.main-header');
+      const main = document.querySelector('main.container-wide, main');
+      const root = document.documentElement;
+      let ticking = false;
+
+      const compute = ()=>{
+        try{
+          const mainTop = main ? (main.getBoundingClientRect().top + (window.scrollY || window.pageYOffset || 0)) : null;
+          const mainPadTop = main ? (parseFloat(getComputedStyle(main).paddingTop || '0') || 0) : 0;
+          const headerHeight = header ? (header.offsetHeight || header.getBoundingClientRect().height || 0) : 0;
+          const desiredTop = mainTop != null ? Math.max(0, mainTop + mainPadTop) : Math.max(16, headerHeight + 16);
+          root.style.setProperty('--ad-rail-top-static', `${Math.round(desiredTop)}px`);
+          root.style.setProperty('--ad-rail-top', `${Math.round(desiredTop)}px`);
+          const adHeight = ad.offsetHeight || (ad.getBoundingClientRect && ad.getBoundingClientRect().height) || 0;
+          root.style.setProperty('--ad-rail-height', `${Math.round(adHeight)}px`);
+          try{ document.body?.setAttribute('data-ad-rail','1'); }catch{}
+        }catch{}
+      };
+
+      const requestUpdate = ()=>{
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(()=>{ ticking = false; compute(); });
+      };
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', requestUpdate);
+      } else {
+        requestUpdate();
+      }
+      window.addEventListener('load', requestUpdate);
+      window.addEventListener('resize', requestUpdate);
+      if ('ResizeObserver' in window) {
+        const ro = new ResizeObserver(requestUpdate);
+        ro.observe(ad);
+        if (header) ro.observe(header);
+        if (main) ro.observe(main);
+      }
+    }catch{}
+  }
+  initAdLeftRail();
+})();

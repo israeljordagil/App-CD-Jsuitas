@@ -50,113 +50,27 @@ export interface CalendarEvent {
   notes?: string;
 }
 
-// Generador defensivo de eventos demo ajustados al mes/año visible para testing continuo
-function getDemoEventsForDate(dateObj: Date, familyPlayers: UnifiedPlayer[]): CalendarEvent[] {
-  const currentYear = dateObj.getFullYear();
-  const currentMonth = dateObj.getMonth();
-  const monthStr = String(currentMonth + 1).padStart(2, '0');
+import { 
+  generateTrainingScheduleOccurrences, 
+  AthleteMapping, 
+  GeneratedOccurrence 
+} from '../../utils/trainingScheduleOccurrences';
+import { INITIAL_TRAINING_SCHEDULES } from '../../data/trainingSchedulesData';
+import { FamilyCalendarFilter } from '../dashboards/FamiliaDashboard';
 
-  const p1 = familyPlayers[0] || { id: 'a1000001-0000-4000-8000-000000000046', name: 'Pablo', team: 'Cadete B Fútbol' };
-  const p2 = familyPlayers[1] || { id: 'a1000001-0000-4000-8000-000000000047', name: 'Hugo', team: 'Infantil A Fútbol' };
-  const p3 = familyPlayers[2] || { id: 'a1000001-0000-4000-8000-000000000048', name: 'Elena', team: 'Alevín Vóley' };
-
-  return [
-    {
-      id: `e1-${currentYear}-${monthStr}`,
-      childId: p1.id,
-      childName: p1.name,
-      sport: '⚽ Fútbol',
-      team: p1.team || 'Cadete B',
-      title: 'Entrenamiento Pre-Partido',
-      type: 'training',
-      date: `${currentYear}-${monthStr}-08`,
-      dayNum: 8,
-      dayName: 'Viernes',
-      time: '17:30 - 19:00',
-      citationTime: '17:15h',
-      location: 'Campo 2 Césped Artificial - CD Jesuitas',
-      weather: '☀️ 20°C • Despejado',
-      carDeparture: '16:55h (15 min viaje desde casa)',
-      notes: 'Revisión táctica y jugadas ensayadas.'
-    },
-    {
-      id: `e2-${currentYear}-${monthStr}`,
-      childId: p1.id,
-      childName: p1.name,
-      sport: '⚽ Fútbol',
-      team: p1.team || 'Cadete B',
-      title: 'Jornada Oficial vs Levante UD B',
-      type: 'match',
-      date: `${currentYear}-${monthStr}-10`,
-      dayNum: 10,
-      dayName: 'Sábado',
-      time: '11:00h',
-      citationTime: '10:00h en Vestuarios',
-      location: 'Campo 1 - CD Jesuitas (Valencia)',
-      weather: '⛅ 18°C • Sol y nubes • 10% prob. lluvia',
-      carDeparture: '09:40h (15 min viaje + parking)',
-      kit: '1ª Equipación Azul Noche',
-      notes: 'Partido oficial de Liga. Citación puntual.'
-    },
-    {
-      id: `e3-${currentYear}-${monthStr}`,
-      childId: p2.id,
-      childName: p2.name,
-      sport: '👟 Fútbol Sala',
-      team: p2.team || 'Infantil A Futsal',
-      title: 'Jornada Oficial vs El Pilar Futsal',
-      type: 'match',
-      date: `${currentYear}-${monthStr}-10`,
-      dayNum: 10,
-      dayName: 'Sábado',
-      time: '11:30h',
-      citationTime: '10:45h en Pista',
-      location: 'Pabellón Colegio Jesuitas',
-      weather: '☀️ 21°C • Pista Cubierta',
-      carDeparture: '09:45h (Llegar con Pablo)',
-      kit: '1ª Equipación Futsal',
-      notes: 'Partido coincidente el mismo sábado por la mañana.'
-    },
-    {
-      id: `e4-${currentYear}-${monthStr}`,
-      childId: p3.id,
-      childName: p3.name,
-      sport: '🏐 Voleibol',
-      team: p3.team || 'Alevín Femenino Vóley',
-      title: 'Entrenamiento Semanal Vóley',
-      type: 'training',
-      date: `${currentYear}-${monthStr}-13`,
-      dayNum: 13,
-      dayName: 'Martes',
-      time: '17:30 - 19:00',
-      citationTime: '17:20h',
-      location: 'Pistas Exteriores Vóley - CD Jesuitas',
-      weather: '⛅ 19°C • Sol y nubes',
-      carDeparture: '16:55h desde casa',
-      notes: 'Entrenamiento coincidente a la misma hora que Pablo.'
-    },
-    {
-      id: `e5-${currentYear}-${monthStr}`,
-      childId: p1.id,
-      childName: p1.name,
-      sport: '⚽ Fútbol',
-      team: p1.team || 'Cadete B',
-      title: 'Entrenamiento Rincón Técnico',
-      type: 'training',
-      date: `${currentYear}-${monthStr}-13`,
-      dayNum: 13,
-      dayName: 'Martes',
-      time: '17:30 - 19:00',
-      citationTime: '17:15h',
-      location: 'Campo 2 Césped Artificial - CD Jesuitas',
-      weather: '⛅ 19°C • Sol y nubes',
-      carDeparture: '16:55h desde casa',
-      notes: 'Trabajo de finalización y posesiones.'
-    }
-  ];
+export interface FamiliaCalendarioViewProps {
+  familyFilter?: FamilyCalendarFilter;
+  onSelectFamilyFilter?: (filter: FamilyCalendarFilter) => void;
 }
 
-export function FamiliaCalendarioView() {
+// Mapeo defensivo de deportistas de la demo con sus teamId canónicos
+const DEMO_ATHLETES_MAP: AthleteMapping[] = [
+  { athleteId: 'pablo-10', athleteName: 'Pablo', teamId: 'b1000001-0000-4000-8000-000000000001', teamName: 'Juvenil A', sport: '⚽ Fútbol 11' },
+  { athleteId: 'lucia-7', athleteName: 'Lucía', teamId: 'b1000001-0000-4000-8000-000000000009', teamName: 'Infantil A', sport: '⚽ Fútbol 11' },
+  { athleteId: 'lucas-22', athleteName: 'Lucas', teamId: 'b1000001-0000-4000-8000-000000000014', teamName: 'Alevín A', sport: '⚽ Fútbol 8' }
+];
+
+export function FamiliaCalendarioView({ familyFilter, onSelectFamilyFilter }: FamiliaCalendarioViewProps) {
   const { width: screenWidth } = useWindowDimensions();
   const isTablet = screenWidth >= 768;
 
@@ -168,8 +82,21 @@ export function FamiliaCalendarioView() {
   const [visibleDate, setVisibleDate] = useState(() => new Date());
   const [selectedDayNum, setSelectedDayNum] = useState(() => new Date().getDate());
 
-  // Filtros de estado
-  const [selectedChild, setSelectedChild] = useState<string>('all');
+  // Estado unificado de filtro de hijo (reutiliza prop familyFilter si está disponible para 1 única fuente de verdad)
+  const [localFamilyFilter, setLocalFamilyFilter] = useState<FamilyCalendarFilter>({ mode: 'child', childId: 'pablo-10' });
+  const activeFilter = familyFilter || localFamilyFilter;
+
+  const handleSetFilter = (newFilter: FamilyCalendarFilter) => {
+    if (onSelectFamilyFilter) {
+      onSelectFamilyFilter(newFilter);
+    } else {
+      setLocalFamilyFilter(newFilter);
+    }
+  };
+
+  const selectedChild = activeFilter.mode === 'all' ? 'all' : activeFilter.childId;
+
+  // Filtros de tipo y modal
   const [selectedType, setSelectedType] = useState<'all' | 'match' | 'training' | 'tournament'>('all');
   const [syncedModalVisible, setSyncedModalVisible] = useState(false);
   const [eveReminderEnabled, setEveReminderEnabled] = useState(true);
@@ -204,14 +131,96 @@ export function FamiliaCalendarioView() {
   const monthTitleText = rawMonthName.toUpperCase();
   const monthShortName = visibleDate.toLocaleDateString('es-ES', { month: 'long' });
 
-  // Eventos demo dinámicos para la fecha visible
-  const allEvents = getDemoEventsForDate(visibleDate, familyPlayers);
+  // Generación pura de ocurrencias a partir de las 86 reglas recurrentes de public.training_schedules
+  const trainingOccurrences = generateTrainingScheduleOccurrences({
+    schedules: INITIAL_TRAINING_SCHEDULES,
+    year,
+    monthZeroIndexed: month,
+    activeFilter,
+    athletes: DEMO_ATHLETES_MAP
+  });
 
-  // Filtrado de eventos
+  // Eventos adicionales de partidos/torneos para fin de semana
+  const monthStr = String(month + 1).padStart(2, '0');
+  const matchEvents: GeneratedOccurrence[] = [];
+
+  if (activeFilter.mode === 'all' || activeFilter.childId === 'pablo-10') {
+    matchEvents.push({
+      id: `match:pablo:${year}-${monthStr}-10`,
+      scheduleId: 'match-pablo',
+      childId: 'pablo-10',
+      childName: 'Pablo',
+      sport: '⚽ Fútbol 11',
+      team: 'Juvenil A',
+      title: 'Jornada Oficial vs Levante UD B',
+      type: 'match',
+      date: `${year}-${monthStr}-10`,
+      dayNum: 10,
+      dayName: 'Sábado',
+      time: '11:00 - 12:45',
+      startTimeRaw: '11:00',
+      endTimeRaw: '12:45',
+      citationTime: '10:00h en Vestuarios',
+      location: 'Campo 1 - CD Jesuitas (Valencia)',
+      weather: '⛅ 18°C • Sol y nubes',
+      carDeparture: '09:40h (15 min viaje)',
+      notes: 'Partido oficial de Liga Juvenil A'
+    });
+  }
+
+  if (activeFilter.mode === 'all' || activeFilter.childId === 'lucia-7') {
+    matchEvents.push({
+      id: `match:lucia:${year}-${monthStr}-10`,
+      scheduleId: 'match-lucia',
+      childId: 'lucia-7',
+      childName: 'Lucía',
+      sport: '⚽ Fútbol 11',
+      team: 'Infantil A',
+      title: 'Jornada Oficial vs Valencia CF C',
+      type: 'match',
+      date: `${year}-${monthStr}-10`,
+      dayNum: 10,
+      dayName: 'Sábado',
+      time: '12:30 - 14:15',
+      startTimeRaw: '12:30',
+      endTimeRaw: '14:15',
+      citationTime: '11:30h en Vestuarios',
+      location: 'Campo 2 - CD Jesuitas (Valencia)',
+      weather: '⛅ 18°C • Sol y nubes',
+      carDeparture: '11:10h (15 min viaje)',
+      notes: 'Partido oficial de Liga Infantil A'
+    });
+  }
+
+  if (activeFilter.mode === 'all' || activeFilter.childId === 'lucas-22') {
+    matchEvents.push({
+      id: `tournament:lucas:${year}-${monthStr}-11`,
+      scheduleId: 'tourn-lucas',
+      childId: 'lucas-22',
+      childName: 'Lucas',
+      sport: '⚽ Fútbol 8',
+      team: 'Alevín A',
+      title: 'Torneo Alevín de Primavera',
+      type: 'tournament',
+      date: `${year}-${monthStr}-11`,
+      dayNum: 11,
+      dayName: 'Domingo',
+      time: '10:00 - 14:00',
+      startTimeRaw: '10:00',
+      endTimeRaw: '14:00',
+      citationTime: '09:30h',
+      location: 'Instalaciones Centrales CD Jesuitas',
+      weather: '☀️ 22°C • Soleado',
+      carDeparture: '09:15h',
+      notes: 'Torneo oficial Alevín A'
+    });
+  }
+
+  const allEvents = [...trainingOccurrences, ...matchEvents];
+
+  // Filtrado final por tipo
   const filteredEvents = allEvents.filter(e => {
-    const matchChild = selectedChild === 'all' || e.childId === selectedChild;
-    const matchType = selectedType === 'all' || e.type === selectedType;
-    return matchChild && matchType;
+    return selectedType === 'all' || e.type === selectedType;
   });
 
   const activeDayEvents = filteredEvents.filter(e => e.dayNum === selectedDayNum);
@@ -247,14 +256,14 @@ export function FamiliaCalendarioView() {
         </View>
       ) : (
         <>
-          {/* 1. SELECTOR MULTIDEPORTE DE HIJOS REALES */}
+          {/* 1. SELECTOR MULTIDEPORTE DE HIJOS REALES (FUENTE ÚNICA DE VERDAD) */}
           <View style={styles.filterRow}>
             <TouchableOpacity 
               style={[styles.filterPill, selectedChild === 'all' && styles.filterPillActive]}
-              onPress={() => setSelectedChild('all')}
+              onPress={() => handleSetFilter({ mode: 'all' })}
             >
               <Text style={[styles.filterPillText, selectedChild === 'all' && styles.filterPillTextActive]}>
-                👨‍👩‍👧‍👦 Toda la Familia
+                👨‍👩‍👧‍👦 Todos los hijos
               </Text>
             </TouchableOpacity>
 
@@ -265,7 +274,7 @@ export function FamiliaCalendarioView() {
                 <TouchableOpacity 
                   key={player.id}
                   style={[styles.filterPill, isSelected && styles.filterPillActive]}
-                  onPress={() => setSelectedChild(player.id)}
+                  onPress={() => handleSetFilter({ mode: 'child', childId: player.id })}
                 >
                   <Text style={[styles.filterPillText, isSelected && styles.filterPillTextActive]}>
                     {player.avatarIcon || '👦'} {player.name} ({shortTeam})
@@ -564,6 +573,51 @@ export function FamiliaCalendarioView() {
                         <Text style={styles.carDepartureTxt}>
                           Hora recomendada de salida: <Text style={{fontWeight: '900', color: colors.accentGold}}>{evt.carDeparture}</Text>
                         </Text>
+                      </View>
+
+                      {/* BOTONES DE EXPORTACIÓN A GOOGLE CALENDAR Y APPLE CALENDAR */}
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                        {evt.googleCalendarUrl && (
+                          <TouchableOpacity 
+                            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#1E293B', paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.skyPrimary }}
+                            onPress={() => {
+                              if (evt.googleCalendarUrl) {
+                                require('react-native').Linking.openURL(evt.googleCalendarUrl);
+                              }
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name="logo-google" size={14} color={colors.skyPrimary} style={{ marginRight: 6 }} />
+                            <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Google Calendar</Text>
+                          </TouchableOpacity>
+                        )}
+
+                        {evt.icsContent && (
+                          <TouchableOpacity 
+                            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#1E293B', paddingVertical: 8, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.accentGold }}
+                            onPress={() => {
+                              const Platform = require('react-native').Platform;
+                              const Linking = require('react-native').Linking;
+                              if (Platform.OS === 'web' && typeof document !== 'undefined') {
+                                const blob = new Blob([evt.icsContent!], { type: 'text/calendar;charset=utf-8' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `entrenamiento_${evt.childName.toLowerCase()}_${evt.date}.ics`;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                              } else {
+                                const dataUri = `data:text/calendar;charset=utf-8,${encodeURIComponent(evt.icsContent!)}`;
+                                Linking.openURL(dataUri).catch(() => {});
+                              }
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name="logo-apple" size={14} color={colors.accentGold} style={{ marginRight: 6 }} />
+                            <Text style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Apple Calendar</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
 
                     </LinearGradient>

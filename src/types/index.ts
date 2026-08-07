@@ -14,4 +14,8 @@ export interface Match {
 }
 
 export * from './liveMatch';
+export * from './teams';
+export * from './schedules';
+export * from './matches';
+export * from './opponentClubs';
 

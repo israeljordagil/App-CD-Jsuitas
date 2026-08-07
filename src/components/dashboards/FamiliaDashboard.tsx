@@ -17,6 +17,46 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { useSport } from '../../context/SportContext';
 import { useDemoNavigation } from '../../context/DemoNavigationContext';
+import { supabase } from '../../lib/supabase';
+
+const getEquipacionPublicUrl = (fileName: string): string => {
+  if (!supabase) return '';
+  const { data } = supabase.storage
+    .from('Equipaciones CD Jesuitas')
+    .getPublicUrl(fileName);
+
+  return `${data?.publicUrl}?v=png-final-20260802`;
+};
+
+const CAMISETA_TRASERA_3D_LIMPIA = require('../../../assets/images/camiseta_trasera_3d_limpia.png');
+
+const DORSAL_3D_IMAGES: Record<number, any> = {
+  1: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-01.png'),
+  2: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-02.png'),
+  3: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-03.png'),
+  4: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-04.png'),
+  5: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-05.png'),
+  6: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-06.png'),
+  7: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-07.png'),
+  8: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-08.png'),
+  9: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-09.png'),
+  10: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-10.png'),
+  11: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-11.png'),
+  12: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-12.png'),
+  13: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-13.png'),
+  14: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-14.png'),
+  15: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-15.png'),
+  16: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-16.png'),
+  17: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-17.png'),
+  18: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-18.png'),
+  19: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-19.png'),
+  20: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-20.png'),
+  21: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-21.png'),
+  22: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-22.png'),
+  23: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-23.png'),
+  24: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-24.png'),
+  25: require('../../../assets/equipaciones/primera-equipacion-3d-dorsales/dorsal-0125.png'),
+};
 
 // Paleta corporativa de lujo CD Jesuitas
 const colors = {
@@ -46,12 +86,159 @@ const VALENCIA_SHIELD_URI = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.o
 // Imagen de estadio iluminado en alta definición (con fallback visual estilizado)
 const STADIUM_BG_URI = 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80';
 
-// Lista de deportistas fija exigida por las especificaciones de la demo
+// Lista de deportistas fija de demostración idéntica a la captura de referencia
 const DEMO_ATHLETES = [
-  { id: 'pablo-10', name: 'Pablo García', team: 'Alevín C', sport: 'Fútbol', dorsal: 10, avatar: '👦', active: true },
-  { id: 'laura-7', name: 'Laura García', team: 'Infantil A', sport: 'Baloncesto', dorsal: 7, avatar: '👧', active: false },
-  { id: 'sergio-5', name: 'Sergio García', team: 'Benjamín A', sport: 'Futsal', dorsal: 5, avatar: '👦', active: false },
+  { 
+    id: 'pablo-10', 
+    name: 'Pablo', 
+    fullName: 'Pablo Martínez', 
+    teamId: 'b1000001-0000-4000-8000-000000000001',
+    team: 'Juvenil A', 
+    sport: 'Fútbol 11', 
+    dorsal: 10, 
+    avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=200&q=80', 
+    active: true 
+  },
+  { 
+    id: 'lucia-7', 
+    name: 'Lucía', 
+    fullName: 'Lucía Martínez', 
+    teamId: 'b1000001-0000-4000-8000-000000000009',
+    team: 'Infantil A', 
+    sport: 'Fútbol 11', 
+    dorsal: 7, 
+    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80', 
+    active: false 
+  },
+  { 
+    id: 'lucas-22', 
+    name: 'Lucas', 
+    fullName: 'Lucas Martínez', 
+    teamId: 'b1000001-0000-4000-8000-000000000014',
+    team: 'Alevín A', 
+    sport: 'Fútbol 8', 
+    dorsal: 22, 
+    avatar: 'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?auto=format&fit=crop&w=200&q=80', 
+    active: false 
+  },
 ];
+
+interface DemoDashboardEvent {
+  id: string;
+  athleteId: string;
+  athleteName: string;
+  team: string;
+  sport: string;
+  title: string;
+  type: 'Entrenamiento' | 'Partido' | 'Convocatoria' | 'Torneo';
+  date: string;
+  time: string;
+  location: string;
+  badgeTag: string;
+}
+
+const DEMO_CALENDAR_EVENTS: DemoDashboardEvent[] = [
+  // Pablo · Juvenil A (15:45 - 17:15)
+  {
+    id: 'ev-p1',
+    athleteId: 'pablo-10',
+    athleteName: 'Pablo',
+    team: 'Juvenil A',
+    sport: 'Fútbol 11',
+    title: 'Entrenamiento Juvenil A',
+    type: 'Entrenamiento',
+    date: 'Lunes, Miércoles, Viernes',
+    time: '15:45 - 17:15',
+    location: 'Campo CD Jesuitas',
+    badgeTag: 'Pablo · Juvenil A'
+  },
+  {
+    id: 'ev-p2',
+    athleteId: 'pablo-10',
+    athleteName: 'Pablo',
+    team: 'Juvenil A',
+    sport: 'Fútbol 11',
+    title: 'Jornada Oficial vs Levante UD B',
+    type: 'Partido',
+    date: 'Sábado 10 de Mayo',
+    time: '11:00h (Citación 10:00h)',
+    location: 'Campo 1 · CD Jesuitas',
+    badgeTag: 'Pablo · Juvenil A'
+  },
+  {
+    id: 'ev-p3',
+    athleteId: 'pablo-10',
+    athleteName: 'Pablo',
+    team: 'Juvenil A',
+    sport: 'Fútbol 11',
+    title: 'Convocatoria Oficial Publicada',
+    type: 'Convocatoria',
+    date: 'Jueves 8 de Mayo',
+    time: '19:15h',
+    location: 'Vestuarios / App CDJ',
+    badgeTag: 'Pablo · Juvenil A'
+  },
+
+  // Lucía · Infantil A (18:45 - 20:15)
+  {
+    id: 'ev-l1',
+    athleteId: 'lucia-7',
+    athleteName: 'Lucía',
+    team: 'Infantil A',
+    sport: 'Fútbol 11',
+    title: 'Entrenamiento Infantil A',
+    type: 'Entrenamiento',
+    date: 'Lunes, Miércoles, Viernes',
+    time: '18:45 - 20:15',
+    location: 'Campo CD Jesuitas',
+    badgeTag: 'Lucía · Infantil A'
+  },
+  {
+    id: 'ev-l2',
+    athleteId: 'lucia-7',
+    athleteName: 'Lucía',
+    team: 'Infantil A',
+    sport: 'Fútbol 11',
+    title: 'Jornada Oficial vs Valencia CF C',
+    type: 'Partido',
+    date: 'Sábado 10 de Mayo',
+    time: '12:30h (Citación 11:30h)',
+    location: 'Campo 2 · CD Jesuitas',
+    badgeTag: 'Lucía · Infantil A'
+  },
+
+  // Lucas · Alevín A (17:30 - 19:00 Lun/Mié | 18:00 - 19:00 Vie)
+  {
+    id: 'ev-k1',
+    athleteId: 'lucas-22',
+    athleteName: 'Lucas',
+    team: 'Alevín A',
+    sport: 'Fútbol 8',
+    title: 'Entrenamiento Alevín A',
+    type: 'Entrenamiento',
+    date: 'Lunes, Miércoles, Viernes',
+    time: '17:30 - 19:00 (Vie 18:00)',
+    location: 'Campo CD Jesuitas',
+    badgeTag: 'Lucas · Alevín A'
+  },
+  {
+    id: 'ev-k2',
+    athleteId: 'lucas-22',
+    athleteName: 'Lucas',
+    team: 'Alevín A',
+    sport: 'Fútbol 8',
+    title: 'Torneo Alevín de Primavera',
+    type: 'Torneo',
+    date: 'Domingo 11 de Mayo',
+    time: '10:00h - 14:00h',
+    location: 'Instalaciones Centrales CDJ',
+    badgeTag: 'Lucas · Alevín A'
+  }
+];
+
+export type FamilyCalendarFilter =
+  | { mode: 'all' }
+  | { mode: 'child'; childId: string };
 
 export function FamiliaDashboard() {
   const router = useRouter();
@@ -63,8 +250,11 @@ export function FamiliaDashboard() {
 
   const { linkedPlayers, activePlayerId, switchActivePlayer } = useAuth();
 
-  // Deportista seleccionado (Pablo García por defecto)
-  const [selectedAthleteId, setSelectedAthleteId] = useState<string>('pablo-10');
+  // Fuente de verdad única para el filtro del calendario familiar
+  const [familyFilter, setFamilyFilter] = useState<FamilyCalendarFilter>({
+    mode: 'child',
+    childId: 'pablo-10'
+  });
 
   // Confirmación binaria de asistencia a partido ('Confirmado' | 'Ausente')
   const [matchStatusMap, setMatchStatusMap] = useState<Record<string, { status: 'Confirmado' | 'Ausente'; reason?: string; detail?: string }>>({});
@@ -82,24 +272,32 @@ export function FamiliaDashboard() {
   // Estado replegable para el Asistente de Salida (contraído por defecto)
   const [isTravelAssistantOpen, setIsTravelAssistantOpen] = useState(false);
 
-  // Obtener deportista activo
-  const activeAthlete = DEMO_ATHLETES.find(a => a.id === selectedAthleteId) || DEMO_ATHLETES[0];
+  // Obtener deportista activo y eventos filtrados dinámicos
+  const activeAthleteId = familyFilter.mode === 'child' ? familyFilter.childId : 'pablo-10';
+  const activeAthlete = DEMO_ATHLETES.find(a => a.id === activeAthleteId) || DEMO_ATHLETES[0];
 
-  const handleSelectAthlete = (athlete: any) => {
-    setSelectedAthleteId(athlete.id);
-    if (athlete.sport === 'Fútbol') setSport('futbol');
+  const activeEvents = familyFilter.mode === 'all'
+    ? DEMO_CALENDAR_EVENTS
+    : DEMO_CALENDAR_EVENTS.filter(e => e.athleteId === familyFilter.childId);
+
+  const nextTraining = activeEvents.find(e => e.type === 'Entrenamiento') || DEMO_CALENDAR_EVENTS[0];
+  const nextMatch = activeEvents.find(e => e.type === 'Partido' || e.type === 'Torneo') || DEMO_CALENDAR_EVENTS[1];
+
+  const handleSelectAthlete = (athlete: typeof DEMO_ATHLETES[0]) => {
+    setFamilyFilter({ mode: 'child', childId: athlete.id });
+    if (athlete.sport === 'Fútbol' || athlete.sport === 'Fútbol 11' || athlete.sport === 'Fútbol 8') setSport('futbol');
     if (athlete.sport === 'Baloncesto') setSport('baloncesto');
     if (athlete.sport === 'Futsal') setSport('futbol_sala');
   };
 
-  const currentMatchRecord = matchStatusMap[selectedAthleteId];
+  const currentMatchRecord = matchStatusMap[activeAthleteId];
   const currentMatchStatus = currentMatchRecord?.status;
 
   // Confirmación binaria: ASISTIRÁ
   const handleConfirmAttendance = () => {
     setMatchStatusMap(prev => ({
       ...prev,
-      [selectedAthleteId]: { status: 'Confirmado' }
+      [activeAthleteId]: { status: 'Confirmado' }
     }));
   };
 
@@ -120,7 +318,7 @@ export function FamiliaDashboard() {
 
     setMatchStatusMap(prev => ({
       ...prev,
-      [selectedAthleteId]: { 
+      [activeAthleteId]: { 
         status: 'Ausente', 
         reason: finalReason, 
         detail: optionalObservations.trim() 
@@ -160,8 +358,9 @@ export function FamiliaDashboard() {
           style={styles.heroBannerGradient}
         >
           <View style={styles.heroHeaderContent}>
-            <Text style={styles.heroGreetingText}>Buenas tardes, familia García 👋</Text>
-            <Text style={styles.heroSubText}>Todo preparado para la semana de {activeAthlete.name.split(' ')[0]}</Text>
+            <Text style={styles.heroGreetingText}>¡Buenas tardes!</Text>
+            <Text style={[styles.heroGreetingText, { fontSize: 24, marginTop: 2 }]}>Familia Martínez 👋</Text>
+            <Text style={styles.heroSubText}>Vamos a por un gran día.</Text>
             <View style={styles.heroTeamTagRow}>
               <Image source={{ uri: JESUITAS_SHIELD_URI }} style={{ width: 14, height: 16, marginRight: 6 }} />
               <Text style={styles.heroTeamTagTxt}>{activeAthlete.team} · CD Jesuitas</Text>
@@ -170,47 +369,92 @@ export function FamiliaDashboard() {
         </LinearGradient>
       </View>
 
-      {/* 3. SELECTOR DE DEPORTISTAS CON CAMISETAS TÁCTICAS Y DORSALES (EXACTO AL MOCKUP) */}
+      {/* 3. SELECTOR DE DEPORTISTAS CON CAMISETA 3D VISTA TRASERA (RÉPLICA EXACTA DEL DISEÑO DE REFERENCIA) */}
       <View style={styles.sectionHeaderRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.sectionTitleTxt}>MIS DEPORTISTAS</Text>
-          <Text style={styles.sectionSubTitleTxt}>Selecciona a tu hijo</Text>
-        </View>
+        <Text style={styles.sectionTitleTxt}>MIS DEPORTISTAS</Text>
+        <TouchableOpacity style={styles.manageKidsHeaderBtn} onPress={() => router.push('/familias' as any)}>
+          <Text style={styles.manageKidsHeaderBtnTxt}>Gestionar hijos</Text>
+          <Ionicons name="settings-outline" size={13} color={colors.skyPrimary} />
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.athletesGridRow}>
+      {/* Selector de Modo Familiar vs Hijo Individual */}
+      <View style={{ marginBottom: 12, flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+        <TouchableOpacity
+          style={[
+            styles.familyModePillBtn,
+            familyFilter.mode === 'all' && styles.familyModePillBtnActive
+          ]}
+          onPress={() => setFamilyFilter({ mode: 'all' })}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="people" size={14} color={familyFilter.mode === 'all' ? colors.navyDark : colors.skyPrimary} />
+          <Text style={[
+            styles.familyModePillBtnTxt,
+            familyFilter.mode === 'all' && styles.familyModePillBtnTxtActive
+          ]}>
+            👨‍👩‍👧‍👦 Todos los hijos (Vista combinada)
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={[styles.athletesGridRow, !isDesktop && styles.athletesGridRowMobile]}>
         {DEMO_ATHLETES.map((athlete) => {
-          const isSelected = athlete.id === selectedAthleteId;
+          const isSelected = familyFilter.mode === 'child' && familyFilter.childId === athlete.id;
+          const rawDorsal = athlete.dorsal;
+          const dorsalVal = typeof rawDorsal === 'number' ? rawDorsal : (rawDorsal ? Number(rawDorsal) : 0);
+          const jerseySource = DORSAL_3D_IMAGES[dorsalVal] || CAMISETA_TRASERA_3D_LIMPIA;
           return (
             <TouchableOpacity
               key={athlete.id}
-              activeOpacity={0.85}
-              style={[styles.athleteCard, isSelected && styles.athleteCardActive]}
+              activeOpacity={0.88}
+              style={[styles.athleteCardRef, isSelected && styles.athleteCardRefActive]}
               onPress={() => handleSelectAthlete(athlete)}
             >
-              {/* Camiseta Azul 3D con Dorsal */}
-              <View style={[styles.jerseyBox, isSelected && styles.jerseyBoxActive]}>
-                <Ionicons name="shirt" size={32} color={isSelected ? colors.skyPrimary : 'rgba(79, 195, 247, 0.5)'} />
-                <Text style={[styles.jerseyDorsalTxt, isSelected && styles.jerseyDorsalTxtActive]}>{athlete.dorsal}</Text>
+              {/* Lado Izquierdo: Camiseta 3D Oficial con dorsal 3D correspondiente */}
+              <View style={styles.jersey3DContainer}>
+                <Image 
+                  source={jerseySource}
+                  style={styles.jersey3DImg}
+                  resizeMode="contain"
+                />
+                {!DORSAL_3D_IMAGES[dorsalVal] && dorsalVal > 0 && (
+                  <Text style={[
+                    styles.jerseyIntegratedDorsalTxt,
+                    String(dorsalVal).length >= 2 && styles.jerseyIntegratedDorsalTxtTwoDigits
+                  ]}>
+                    {dorsalVal}
+                  </Text>
+                )}
               </View>
 
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.athleteName, isSelected && styles.athleteNameActive]}>{athlete.name}</Text>
-                <Text style={styles.athleteDetailsTxt}>{athlete.team} · {athlete.sport}</Text>
-                <Text style={styles.athleteDorsalSub}>#{athlete.dorsal}</Text>
-              </View>
-
-              {isSelected && (
-                <View style={styles.activeCheckBadgeCircle}>
-                  <Ionicons name="checkmark" size={14} color={colors.navyDark} />
+              {/* Lado Derecho: Avatar, Nombre, Equipo, Deporte y Botón de Estado */}
+              <View style={styles.athleteRightCol}>
+                <Image source={{ uri: athlete.avatar }} style={styles.athleteAvatarImg} />
+                <Text style={[styles.athleteNameTxt, isSelected && styles.athleteNameTxtActive]}>{athlete.name}</Text>
+                <Text style={styles.athleteTeamTxt}>{athlete.team}</Text>
+                <View style={styles.athleteSportRow}>
+                  <Ionicons name="football-outline" size={12} color={colors.skyPrimary} />
+                  <Text style={styles.athleteSportTxt}>{athlete.sport}</Text>
                 </View>
-              )}
+
+                {/* Botón Pill de Estado (Activo / Seleccionar) */}
+                <TouchableOpacity 
+                  style={[styles.selectActionPill, isSelected ? styles.selectActionPillActive : styles.selectActionPillOutline]}
+                  onPress={() => handleSelectAthlete(athlete)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.selectActionPillTxt, isSelected ? styles.selectActionPillTxtActive : styles.selectActionPillTxtOutline]}>
+                    {isSelected ? 'Activo' : 'Seleccionar'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </TouchableOpacity>
           );
         })}
       </View>
 
-      {/* 4. ENTRENAMIENTOS DE ESTA SEMANA (BLOQUE HERO CON IMAGEN DE CAMPO ILUMINADO EN LA MITAD DERECHA) */}
+      {/* 4. ENTRENAMIENTOS DE ESTA SEMANA (DINÁMICO CON FILTRO FAMILIAR) */}
       <View style={styles.trainingHeroCard}>
         <View style={[styles.trainingHeroFlexRow, isDesktop && { flexDirection: 'row' }]}>
           
@@ -218,22 +462,22 @@ export function FamiliaDashboard() {
           <View style={[styles.trainingHeroLeft, isDesktop && { flex: 1 }]}>
             <View style={styles.trainingHeaderBadgeRow}>
               <Ionicons name="calendar-outline" size={16} color={colors.skyPrimary} />
-              <Text style={styles.trainingHeaderTitle}>1. ENTRENAMIENTO DE ESTA SEMANA</Text>
+              <Text style={styles.trainingHeaderTitle}>1. ENTRENAMIENTO · {familyFilter.mode === 'all' ? 'TODOS LOS HIJOS' : activeAthlete.name.toUpperCase()}</Text>
               <View style={styles.tomorrowBadge}>
-                <Text style={styles.tomorrowBadgeTxt}>MAÑANA</Text>
+                <Text style={styles.tomorrowBadgeTxt}>{nextTraining.badgeTag}</Text>
               </View>
             </View>
 
-            <Text style={styles.trainingMainTimeTxt}>Jueves 8 de Mayo · 17:30 - 19:00</Text>
+            <Text style={styles.trainingMainTimeTxt}>{nextTraining.date} · {nextTraining.time}</Text>
 
             <View style={styles.trainingDetailsList}>
               <View style={styles.trainingDetailRow}>
                 <Ionicons name="location-outline" size={15} color={colors.skyPrimary} />
-                <Text style={styles.trainingDetailTxt}>Campo 2 · Césped Artificial</Text>
+                <Text style={styles.trainingDetailTxt}>{nextTraining.location}</Text>
               </View>
               <View style={styles.trainingDetailRow}>
                 <Ionicons name="people-outline" size={15} color={colors.skyPrimary} />
-                <Text style={styles.trainingDetailTxt}>Entrenamiento de equipo</Text>
+                <Text style={styles.trainingDetailTxt}>{nextTraining.title}</Text>
               </View>
             </View>
 
@@ -256,14 +500,14 @@ export function FamiliaDashboard() {
         </View>
       </View>
 
-      {/* 5. PRÓXIMO PARTIDO COMO COMPOSICIÓN DEPORTIVA DE ALTA FIDELIDAD CON ESCUDOS ENFRENTADOS Y VS DORADO */}
+      {/* 5. PRÓXIMO PARTIDO / EVENTO (DINÁMICO CON FILTRO FAMILIAR) */}
       <View style={styles.matchHeroCard}>
         <LinearGradient colors={['#091B3E', '#06132D']} style={styles.matchCardGradient}>
           
           <View style={styles.matchTopBadgeRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Ionicons name="trophy-outline" size={16} color={colors.accentGold} />
-              <Text style={styles.matchSectionTitleTxt}>2. PRÓXIMO PARTIDO</Text>
+              <Text style={styles.matchSectionTitleTxt}>2. PRÓXIMO PARTIDO · {familyFilter.mode === 'all' ? 'TODOS LOS HIJOS' : activeAthlete.name.toUpperCase()}</Text>
             </View>
             <View style={[
               styles.statusPill, 
@@ -277,7 +521,7 @@ export function FamiliaDashboard() {
             </View>
           </View>
 
-          {/* COMPOSICIÓN DE ESCUDOS ENFRENTADOS (CD JESUITAS vs LEVANTE UD B) */}
+          {/* COMPOSICIÓN DE ESCUDOS Y TITULAR DEL ENCUENTRO */}
           <View style={[styles.matchFacingRow, isDesktop && styles.matchFacingRowDesktop]}>
             <View style={styles.teamColLeft}>
               <Image source={{ uri: JESUITAS_SHIELD_URI }} style={styles.teamMatchShield} />
@@ -286,12 +530,12 @@ export function FamiliaDashboard() {
 
             <View style={styles.versusCenterCol}>
               <Text style={styles.versusGoldenTxt}>VS</Text>
-              <Text style={styles.matchDateGoldenTxt}>📅 Sábado 10 de Mayo · 11:00</Text>
+              <Text style={styles.matchDateGoldenTxt}>📅 {nextMatch.date} · {nextMatch.time}</Text>
             </View>
 
             <View style={styles.teamColRight}>
               <Image source={{ uri: LEVANTE_SHIELD_URI }} style={styles.teamMatchShield} />
-              <Text style={styles.teamMatchNameTxt}>Levante UD B</Text>
+              <Text style={styles.teamMatchNameTxt}>{nextMatch.title.includes('vs') ? nextMatch.title.split('vs')[1].trim() : nextMatch.team}</Text>
             </View>
           </View>
 
@@ -394,30 +638,70 @@ export function FamiliaDashboard() {
       {/* 6. GRID DE 3 COLUMNAS INFERIORES EN ESCRITORIO (ENTRENAMIENTOS, PENDIENTES, ÚLTIMO PARTIDO) */}
       <View style={[styles.bottomGrid3Cols, isDesktop && { flexDirection: 'row' }]}>
         
-        {/* Columna 1: Entrenamientos de esta semana */}
-        <View style={[styles.bottomColCard, isDesktop && { flex: 1 }]}>
-          <Text style={styles.bottomColTitleTxt}>3. ENTRENAMIENTOS DE ESTA SEMANA</Text>
+        {/* Columna 1: CALENDARIO DEPORTIVO FAMILIAR */}
+        <View style={[styles.bottomColCard, isDesktop && { flex: 1.2 }]}>
+          <Text style={styles.bottomColTitleTxt}>3. CALENDARIO</Text>
+
+          {/* Selector de Modo: Todos los Hijos vs Hijo Seleccionado */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10, marginTop: 4 }}>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              <TouchableOpacity
+                style={[
+                  styles.calendarFilterPill,
+                  familyFilter.mode === 'all' && styles.calendarFilterPillActive
+                ]}
+                onPress={() => setFamilyFilter({ mode: 'all' })}
+                activeOpacity={0.8}
+              >
+                <Text style={[
+                  styles.calendarFilterPillTxt,
+                  familyFilter.mode === 'all' && styles.calendarFilterPillTxtActive
+                ]}>
+                  👨‍👩‍👧‍👦 Todos los hijos
+                </Text>
+              </TouchableOpacity>
+
+              {DEMO_ATHLETES.map((ath) => {
+                const isSel = familyFilter.mode === 'child' && familyFilter.childId === ath.id;
+                return (
+                  <TouchableOpacity
+                    key={ath.id}
+                    style={[
+                      styles.calendarFilterPill,
+                      isSel && styles.calendarFilterPillActive
+                    ]}
+                    onPress={() => setFamilyFilter({ mode: 'child', childId: ath.id })}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[
+                      styles.calendarFilterPillTxt,
+                      isSel && styles.calendarFilterPillTxtActive
+                    ]}>
+                      {ath.name} ({ath.team})
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </ScrollView>
           
           <View style={styles.bottomColContentList}>
-            <View style={styles.bottomTrainingItemRow}>
-              <Ionicons name="calendar-outline" size={14} color={colors.skyPrimary} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.bottomTrainingDateTxt}>Martes 6 de Mayo <Text style={{color: colors.textMuted}}>17:30 - 19:00</Text></Text>
-                <Text style={styles.bottomTrainingSubTxt}>• Campo 2 · Césped Artificial</Text>
+            {activeEvents.map((evt) => (
+              <View key={evt.id} style={styles.bottomTrainingItemRow}>
+                <Ionicons 
+                  name={evt.type === 'Partido' ? 'football-outline' : evt.type === 'Torneo' ? 'trophy-outline' : evt.type === 'Convocatoria' ? 'clipboard-outline' : 'calendar-outline'} 
+                  size={15} 
+                  color={evt.type === 'Partido' ? colors.accentGold : evt.type === 'Torneo' ? colors.skyGlow : colors.skyPrimary} 
+                />
+                <View style={{ flex: 1, paddingRight: 4 }}>
+                  <Text style={styles.bottomTrainingDateTxt} numberOfLines={1}>{evt.title}</Text>
+                  <Text style={styles.bottomTrainingSubTxt}>{evt.date} · {evt.time}</Text>
+                </View>
+                <View style={styles.childEventBadgeBox}>
+                  <Text style={styles.childEventBadgeTxt}>{evt.badgeTag}</Text>
+                </View>
               </View>
-              <Ionicons name="checkmark-circle-outline" size={16} color={colors.accentGreen} />
-            </View>
-
-            <View style={styles.bottomTrainingItemRow}>
-              <Ionicons name="calendar-outline" size={14} color={colors.skyPrimary} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.bottomTrainingDateTxt}>Jueves 8 de Mayo <Text style={{color: colors.textMuted}}>17:30 - 19:00</Text></Text>
-                <Text style={styles.bottomTrainingSubTxt}>• Campo 2 · Césped Artificial</Text>
-              </View>
-              <View style={styles.nextTagSmall}>
-                <Text style={styles.nextTagSmallTxt}>PRÓXIMO</Text>
-              </View>
-            </View>
+            ))}
           </View>
 
           <TouchableOpacity style={styles.bottomColLinkRow} activeOpacity={0.8} onPress={() => router.push('/(drawer)/calendario')}>
@@ -694,31 +978,128 @@ const styles = StyleSheet.create({
   heroTeamTagRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' },
   heroTeamTagTxt: { color: colors.goldLight, fontSize: 11, fontWeight: '800' },
 
-  sectionHeaderRow: { marginBottom: 6 },
+  sectionHeaderRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    marginBottom: 10 
+  },
   sectionTitleTxt: { fontSize: 11, fontWeight: '900', color: colors.skyPrimary, letterSpacing: 1.5 },
   sectionSubTitleTxt: { fontSize: 11, color: colors.textMuted, marginTop: 1 },
+  manageKidsHeaderBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  manageKidsHeaderBtnTxt: { color: colors.skyPrimary, fontSize: 11, fontWeight: '700' },
 
-  // SELECTOR DE DEPORTISTAS CON CAMISETAS TÁCTICAS
-  athletesGridRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  athleteCard: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: colors.navyCard, padding: 10, borderRadius: 14,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)'
+  // SELECTOR DE DEPORTISTAS RÉPLICA DE CAPTURA DE REFERENCIA
+  athletesGridRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  athletesGridRowMobile: { flexDirection: 'column' },
+  athleteCardRef: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(9, 27, 62, 0.85)',
+    borderRadius: 20,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  athleteCardActive: { borderColor: colors.skyPrimary, backgroundColor: colors.navyCardHighlight },
-  jerseyBox: {
-    width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(79, 195, 247, 0.1)',
-    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(79, 195, 247, 0.3)',
-    position: 'relative'
+  athleteCardRefActive: {
+    borderColor: colors.skyPrimary,
+    backgroundColor: 'rgba(14, 41, 90, 0.95)',
+    shadowColor: colors.skyPrimary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
-  jerseyBoxActive: { backgroundColor: 'rgba(79, 195, 247, 0.2)', borderColor: colors.skyPrimary },
-  jerseyDorsalTxt: { position: 'absolute', color: colors.skyPrimary, fontSize: 10, fontWeight: '900' },
-  jerseyDorsalTxtActive: { color: colors.white },
-  athleteName: { color: colors.white, fontSize: 13, fontWeight: '800' },
-  athleteNameActive: { color: colors.skyGlow },
-  athleteDetailsTxt: { color: colors.textMuted, fontSize: 10, fontWeight: '600' },
-  athleteDorsalSub: { color: colors.skyPrimary, fontSize: 10, fontWeight: '800' },
-  activeCheckBadgeCircle: { width: 20, height: 20, borderRadius: 10, backgroundColor: colors.skyPrimary, justifyContent: 'center', alignItems: 'center' },
+  jersey3DContainer: {
+    width: 90,
+    height: 120,
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  jersey3DImg: {
+    width: '100%',
+    height: '100%',
+  },
+  jerseyIntegratedDorsalTxt: {
+    position: 'absolute',
+    top: '25%',
+    color: '#071A3D',
+    fontSize: 26,
+    fontWeight: '900',
+    textAlign: 'center',
+    letterSpacing: -0.5,
+  },
+  jerseyIntegratedDorsalTxtTwoDigits: {
+    fontSize: 23,
+    letterSpacing: -1,
+  },
+  athleteRightCol: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: 6,
+  },
+  athleteAvatarImg: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    marginBottom: 4,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  athleteNameTxt: {
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: '900',
+    marginBottom: 1,
+  },
+  athleteNameTxtActive: {
+    color: colors.skyGlow,
+  },
+  athleteTeamTxt: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  athleteSportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 8,
+  },
+  athleteSportTxt: {
+    color: colors.textMuted,
+    fontSize: 10.5,
+    fontWeight: '600',
+  },
+  selectActionPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 5,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 84,
+  },
+  selectActionPillActive: {
+    backgroundColor: colors.skyPrimary,
+  },
+  selectActionPillOutline: {
+    borderWidth: 1,
+    borderColor: colors.skyPrimary,
+    backgroundColor: 'transparent',
+  },
+  selectActionPillTxt: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  selectActionPillTxtActive: {
+    color: colors.navyDark,
+  },
+  selectActionPillTxtOutline: {
+    color: colors.skyPrimary,
+  },
 
   // 1. ENTRENAMIENTOS DE ESTA SEMANA (BLOQUE HERO CON IMAGEN DE CAMPO ILUMINADO EN MITAD DERECHA)
   trainingHeroCard: { borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: colors.borderGlow, backgroundColor: colors.navyCard, marginBottom: 14 },
@@ -861,5 +1242,66 @@ const styles = StyleSheet.create({
   modalBtnCancelText: { color: colors.white, fontWeight: '800', fontSize: 11 },
   modalBtnSend: { flex: 1, paddingVertical: 11, borderRadius: 10, backgroundColor: colors.accentRed, alignItems: 'center' },
   modalBtnDisabled: { opacity: 0.4 },
-  modalBtnSendText: { color: colors.white, fontWeight: '900', fontSize: 11 }
+  modalBtnSendText: { color: colors.white, fontWeight: '900', fontSize: 11 },
+
+  // CALENDARIO FAMILIAR STYLES
+  calendarFilterPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  calendarFilterPillActive: {
+    backgroundColor: colors.skyPrimary,
+    borderColor: colors.skyPrimary,
+  },
+  calendarFilterPillTxt: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.textMuted,
+  },
+  calendarFilterPillTxtActive: {
+    color: colors.navyDark,
+    fontWeight: '900',
+  },
+  childEventBadgeBox: {
+    backgroundColor: 'rgba(79, 195, 247, 0.12)',
+    borderWidth: 1,
+    borderColor: colors.borderGlow,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    alignSelf: 'center',
+  },
+  childEventBadgeTxt: {
+    color: colors.skyGlow,
+    fontSize: 9,
+    fontWeight: '800',
+  },
+
+  familyModePillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: 'rgba(79, 195, 247, 0.12)',
+    borderWidth: 1,
+    borderColor: colors.borderGlow,
+  },
+  familyModePillBtnActive: {
+    backgroundColor: colors.skyPrimary,
+    borderColor: colors.skyPrimary,
+  },
+  familyModePillBtnTxt: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.skyPrimary,
+  },
+  familyModePillBtnTxtActive: {
+    color: colors.navyDark,
+  },
 });

@@ -6,6 +6,9 @@ import { useSport } from '../../context/SportContext';
 import { useAuth } from '../../context/AuthContext';
 import { useRole } from '../../context/RoleContext';
 
+import { FEATURE_FLAGS } from '../../config/featureFlags';
+import { resolveNavigationForIdentity } from '../../services/navigationResolver';
+
 const clubColors = {
   navy: '#0B1F4D',
   skyPrimary: '#4FC3F7',
@@ -80,7 +83,7 @@ import { useDemoNavigation } from '../../context/DemoNavigationContext';
 export function CustomDrawerContent(props: any) {
   const router = useRouter();
   const { selectedDemoProfile, resetDemoFlow } = useDemoNavigation();
-  const { activeContext, user, activePlayerId, linkedPlayers, assignedTeams, clearProfile } = useAuth();
+  const { activeContext, user, resolvedIdentity, activePlayerId, linkedPlayers, assignedTeams, clearProfile } = useAuth();
   const { role } = useRole();
   const { sport, setSport } = useSport();
 

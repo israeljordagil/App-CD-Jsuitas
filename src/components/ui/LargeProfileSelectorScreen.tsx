@@ -74,7 +74,7 @@ interface LargeProfileSelectorScreenProps {
 }
 
 export function LargeProfileSelectorScreen({ onSelectProfile }: LargeProfileSelectorScreenProps) {
-  const { user, switchContext } = useAuth();
+  const { user, resolvedIdentity, switchContext, setActiveProfileFromCanonical } = useAuth();
   const { width: screenWidth } = useWindowDimensions();
   const isDesktop = screenWidth >= 900;
   const isTablet = screenWidth >= 600 && screenWidth < 900;
@@ -87,7 +87,11 @@ export function LargeProfileSelectorScreen({ onSelectProfile }: LargeProfileSele
   const [failedImageIds, setFailedImageIds] = useState<Record<string, boolean>>({});
 
   const handleSelect = (profileId: ActiveContextType) => {
-    switchContext(profileId);
+    if (setActiveProfileFromCanonical) {
+      setActiveProfileFromCanonical(profileId as AppRole, true);
+    } else {
+      switchContext(profileId);
+    }
     onSelectProfile(profileId);
   };
 
@@ -140,9 +144,15 @@ export function LargeProfileSelectorScreen({ onSelectProfile }: LargeProfileSele
     },
   ];
 
-  // Filtrar para que cada usuario solo vea los perfiles autorizados en su cuenta (o todos si es admin/demo)
+  // M7: Filtrar usando perfiles canónicos disponibles si el Resolver está activo; fallback legacy en otro caso
+  const canonicalAvailable = resolvedIdentity?.availableProfiles;
   const userRoles = user?.roles || [];
+  
   const visibleProfiles = PROFILES.filter(profile => {
+    if (canonicalAvailable && canonicalAvailable.length > 0) {
+      if (canonicalAvailable.includes('ADMIN_GENERAL')) return true;
+      return canonicalAvailable.includes(profile.id as AppRole);
+    }
     if (!userRoles || userRoles.length === 0) return true;
     if (userRoles.includes('ADMIN_GENERAL') || userRoles.includes('DIR_DEPORTIVA')) return true;
     return userRoles.includes(profile.id as AppRole);
